@@ -1,0 +1,2 @@
+CONFIG_PACKAGE_luci-app-camera=y
+CONFIG_PACKAGE_aws-kvs=y

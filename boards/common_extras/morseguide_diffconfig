@@ -1,0 +1,2 @@
+# Heavier morse packages that make the user experience better
+CONFIG_PACKAGE_luci-app-morseguide=y

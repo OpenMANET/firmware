@@ -1,0 +1,27 @@
+# # Camera setup for RPI only
+
+# # ONVIF server
+# # (this will pull in libcamera/mediamtx to provide the stream)
+# CONFIG_PACKAGE_camera-onvif-server=y
+
+# # Video encode/decode (for h264 hardware encode via libcamera)
+# CONFIG_PACKAGE_kmod-video-core=y
+# CONFIG_PACKAGE_kmod-video-codec-bcm2835=y
+
+# # Actual camera driver
+# CONFIG_PACKAGE_kmod-camera-bcm2835-unicam=y
+
+# # Utils
+# CONFIG_PACKAGE_v4l-utils=y
+# CONFIG_PACKAGE_libcamera-utils=y
+
+# # Supported sensors
+# CONFIG_PACKAGE_kmod-video-ov5647=y  # Camera V1
+# CONFIG_PACKAGE_kmod-video-imx477=y  # HQ Camera
+# CONFIG_PACKAGE_kmod-video-imx219=y  # Camera V2
+# CONFIG_PACKAGE_kmod-video-imx708=y  # Camera V3
+
+# # Generic UVC cameras
+# # Note that currently the ONVIF server doesn't know how to
+# # advertise/configure these streams.
+# CONFIG_PACKAGE_kmod-video-uvc=y

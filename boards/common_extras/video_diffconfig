@@ -1,0 +1,28 @@
+# Useful things for video encode/decode.
+# Mostly targeting RPI (since it has sufficient power,
+# and hardware encode/decode via v4l).
+
+# ffmpeg
+CONFIG_PACKAGE_ffmpeg=y
+# ffmpeg won't build without specifying this (maybe upstream dep error)
+CONFIG_PACKAGE_libopus=y
+# Include _software_ h264 encode/decode.
+# NB: RPI4 has hardware encode/decode via h264_v4l2m2m, so this is not required.
+CONFIG_BUILD_PATENTED=y
+CONFIG_PACKAGE_libx264=y
+
+# gstreamer
+CONFIG_PACKAGE_gstreamer1-libs=y
+CONFIG_PACKAGE_gstreamer1-utils=y
+CONFIG_PACKAGE_gstreamer1-plugins-base=y
+CONFIG_PACKAGE_gstreamer1-plugins-good=y
+CONFIG_PACKAGE_gst1-mod-video4linux2=y
+CONFIG_PACKAGE_gst1-mod-udp=y
+CONFIG_PACKAGE_gst1-mod-rtsp=y
+CONFIG_PACKAGE_gst1-mod-jpeg=y
+CONFIG_PACKAGE_gst1-mod-videotestsrc=y
+CONFIG_PACKAGE_gst1-mod-videoconvert=y
+CONFIG_PACKAGE_gst1-mod-rtspclientsink=y
+
+# v4l
+CONFIG_PACKAGE_v4l-utils=y

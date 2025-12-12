@@ -1,0 +1,61 @@
+################################################################################
+# Bootloader configuration - distroconfig.txt
+################################################################################
+
+# Restore PL011 (ttyAMA0) to GPIOs 14 & 15, instead of Mini UART (ttyS0).
+# Mini UART is disabled by default unless "enable_uart=1" is specified,
+#  which changes the core frequency to a fixed value and impacts performance.
+# See https://www.raspberrypi.com/documentation/computers/configuration.html#mini-uart-and-cpu-core-frequency
+[pi0w]
+dtoverlay=disable-bt
+[pi3]
+dtoverlay=disable-bt
+[pi4]
+dtoverlay=miniuart-bt
+[cm4]
+# This overlay is used to allow m.2 wifi cards
+dtoverlay=pcie-32bit-dma
+# Enable USB ports on carrier cards
+dtoverlay=dwc2,dr_mode=host
+
+[all]
+# Disable overscan assuming the display supports displaying the full resolution
+# If the text shown on the screen disappears off the edge, comment this out
+disable_overscan=1
+
+# How much memory in MB to assign to the GPU on Pi models having
+# 256, 512 or 1024 MB total memory
+gpu_mem_256=128
+gpu_mem_512=128
+gpu_mem_1024=128
+
+# enable uart
+uart_enable=1
+
+#enable sdio
+dtoverlay=sdio,poll_once=on
+
+#setup sub 50MHz SDIO clock
+dtparam=sdio_overclock=42
+
+#enable uart5
+dtoverlay=uart5
+
+#enable morse gpio configuration
+dtoverlay=mm_wlan
+
+#adds morse-ps device tree
+dtoverlay=morse-ps
+
+#enable spi
+dtparam=spi=on
+
+#disable SD activity LED by default
+#(we configure it for HaLow later in userspace)
+dtparam=act_led_trigger=none
+
+#adds ramoops device tree overlay
+dtoverlay=ramoops
+
+# automatically load sensor dtoverlays
+camera_auto_detect=1

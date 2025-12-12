@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+sourcename="$1"; shift
+
+for pkg in "$@"; do
+	case "$pkg" in
+		*/"${sourcename}_"*.ipk)
+			rm -vf "$pkg"
+		;;
+		*)
+			tar -Ozxf "$pkg" ./control.tar.gz 2>/dev/null | tar -Ozxf - ./control 2>/dev/null | {
+				packagename=
+				abiversion=
+				while read field value; do
+					case "$field" in
+						Package:) packagename="$value";;
+						ABIVersion:) abiversion="$value";;
+					esac
+				done
+				[ -n "$abiversion" ] && packagename="${packagename%%$abiversion}"
+				[ "$packagename" = "$sourcename" ] && rm -vf "$pkg"
+			}
+		;;
+	esac
+done
+
+exit 0

@@ -1,0 +1,29 @@
+# Performance evaluation
+CONFIG_PACKAGE_luci-app-statistics=y
+CONFIG_PACKAGE_collectd-mod-conntrack=y
+CONFIG_PACKAGE_collectd-mod-ipstatistics=y
+CONFIG_PACKAGE_collectd-mod-ping=y
+CONFIG_PACKAGE_arp-scan=y
+CONFIG_PACKAGE_arp-scan-database=y
+CONFIG_IPERF_ENABLE_MULTICAST=y
+CONFIG_PACKAGE_iperf3=y
+CONFIG_PACKAGE_iperf=y
+CONFIG_PACKAGE_iptraf-ng=y
+CONFIG_PACKAGE_tcpdump=y
+CONFIG_PACKAGE_fping=y
+CONFIG_PACKAGE_pciutils=y
+
+# General usefulness
+CONFIG_PACKAGE_luci-app-ttyd=y
+CONFIG_PACKAGE_tmux=y
+CONFIG_PACKAGE_rsync=y
+CONFIG_PACKAGE_openssh-sftp-server=y
+CONFIG_PACKAGE_picocom=y
+CONFIG_PACKAGE_nano-full=y
+
+# LuCI packages
+CONFIG_PACKAGE_luci-app-morseupgrade=y
+
+# Wifi
+CONFIG_PACKAGE_wifi-openmanet=y
+
