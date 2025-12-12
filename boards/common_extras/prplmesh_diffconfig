@@ -1,3 +1,0 @@
-CONFIG_PACKAGE_prplmesh=y
-CONFIG_PACKAGE_arp-scan=y
-CONFIG_PACKAGE_arp-scan-database=y

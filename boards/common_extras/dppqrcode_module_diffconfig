@@ -1,3 +1,0 @@
-CONFIG_PACKAGE_dpp-key-recovery=y
-CONFIG_PACKAGE_dppd-creds-dummy=m
-CONFIG_PACKAGE_morse-dppd=m

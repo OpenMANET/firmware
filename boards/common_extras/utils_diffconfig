@@ -24,6 +24,3 @@ CONFIG_PACKAGE_nano-full=y
 # LuCI packages
 CONFIG_PACKAGE_luci-app-morseupgrade=y
 
-# Wifi
-CONFIG_PACKAGE_wifi-openmanet=y
-
