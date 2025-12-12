@@ -1,0 +1,81 @@
+From 0f2fec4f2965802fe5ff913284cf13a3cee678ac Mon Sep 17 00:00:00 2001
+From: Tim Harvey <tharvey@gateworks.com>
+Date: Tue, 22 Jul 2025 09:05:02 -0700
+Subject: [PATCH] imx: kernel: backport patch for gsc-hwmon
+
+Backport an upstream patch that fixes the fan temperature setpoints for
+the Gateworks System Controller.
+
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ ...-fix-fan-pwm-setpoint-show-functions.patch | 59 +++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 target/linux/imx/patches-6.6/507-6.17-hwmon-gsc-hwmon-fix-fan-pwm-setpoint-show-functions.patch
+
+diff --git a/target/linux/imx/patches-6.6/507-6.17-hwmon-gsc-hwmon-fix-fan-pwm-setpoint-show-functions.patch b/target/linux/imx/patches-6.6/507-6.17-hwmon-gsc-hwmon-fix-fan-pwm-setpoint-show-functions.patch
+new file mode 100644
+index 0000000000..0484047b4f
+--- /dev/null
++++ b/target/linux/imx/patches-6.6/507-6.17-hwmon-gsc-hwmon-fix-fan-pwm-setpoint-show-functions.patch
+@@ -0,0 +1,59 @@
++From 21fee7e0358687a416c10dd5640339d518acc2a0 Mon Sep 17 00:00:00 2001
++From: Tim Harvey <tharvey@gateworks.com>
++Date: Fri, 18 Jul 2025 13:02:59 -0700
++Subject: [PATCH] hwmon: (gsc-hwmon) fix fan pwm setpoint show functions
++
++The Linux hwmon sysfs API values for pwmX_auto_pointY_pwm represent an
++integer value between 0 (0%) to 255 (100%) and the pwmX_auto_pointY_temp
++represent millidegrees Celcius.
++
++Commit a6d80df47ee2 ("hwmon: (gsc-hwmon) fix fan pwm temperature
++scaling") properly addressed the incorrect scaling in the
++pwm_auto_point_temp_store implementation but erroneously scaled
++the pwm_auto_point_pwm_show (pwm value) instead of the
++pwm_auto_point_temp_show (temp value) resulting in:
++ # cat /sys/class/hwmon/hwmon0/pwm1_auto_point6_pwm
++ 25500
++ # cat /sys/class/hwmon/hwmon0/pwm1_auto_point6_temp
++ 4500
++
++Fix the scaling of these attributes:
++ # cat /sys/class/hwmon/hwmon0/pwm1_auto_point6_pwm
++ 255
++ # cat /sys/class/hwmon/hwmon0/pwm1_auto_point6_temp
++ 45000
++
++Fixes: a6d80df47ee2 ("hwmon: (gsc-hwmon) fix fan pwm temperature scaling")
++Cc: stable@vger.kernel.org
++Signed-off-by: Tim Harvey <tharvey@gateworks.com>
++Link: https://lore.kernel.org/r/20250718200259.1840792-1-tharvey@gateworks.com
++Signed-off-by: Guenter Roeck <linux@roeck-us.net>
++---
++ drivers/hwmon/gsc-hwmon.c | 4 ++--
++ 1 file changed, 2 insertions(+), 2 deletions(-)
++
++diff --git a/drivers/hwmon/gsc-hwmon.c b/drivers/hwmon/gsc-hwmon.c
++index 1501ceb551e79..23238a80c000d 100644
++--- a/drivers/hwmon/gsc-hwmon.c
+++++ b/drivers/hwmon/gsc-hwmon.c
++@@ -65,7 +65,7 @@ static ssize_t pwm_auto_point_temp_show(struct device *dev,
++ 		return ret;
++ 
++ 	ret = regs[0] | regs[1] << 8;
++-	return sprintf(buf, "%d\n", ret * 10);
+++	return sprintf(buf, "%d\n", ret * 100);
++ }
++ 
++ static ssize_t pwm_auto_point_temp_store(struct device *dev,
++@@ -100,7 +100,7 @@ static ssize_t pwm_auto_point_pwm_show(struct device *dev,
++ {
++ 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
++ 
++-	return sprintf(buf, "%d\n", 255 * (50 + (attr->index * 10)));
+++	return sprintf(buf, "%d\n", 255 * (50 + (attr->index * 10)) / 100);
++ }
++ 
++ static SENSOR_DEVICE_ATTR_RO(pwm1_auto_point1_pwm, pwm_auto_point_pwm, 0);
++-- 
++2.34.1
++
+-- 
+2.34.1

@@ -122,15 +122,24 @@ download_toolchain(){
 }
 
 patch_feeds_packages(){
-    PATCHES_DIR="patches"
+    local BOARD_ARG="${1:-}"
 
-    # Check if the patches directory exists
-    if [ ! -d "$PATCHES_DIR" ]; then
-        echo "Error: The patches directory '$PATCHES_DIR' does not exist."
-        exit 1
+    if [ -z "$BOARD_ARG" ]; then
+        echo "No board specified, skipping patches."
+        return 0
     fi
 
-    # Iterate over all patch files in the patches directory
+    PATCHES_DIR="patches/${BOARD_ARG}"
+
+    # Check if the board-specific patches directory exists
+    if [ ! -d "$PATCHES_DIR" ]; then
+        echo "No patches directory found for board '$BOARD_ARG' at '$PATCHES_DIR', skipping patches."
+        return 0
+    fi
+
+    echo "Applying patches from: $PATCHES_DIR"
+
+    # Iterate over all patch files in the board-specific patches directory
     for patch_file in "$PATCHES_DIR"/*.patch; do
         if [ -e "$patch_file" ]; then
             echo "Applying patch: $patch_file"
@@ -208,7 +217,7 @@ fi
 if [ "${INITIALIZE}" ]; then
     ./scripts/feeds update -a
     #patch packages if necessary and re-create index files
-    patch_feeds_packages
+    patch_feeds_packages "${BOARD:-}"
     ./scripts/feeds update -i
     ./scripts/feeds install -p morse -a
     ./scripts/feeds install -a

@@ -1,0 +1,45 @@
+From 2400b806b7a18551942d40a4d39e03b3e2057e3c Mon Sep 17 00:00:00 2001
+From: Tim Harvey <tharvey@gateworks.com>
+Date: Fri, 15 Aug 2025 14:15:51 -0700
+Subject: [PATCH] kernel: add support for HCIUART_BCM
+
+Enable support for the Bluetooth Broadcom HCI protocol supporting
+various broadcom chip BT HCI devices we must enable:
+ - BT_HCIUART_BCM=y
+ - BT_HCIUART_SERDEV=y (dependency of BT_HCIUART_BCM)
+ - SERIAL_DEV_CTRL_TTYPORT=y (dependency of BT_HCIUART_BCM)
+ - SERIAL_DEV_BUS=y (dependency of SERIAL_DEV_CTRL_TTYPORT)
+ - RAVE_SP_CORE=n (selected by above and we do not need)
+
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ package/kernel/linux/modules/other.mk | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/package/kernel/linux/modules/other.mk b/package/kernel/linux/modules/other.mk
+index 7b64985fd6..7c9d247d80 100644
+--- a/package/kernel/linux/modules/other.mk
++++ b/package/kernel/linux/modules/other.mk
+@@ -43,7 +43,11 @@ define KernelPackage/bluetooth
+ 	CONFIG_BT_HCIBTUSB_MTK=y \
+ 	CONFIG_BT_HCIBTUSB_RTL=y \
+ 	CONFIG_BT_HCIUART \
+-	CONFIG_BT_HCIUART_BCM=n \
++	CONFIG_BT_HCIUART_BCM=y \
++	CONFIG_BT_HCIUART_SERDEV=y \
++	CONFIG_SERIAL_DEV_CTRL_TTYPORT=y \
++	CONFIG_SERIAL_DEV_BUS=y \
++	CONFIG_RAVE_SP_CORE=n \
+ 	CONFIG_BT_HCIUART_INTEL=n \
+ 	CONFIG_BT_HCIUART_H4 \
+ 	CONFIG_BT_HCIUART_NOKIA=n \
+@@ -56,6 +60,7 @@ define KernelPackage/bluetooth
+ 	$(LINUX_DIR)/net/bluetooth/hidp/hidp.ko \
+ 	$(LINUX_DIR)/drivers/bluetooth/hci_uart.ko \
+ 	$(LINUX_DIR)/drivers/bluetooth/btusb.ko \
++	$(LINUX_DIR)/drivers/bluetooth/btbcm.ko \
+ 	$(LINUX_DIR)/drivers/bluetooth/btintel.ko \
+ 	$(LINUX_DIR)/drivers/bluetooth/btrtl.ko \
+ 	$(LINUX_DIR)/drivers/bluetooth/btmtk.ko
+-- 
+2.34.1

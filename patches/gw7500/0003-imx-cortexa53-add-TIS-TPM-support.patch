@@ -1,0 +1,28 @@
+From 62fed928eb8e31e9fe262bc971610b4354a580ed Mon Sep 17 00:00:00 2001
+From: Tim Harvey <tharvey@gateworks.com>
+Date: Tue, 19 Aug 2025 09:58:51 -0700
+Subject: [PATCH] imx: cortexa53: add TIS TPM support
+
+Add support for SPI based TIS TPM devices found on the Gateworks venice product
+family.
+
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ target/linux/imx/cortexa53/config-default | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/target/linux/imx/cortexa53/config-default b/target/linux/imx/cortexa53/config-default
+index ac8e646da4..766aa43f3e 100644
+--- a/target/linux/imx/cortexa53/config-default
++++ b/target/linux/imx/cortexa53/config-default
+@@ -173,3 +173,8 @@ CONFIG_VT=y
+ CONFIG_VT_CONSOLE=y
+ CONFIG_VT_HW_CONSOLE_BINDING=y
+ CONFIG_ZONE_DMA32=y
++CONFIG_TCG_TPM=y
++CONFIG_TCG_TIS_CORE=y
++CONFIG_TCG_TIS_SPI=y
++CONFIG_SPI=y
++# CONFIG_TCG_TIS_SPI_CR50 is not set
+-- 
+2.34.1
