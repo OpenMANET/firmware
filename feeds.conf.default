@@ -1,4 +1,4 @@
-src-git openmanet https://github.com/OpenMANET/packages.git^6861f8c094846f8a0e6d52dcd1c8fa609434698a
+src-git openmanet https://github.com/OpenMANET/packages.git^3e46366eb4c84a18021853ca748325d2088fc12f
 src-git packages https://git.openwrt.org/feed/packages.git^f1470815f41fe199bfdafe9a91ad115bc2e91203
 src-git luci https://git.openwrt.org/project/luci.git^75e41cba5160281b2d1dca922719efef29f7ffd8
 src-git routing https://git.openwrt.org/feed/routing.git^3eb59e9471858c83891979793f1dd29cca156919
