@@ -12,6 +12,7 @@ CONFIG_PACKAGE_iptraf-ng=y
 CONFIG_PACKAGE_tcpdump=y
 CONFIG_PACKAGE_fping=y
 CONFIG_PACKAGE_pciutils=y
+CONFIG_PACKAGE_pciids=y
 
 # General usefulness
 CONFIG_PACKAGE_luci-app-ttyd=y
