@@ -1,3 +1,8 @@
+# Disable Packages not needed for OpenMANET
+CONFIG_PACKAGE_dahdi-linux=n
+CONFIG_PACKAGE_dahdi-tools=n
+CONFIG_PACKAGE_kmod-dahdi=n
+
 #
 # USB Support
 #
