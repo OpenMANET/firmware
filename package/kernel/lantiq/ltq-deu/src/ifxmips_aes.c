@@ -148,7 +148,7 @@ extern int disable_multiblock;
  *  \param key_len key lengths of 16, 24 and 32 bytes supported  
  *  \return -EINVAL - bad key length, 0 - SUCCESS
 */                                 
-static int aes_set_key (struct crypto_tfm *tfm, const u8 *in_key, unsigned int key_len)
+int aes_set_key (struct crypto_tfm *tfm, const u8 *in_key, unsigned int key_len)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(tfm);
 
@@ -177,7 +177,7 @@ static int aes_set_key (struct crypto_tfm *tfm, const u8 *in_key, unsigned int k
  *  \param key_len key lengths of 16, 24 and 32 bytes supported
  *  \return -EINVAL - bad key length, 0 - SUCCESS
 */
-static int aes_set_key_skcipher (struct crypto_skcipher *tfm, const u8 *in_key, unsigned int key_len)
+int aes_set_key_skcipher (struct crypto_skcipher *tfm, const u8 *in_key, unsigned int key_len)
 {
     return aes_set_key(crypto_skcipher_tfm(tfm), in_key, key_len);
 }
@@ -189,7 +189,7 @@ static int aes_set_key_skcipher (struct crypto_skcipher *tfm, const u8 *in_key, 
  *  \param ctx_arg crypto algo context  
  *  \return
 */
-static void aes_set_key_hw (void *ctx_arg)
+void aes_set_key_hw (void *ctx_arg)
 {
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
     volatile struct aes_t *aes = (volatile struct aes_t *) AES_START;
@@ -343,7 +343,7 @@ void ifx_deu_aes (void *ctx_arg, u8 *out_arg, const u8 *in_arg,
  *  \return 0 - SUCCESS
  *          -EINVAL - bad key length
 */                                 
-static int ctr_rfc3686_aes_set_key (struct crypto_tfm *tfm, const uint8_t *in_key, unsigned int key_len)
+int ctr_rfc3686_aes_set_key (struct crypto_tfm *tfm, const uint8_t *in_key, unsigned int key_len)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(tfm);
 
@@ -376,7 +376,7 @@ static int ctr_rfc3686_aes_set_key (struct crypto_tfm *tfm, const uint8_t *in_ke
  *  \return 0 - SUCCESS
  *          -EINVAL - bad key length
 */
-static int ctr_rfc3686_aes_set_key_skcipher (struct crypto_skcipher *tfm, const uint8_t *in_key, unsigned int key_len)
+int ctr_rfc3686_aes_set_key_skcipher (struct crypto_skcipher *tfm, const uint8_t *in_key, unsigned int key_len)
 {
     return ctr_rfc3686_aes_set_key(crypto_skcipher_tfm(tfm), in_key, key_len);
 }
@@ -413,7 +413,7 @@ static int ctr_rfc3686_aes_set_key_skcipher (struct crypto_skcipher *tfm, const 
  *  \param encdec 1 for encrypt; 0 for decrypt  
  *  \param inplace not used  
 */                                 
-static void ifx_deu_aes_ecb (void *ctx, uint8_t *dst, const uint8_t *src,
+void ifx_deu_aes_ecb (void *ctx, uint8_t *dst, const uint8_t *src,
         uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_aes (ctx, dst, src, NULL, nbytes, encdec, 0);
@@ -430,7 +430,7 @@ static void ifx_deu_aes_ecb (void *ctx, uint8_t *dst, const uint8_t *src,
  *  \param encdec 1 for encrypt; 0 for decrypt  
  *  \param inplace not used  
 */                                 
-static void ifx_deu_aes_cbc (void *ctx, uint8_t *dst, const uint8_t *src,
+void ifx_deu_aes_cbc (void *ctx, uint8_t *dst, const uint8_t *src,
         uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_aes (ctx, dst, src, iv, nbytes, encdec, 1);
@@ -447,7 +447,7 @@ static void ifx_deu_aes_cbc (void *ctx, uint8_t *dst, const uint8_t *src,
  *  \param encdec 1 for encrypt; 0 for decrypt  
  *  \param inplace not used  
 */                                 
-static void ifx_deu_aes_ofb (void *ctx, uint8_t *dst, const uint8_t *src,
+void ifx_deu_aes_ofb (void *ctx, uint8_t *dst, const uint8_t *src,
         uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_aes (ctx, dst, src, iv, nbytes, encdec, 2);
@@ -464,7 +464,7 @@ static void ifx_deu_aes_ofb (void *ctx, uint8_t *dst, const uint8_t *src,
  *  \param encdec 1 for encrypt; 0 for decrypt  
  *  \param inplace not used  
 */                                 
-static void ifx_deu_aes_cfb (void *ctx, uint8_t *dst, const uint8_t *src,
+void ifx_deu_aes_cfb (void *ctx, uint8_t *dst, const uint8_t *src,
         uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_aes (ctx, dst, src, iv, nbytes, encdec, 3);
@@ -481,7 +481,7 @@ static void ifx_deu_aes_cfb (void *ctx, uint8_t *dst, const uint8_t *src,
  *  \param encdec 1 for encrypt; 0 for decrypt  
  *  \param inplace not used  
 */                                 
-static void ifx_deu_aes_ctr (void *ctx, uint8_t *dst, const uint8_t *src,
+void ifx_deu_aes_ctr (void *ctx, uint8_t *dst, const uint8_t *src,
         uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_aes (ctx, dst, src, iv, nbytes, encdec, 4);
@@ -494,7 +494,7 @@ static void ifx_deu_aes_ctr (void *ctx, uint8_t *dst, const uint8_t *src,
  *  \param out output bytestream
  *  \param in input bytestream
 */
-static void ifx_deu_aes_encrypt (struct crypto_tfm *tfm, uint8_t *out, const uint8_t *in)
+void ifx_deu_aes_encrypt (struct crypto_tfm *tfm, uint8_t *out, const uint8_t *in)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(tfm);
     ifx_deu_aes (ctx, out, in, NULL, AES_BLOCK_SIZE,
@@ -508,7 +508,7 @@ static void ifx_deu_aes_encrypt (struct crypto_tfm *tfm, uint8_t *out, const uin
  *  \param out output bytestream
  *  \param in input bytestream
 */
-static void ifx_deu_aes_decrypt (struct crypto_tfm *tfm, uint8_t *out, const uint8_t *in)
+void ifx_deu_aes_decrypt (struct crypto_tfm *tfm, uint8_t *out, const uint8_t *in)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(tfm);
     ifx_deu_aes (ctx, out, in, NULL, AES_BLOCK_SIZE,
@@ -544,7 +544,7 @@ struct crypto_alg ifxdeu_aes_alg = {
  *  \param req skcipher request
  *  \return err
 */
-static int ecb_aes_encrypt(struct skcipher_request *req)
+int ecb_aes_encrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -570,7 +570,7 @@ static int ecb_aes_encrypt(struct skcipher_request *req)
  *  \param req skcipher request
  *  \return err
 */
-static int ecb_aes_decrypt(struct skcipher_request *req)
+int ecb_aes_decrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -615,7 +615,7 @@ struct skcipher_alg ifxdeu_ecb_aes_alg = {
  *  \param req skcipher request
  *  \return err
 */
-static int cbc_aes_encrypt(struct skcipher_request *req)
+int cbc_aes_encrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -642,7 +642,7 @@ static int cbc_aes_encrypt(struct skcipher_request *req)
  *  \param req skcipher request
  *  \return err
 */
-static int cbc_aes_decrypt(struct skcipher_request *req)
+int cbc_aes_decrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -694,7 +694,7 @@ struct skcipher_alg ifxdeu_cbc_aes_alg = {
  *  \param encdec 1 for encrypt; 0 for decrypt
  *
 */
-static void ifx_deu_aes_xts (void *ctx_arg, u8 *out_arg, const u8 *in_arg,
+void ifx_deu_aes_xts (void *ctx_arg, u8 *out_arg, const u8 *in_arg,
         u8 *iv_arg, size_t nbytes, int encdec)
 {
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
@@ -797,7 +797,7 @@ static void ifx_deu_aes_xts (void *ctx_arg, u8 *out_arg, const u8 *in_arg,
  *  \param req skcipher request
  *  \return err
 */
-static int xts_aes_encrypt(struct skcipher_request *req)
+int xts_aes_encrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -853,7 +853,7 @@ static int xts_aes_encrypt(struct skcipher_request *req)
  *  \param req skcipher request
  *  \return err
 */
-static int xts_aes_decrypt(struct skcipher_request *req)
+int xts_aes_decrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -911,7 +911,7 @@ static int xts_aes_decrypt(struct skcipher_request *req)
  *  \param key_len key lengths of 16, 24 and 32 bytes supported
  *  \return -EINVAL - bad key length, 0 - SUCCESS
 */
-static int xts_aes_set_key_skcipher (struct crypto_skcipher *tfm, const u8 *in_key, unsigned int key_len)
+int xts_aes_set_key_skcipher (struct crypto_skcipher *tfm, const u8 *in_key, unsigned int key_len)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(crypto_skcipher_tfm(tfm));
     unsigned int keylen = (key_len / 2);
@@ -958,7 +958,7 @@ struct skcipher_alg ifxdeu_xts_aes_alg = {
  *  \param req skcipher request
  *  \return err
 */
-static int ofb_aes_encrypt(struct skcipher_request *req)
+int ofb_aes_encrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -991,7 +991,7 @@ static int ofb_aes_encrypt(struct skcipher_request *req)
  *  \param req skcipher request
  *  \return err
 */
-static int ofb_aes_decrypt(struct skcipher_request *req)
+int ofb_aes_decrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -1046,7 +1046,7 @@ struct skcipher_alg ifxdeu_ofb_aes_alg = {
  *  \param req skcipher request
  *  \return err
 */
-static int cfb_aes_encrypt(struct skcipher_request *req)
+int cfb_aes_encrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -1079,7 +1079,7 @@ static int cfb_aes_encrypt(struct skcipher_request *req)
  *  \param req skcipher request
  *  \return err
 */
-static int cfb_aes_decrypt(struct skcipher_request *req)
+int cfb_aes_decrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -1134,7 +1134,7 @@ struct skcipher_alg ifxdeu_cfb_aes_alg = {
  *  \param req skcipher request
  *  \return err
 */
-static int ctr_basic_aes_encrypt(struct skcipher_request *req)
+int ctr_basic_aes_encrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -1167,7 +1167,7 @@ static int ctr_basic_aes_encrypt(struct skcipher_request *req)
  *  \param req skcipher request
  *  \return err
 */
-static int ctr_basic_aes_decrypt(struct skcipher_request *req)
+int ctr_basic_aes_decrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -1221,7 +1221,7 @@ struct skcipher_alg ifxdeu_ctr_basic_aes_alg = {
  *  \param req skcipher request
  *  \return err
 */
-static int ctr_rfc3686_aes_encrypt(struct skcipher_request *req)
+int ctr_rfc3686_aes_encrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -1264,7 +1264,7 @@ static int ctr_rfc3686_aes_encrypt(struct skcipher_request *req)
  *  \param req skcipher request
  *  \return err
 */
-static int ctr_rfc3686_aes_decrypt(struct skcipher_request *req)
+int ctr_rfc3686_aes_decrypt(struct skcipher_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -1576,7 +1576,7 @@ static struct shash_alg ifxdeu_cbcmac_aes_alg = {
  *  \param key_len key lengths of 16, 24 and 32 bytes supported
  *  \return -EINVAL - bad key length, 0 - SUCCESS
 */
-static int aes_set_key_aead (struct crypto_aead *aead, const u8 *in_key, unsigned int key_len)
+int aes_set_key_aead (struct crypto_aead *aead, const u8 *in_key, unsigned int key_len)
 {
     struct aes_ctx *ctx = crypto_aead_ctx(aead);
     int err;
@@ -1601,7 +1601,7 @@ static int aes_set_key_aead (struct crypto_aead *aead, const u8 *in_key, unsigne
  *  \param in_key input authsize
  *  \return -EINVAL - bad authsize length, 0 - SUCCESS
 */
-static int gcm_aes_setauthsize (struct crypto_aead *aead, unsigned int authsize)
+int gcm_aes_setauthsize (struct crypto_aead *aead, unsigned int authsize)
 {
     return crypto_gcm_check_authsize(authsize);
 }
@@ -1612,7 +1612,7 @@ static int gcm_aes_setauthsize (struct crypto_aead *aead, unsigned int authsize)
  *  \param req aead request
  *  \return err
 */
-static int gcm_aes_encrypt(struct aead_request *req)
+int gcm_aes_encrypt(struct aead_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;
@@ -1726,7 +1726,7 @@ static int gcm_aes_encrypt(struct aead_request *req)
  *  \param req aead request
  *  \return err
 */
-static int gcm_aes_decrypt(struct aead_request *req)
+int gcm_aes_decrypt(struct aead_request *req)
 {
     struct aes_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
     struct skcipher_walk walk;

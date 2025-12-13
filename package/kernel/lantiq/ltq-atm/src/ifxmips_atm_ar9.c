@@ -185,7 +185,7 @@ static inline int pp32_download_code(u32 *code_src, unsigned int code_dword_len,
     return 0;
 }
 
-static void ar9_fw_ver(unsigned int *major, unsigned int *minor)
+void ar9_fw_ver(unsigned int *major, unsigned int *minor)
 {
     ASSERT(major != NULL, "pointer is NULL");
     ASSERT(minor != NULL, "pointer is NULL");
@@ -194,7 +194,7 @@ static void ar9_fw_ver(unsigned int *major, unsigned int *minor)
     *minor = FW_VER_ID->minor;
 }
 
-static int ar9_init(struct platform_device *pdev)
+int ar9_init(struct platform_device *pdev)
 {
 	init_pmu();
 	reset_ppe(pdev);
@@ -205,7 +205,7 @@ static int ar9_init(struct platform_device *pdev)
 	return 0;
 }
 
-static void ar9_shutdown(void)
+void ar9_shutdown(void)
 {
 	ltq_pmu_disable(IFX_PMU_MODULE_PPE_SLL01 |
 		IFX_PMU_MODULE_PPE_TC |
@@ -215,7 +215,7 @@ static void ar9_shutdown(void)
 		IFX_PMU_MODULE_DSL_DFE);
 }
 
-static int ar9_start(int pp32)
+int ar9_start(int pp32)
 {
 	int ret;
 
@@ -231,7 +231,7 @@ static int ar9_start(int pp32)
 	return 0;
 }
 
-static void ar9_stop(int pp32)
+void ar9_stop(int pp32)
 {
 	IFX_REG_W32(DBG_CTRL_STOP, PP32_DBG_CTRL(0));
 }

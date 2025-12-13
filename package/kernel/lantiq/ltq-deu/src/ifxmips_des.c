@@ -126,7 +126,7 @@ extern int disable_deudma;
  *  \param key input key  
  *  \param keylen key length  
 */                                 
-static int des_setkey(struct crypto_tfm *tfm, const u8 *key,
+int des_setkey(struct crypto_tfm *tfm, const u8 *key,
                       unsigned int keylen)
 {
         struct ifx_deu_des_ctx *dctx = crypto_tfm_ctx(tfm);
@@ -161,7 +161,7 @@ static int des_setkey(struct crypto_tfm *tfm, const u8 *key,
  *  \param key_len key lengths of 16, 24 and 32 bytes supported
  *  \return -EINVAL - bad key length, 0 - SUCCESS
 */
-static int des_setkey_skcipher (struct crypto_skcipher *tfm, const u8 *in_key, unsigned int key_len)
+int des_setkey_skcipher (struct crypto_skcipher *tfm, const u8 *in_key, unsigned int key_len)
 {
     return des_setkey(crypto_skcipher_tfm(tfm), in_key, key_len);
 }
@@ -296,7 +296,7 @@ void ifx_deu_des (void *ctx_arg, u8 *out_arg, const u8 *in_arg,
  *  \param encdec 1 for encrypt; 0 for decrypt  
  *  \param inplace not used  
 */
-static void ifx_deu_des_ecb (void *ctx, uint8_t *dst, const uint8_t *src,
+void ifx_deu_des_ecb (void *ctx, uint8_t *dst, const uint8_t *src,
                 uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_des (ctx, dst, src, NULL, nbytes, encdec, 0);
@@ -313,7 +313,7 @@ static void ifx_deu_des_ecb (void *ctx, uint8_t *dst, const uint8_t *src,
  *  \param encdec 1 for encrypt; 0 for decrypt  
  *  \param inplace not used  
 */                                 
-static void ifx_deu_des_cbc (void *ctx, uint8_t *dst, const uint8_t *src,
+void ifx_deu_des_cbc (void *ctx, uint8_t *dst, const uint8_t *src,
                 uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_des (ctx, dst, src, iv, nbytes, encdec, 1);
@@ -330,13 +330,11 @@ static void ifx_deu_des_cbc (void *ctx, uint8_t *dst, const uint8_t *src,
  *  \param encdec 1 for encrypt; 0 for decrypt  
  *  \param inplace not used  
 */                                 
-/*
-static void ifx_deu_des_ofb (void *ctx, uint8_t *dst, const uint8_t *src,
+void ifx_deu_des_ofb (void *ctx, uint8_t *dst, const uint8_t *src,
                 uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_des (ctx, dst, src, iv, nbytes, encdec, 2);
 }
-*/
 
 /*! \fn void ifx_deu_des_cfb (void *ctx, uint8_t *dst, const uint8_t *src, uint8_t *iv, size_t nbytes, int encdec, int inplace)
     \ingroup IFX_DES_FUNCTIONS
@@ -349,13 +347,11 @@ static void ifx_deu_des_ofb (void *ctx, uint8_t *dst, const uint8_t *src,
     \param encdec 1 for encrypt; 0 for decrypt  
     \param inplace not used  
 */                                 
-/*
-static void ifx_deu_des_cfb (void *ctx, uint8_t *dst, const uint8_t *src,
+void ifx_deu_des_cfb (void *ctx, uint8_t *dst, const uint8_t *src,
                 uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_des (ctx, dst, src, iv, nbytes, encdec, 3);
 }
-*/
 
 /*! \fn void ifx_deu_des_ctr (void *ctx, uint8_t *dst, const uint8_t *src, uint8_t *iv, size_t nbytes, int encdec, int inplace)
  *  \ingroup IFX_DES_FUNCTIONS
@@ -368,13 +364,11 @@ static void ifx_deu_des_cfb (void *ctx, uint8_t *dst, const uint8_t *src,
  *  \param encdec 1 for encrypt; 0 for decrypt  
  *  \param inplace not used  
 */                                 
-/*
 void ifx_deu_des_ctr (void *ctx, uint8_t *dst, const uint8_t *src,
                 uint8_t *iv, size_t nbytes, int encdec, int inplace)
 {
      ifx_deu_des (ctx, dst, src, iv, nbytes, encdec, 4);
 }
-*/
 
 /*! \fn void ifx_deu_des_encrypt (struct crypto_tfm *tfm, uint8_t *out, const uint8_t *in)
  *  \ingroup IFX_DES_FUNCTIONS
@@ -383,7 +377,7 @@ void ifx_deu_des_ctr (void *ctx, uint8_t *dst, const uint8_t *src,
  *  \param out output bytestream  
  *  \param in input bytestream  
 */                                               
-static void ifx_deu_des_encrypt (struct crypto_tfm *tfm, uint8_t * out, const uint8_t * in)
+void ifx_deu_des_encrypt (struct crypto_tfm *tfm, uint8_t * out, const uint8_t * in)
 {
      struct ifx_deu_des_ctx *ctx = crypto_tfm_ctx(tfm);
      ifx_deu_des (ctx, out, in, NULL, DES_BLOCK_SIZE,
@@ -398,7 +392,7 @@ static void ifx_deu_des_encrypt (struct crypto_tfm *tfm, uint8_t * out, const ui
  *  \param out output bytestream  
  *  \param in input bytestream  
 */                                               
-static void ifx_deu_des_decrypt (struct crypto_tfm *tfm, uint8_t * out, const uint8_t * in)
+void ifx_deu_des_decrypt (struct crypto_tfm *tfm, uint8_t * out, const uint8_t * in)
 {
      struct ifx_deu_des_ctx *ctx = crypto_tfm_ctx(tfm);
      ifx_deu_des (ctx, out, in, NULL, DES_BLOCK_SIZE,
@@ -426,7 +420,7 @@ static void ifx_deu_des_decrypt (struct crypto_tfm *tfm, uint8_t * out, const ui
  *  \param key input key  
  *  \param keylen key length  
 */                                 
-static int des3_ede_setkey(struct crypto_tfm *tfm, const u8 *key,
+int des3_ede_setkey(struct crypto_tfm *tfm, const u8 *key,
                     unsigned int keylen)
 {
         struct ifx_deu_des_ctx *dctx = crypto_tfm_ctx(tfm);
@@ -460,7 +454,7 @@ static int des3_ede_setkey(struct crypto_tfm *tfm, const u8 *key,
  *  \param key input key
  *  \param keylen key length
 */
-static int des3_ede_setkey_skcipher(struct crypto_skcipher *tfm, const u8 *key,
+int des3_ede_setkey_skcipher(struct crypto_skcipher *tfm, const u8 *key,
                     unsigned int keylen)
 {
         return des3_ede_setkey(crypto_skcipher_tfm(tfm), key, keylen);
@@ -514,7 +508,7 @@ struct crypto_alg ifxdeu_des3_ede_alg = {
  *  \param req skcipher request
  *  \return err
 */
-static int ecb_des_encrypt(struct skcipher_request *req)
+int ecb_des_encrypt(struct skcipher_request *req)
 {
         struct ifx_deu_des_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
         struct skcipher_walk walk;
@@ -540,7 +534,7 @@ static int ecb_des_encrypt(struct skcipher_request *req)
  *  \param req skcipher request
  *  \return err
 */
-static int ecb_des_decrypt(struct skcipher_request *req)
+int ecb_des_decrypt(struct skcipher_request *req)
 {
         struct ifx_deu_des_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
         struct skcipher_walk walk;
@@ -605,7 +599,7 @@ struct skcipher_alg ifxdeu_ecb_des3_ede_alg = {
  *  \param req skcipher request
  *  \return err
 */
-static int cbc_des_encrypt(struct skcipher_request *req)
+int cbc_des_encrypt(struct skcipher_request *req)
 {
         struct ifx_deu_des_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
         struct skcipher_walk walk;
@@ -633,7 +627,7 @@ static int cbc_des_encrypt(struct skcipher_request *req)
  *  \param req skcipher request
  *  \return err
 */
-static int cbc_des_decrypt(struct skcipher_request *req)
+int cbc_des_decrypt(struct skcipher_request *req)
 {
         struct ifx_deu_des_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
         struct skcipher_walk walk;

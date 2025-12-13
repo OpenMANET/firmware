@@ -21,7 +21,6 @@ ramips_setup_interfaces()
 	minew,g1-c|\
 	onion,omega2p|\
 	onion,omega2|\
-	qding,qc202|\
 	ravpower,rp-wd009|\
 	tama,w06|\
 	tplink,re200-v2|\
@@ -108,8 +107,7 @@ ramips_setup_interfaces()
 			"2:lan:2" "3:lan:1" "4:wan" "6@eth0"
 		;;
 	duzun,dm06|\
-	glinet,gl-mt300n-v2|\
-	hongdian,h7920-v40)
+	glinet,gl-mt300n-v2)
 		ucidef_add_switch "switch0" \
 			"1:lan" "0:wan" "6@eth0"
 		;;
@@ -258,7 +256,6 @@ ramips_setup_macs()
 		label_mac=$(mtd_get_mac_binary factory 0x4)
 		;;
 	duzun,dm06|\
-	hongdian,h7920-v40|\
 	netgear,r6020|\
 	netgear,r6080|\
 	netgear,r6120|\

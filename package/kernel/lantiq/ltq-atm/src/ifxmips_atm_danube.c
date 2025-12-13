@@ -198,7 +198,7 @@ static void danube_shutdown(void)
 {
 }
 
-static int danube_start(int pp32)
+int danube_start(int pp32)
 {
 	int ret;
 
@@ -218,7 +218,7 @@ static int danube_start(int pp32)
 	return 0;
 }
 
-static void danube_stop(int pp32)
+void danube_stop(int pp32)
 {
 	IFX_REG_W32(DBG_CTRL_STOP_SET(1), PP32_DBG_CTRL);
 }
