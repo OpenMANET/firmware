@@ -46,12 +46,16 @@ CONFIG_PACKAGE_morse_mesh11sd=y
 CONFIG_PACKAGE_morse-button=y
 CONFIG_PACKAGE_morse-leds=y
 CONFIG_PACKAGE_morse-bcf-info=y
+CONFIG_PACKAGE_morse-fw=y
 CONFIG_PACKAGE_morse-firmware-sign=y
 CONFIG_PACKAGE_morse-fw-6108=m
 CONFIG_PACKAGE_morse-fw-6108-tlm=m
 CONFIG_PACKAGE_morse-fw-8108=m
 CONFIG_PACKAGE_morse-fw-8108-tlm=m
 CONFIG_PACKAGE_morse-fw-8108-flm=m
+
+# Disable Gatworks morse_cli
+CONFIG_PACKAGE_morse_cli=n
 
 # TZ
 CONFIG_PACKAGE_zoneinfo-core=y
