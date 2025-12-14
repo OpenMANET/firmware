@@ -1,0 +1,42 @@
+From 268156c1eedc4fefc00925e7893e6f2bbf9fc8fb Mon Sep 17 00:00:00 2001
+From: Arien Judge <arien.judge@morsemicro.com>
+Date: Tue, 6 Feb 2024 17:59:48 +1100
+Subject: [PATCH 4/4] dt-overlays: morse: add ramoops overlay fragment
+
+---
+ .../arm/boot/dts/overlays/ramoops-overlay.dts | 23 +++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 arch/arm/boot/dts/overlays/ramoops-overlay.dts
+
+diff --git a/arch/arm/boot/dts/overlays/ramoops-overlay.dts b/arch/arm/boot/dts/overlays/ramoops-overlay.dts
+new file mode 100644
+index 000000000..ffe10ba25
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/ramoops-overlay.dts
+@@ -0,0 +1,23 @@
++/dts-v1/;
++/plugin/;
++
++/{
++	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2711";
++
++	fragment@0 {
++		target = <&rmem>;
++		__overlay__ {
++			#address-cells = <2>;
++			#size-cells = <1>;
++			ranges;
++
++			/* 1 MB reserved for ramoops/pstore */
++			ramoops@34000000 {
++				compatible = "ramoops";
++				reg = <0x0 0x34000000 0x100000>;
++				record-size = <0x4000>;
++				console-size = <0x4000>;
++			};
++		};
++	};
++};
+\ No newline at end of file
+--
+2.25.1

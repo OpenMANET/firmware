@@ -1,0 +1,119 @@
+From a7f068bc6332aa17a3be03cb69ad18c4c546eddf Mon Sep 17 00:00:00 2001
+From: Sophronia Koilpillai <sophronia.koilpillai@morsemicro.com>
+Date: Fri, 1 Nov 2024 10:55:11 +1100
+Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
+ for MM610x and MM810x
+
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/mm610x-spi-overlay.dts
+@@ -0,0 +1,53 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2711";
++
++	fragment@0 {
++		target = <&spi0>;
++		frag0: __overlay__ {
++			pinctrl-0 = <&spi0_pins &spi0_cs_pins>;
++			cs-gpios = <&gpio 8 1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++
++			mm6108: mm6108@0 {
++				compatible = "morse,mm610x-spi";
++				reg = <0>;	/* CE0 */
++				reset-gpios = <&gpio 17 0>;
++				power-gpios = <&gpio 3 0>,
++				              <&gpio 7 0>;
++				spi-irq-gpios = <&gpio 5 0>;
++				spi-max-frequency = <50000000>;
++				status = "okay";
++			};
++
++			spidev0: spidev@0 {
++				reg = <0>;	/* CE0 */
++				status = "disabled";
++			};
++
++			spidev1: spidev@1 {
++				reg = <1>;	/* CE1 */
++				status = "disabled";
++			};
++		};
++	};
++
++	fragment@1 {
++		target = <&gpio>;
++		__overlay__ {
++			spi0_cs_pins: spi0_cs_pins {
++				brcm,pins = <8>;
++				brcm,function = <1>; /* BCM2835_FSEL_GPIO_OUT */
++				brcm,pull = <2>; 	 /* SET SPI PINS AS PULL HIGH */
++			};
++			spi0_pins: spi0_pins {
++				brcm,pull = <2 2 2>; /* SET SPI PINS AS PULL HIGH */
++			};
++
++		};
++	};
++};
+\ No newline at end of file
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/mm810x-spi-overlay.dts
+@@ -0,0 +1,53 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2711";
++
++	fragment@0 {
++		target = <&spi0>;
++		frag0: __overlay__ {
++			pinctrl-0 = <&spi0_pins &spi0_cs_pins>;
++			cs-gpios = <&gpio 8 1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++
++			mm8108: mm8108@0 {
++				compatible = "morse,mm810x-spi";
++				reg = <0>;	/* CE0 */
++				reset-gpios = <&gpio 5 0>;
++				power-gpios = <&gpio 3 0>,
++				              <&gpio 7 0>;
++				spi-irq-gpios = <&gpio 25 0>;
++				spi-max-frequency = <50000000>;
++				status = "okay";
++			};
++
++			spidev0: spidev@0 {
++				reg = <0>;	/* CE0 */
++				status = "disabled";
++			};
++
++			spidev1: spidev@1 {
++				reg = <1>;	/* CE1 */
++				status = "disabled";
++			};
++		};
++	};
++
++	fragment@1 {
++		target = <&gpio>;
++		__overlay__ {
++			spi0_cs_pins: spi0_cs_pins {
++				brcm,pins = <8>;
++				brcm,function = <1>; /* BCM2835_FSEL_GPIO_OUT */
++				brcm,pull = <2>; 	 /* SET SPI PINS AS PULL HIGH */
++			};
++			spi0_pins: spi0_pins {
++				brcm,pull = <2 2 2>; /* SET SPI PINS AS PULL HIGH */
++			};
++
++		};
++	};
++};

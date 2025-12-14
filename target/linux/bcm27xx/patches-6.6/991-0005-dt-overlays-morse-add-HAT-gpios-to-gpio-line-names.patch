@@ -1,0 +1,31 @@
+From f34d45478594590a4b30fdff6968d258d5883919 Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Fri, 28 Jun 2024 09:28:52 +1000
+Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
+
+---
+ arch/arm/boot/dts/bcm2711-rpi-4-b.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/bcm2711-rpi-4-b.dts b/arch/arm/boot/dts/bcm2711-rpi-4-b.dts
+index 8c0ab39beea1..6810ab3c3a9f 100644
+--- a/arch/arm/boot/dts/bcm2711-rpi-4-b.dts
++++ b/arch/arm/boot/dts/bcm2711-rpi-4-b.dts
+@@ -87,11 +87,11 @@ &gpio {
+ 	gpio-line-names = "ID_SDA",
+ 			  "ID_SCL",
+ 			  "SDA1",
+-			  "SCL1",
++			  "MM_WAKE",
+ 			  "GPIO_GCLK",
+-			  "GPIO5",
++			  "MM_RESET",
+ 			  "GPIO6",
+-			  "SPI_CE1_N",
++			  "MM_BUSY",
+ 			  "SPI_CE0_N",
+ 			  "SPI_MISO",
+ 			  "SPI_MOSI",
+-- 
+2.25.1
+
