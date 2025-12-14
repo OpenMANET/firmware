@@ -219,7 +219,7 @@ if [ "${INITIALIZE}" ]; then
     #patch packages if necessary and re-create index files
     patch_feeds_packages "${BOARD:-}"
     ./scripts/feeds update -i
-    ./scripts/feeds install -p morse -a
+    ./scripts/feeds install -p openmanet -a
     ./scripts/feeds install -a
 
     ./scripts/feeds install -f -p morse iwinfo
