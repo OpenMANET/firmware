@@ -1,0 +1,5 @@
+CONFIG_MORSE_SPI=y
+CONFIG_PACKAGE_kmod-spi-bcm2835=y
+CONFIG_PACKAGE_kmod-spi-bcm2835-aux=y
+CONFIG_PACKAGE_kmod-spi-bitbang=y
+CONFIG_PACKAGE_kmod-spi-gpio=y
