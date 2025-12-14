@@ -9,7 +9,7 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
 
 --- a/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
 +++ b/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
-@@ -75,11 +75,11 @@ &gpio {
+@@ -87,11 +87,11 @@ &gpio {
  	gpio-line-names = "ID_SDA",
  			  "ID_SCL",
  			  "SDA1",
@@ -24,6 +24,3 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
  			  "SPI_CE0_N",
  			  "SPI_MISO",
  			  "SPI_MOSI",
--- 
-2.25.1
-
