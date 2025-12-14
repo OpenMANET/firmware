@@ -11,7 +11,7 @@ Install build environment packages with
 > sudo apt install build-essential clang flex g++ gawk gcc-multilib g++-multilib git gettext \
   libncurses5-dev libssl-dev python3-setuptools rsync unzip zlib1g-dev swig file wget libnl-3-dev \
   libnl-genl-3-dev libgps-dev libcap-dev pkg-config libopus-dev \
-  libopusfile-dev portaudio19-dev net-tools
+  libopusfile-dev portaudio19-dev net-tools libpcre3-dev libpcre3
 ```
 
 ## Usage
