@@ -18,9 +18,9 @@ Install build environment packages with
 
 Run the `./scripts/openmanet_setup.sh` script to configure the build for your board of choice.
 
-For example, Using seeedstudio's WiFi Halow Modules on Raspberry Pi.
+For example, Using seeedstudio's WiFi Halow Modules on Raspberry Pi4.
 ```
-> ./scripts/openmanet_setup.sh -i -b ekh01
+> ./scripts/openmanet_setup.sh -i -b ekh-bcm2711
 ```
 
 For the Gateworks 7500
