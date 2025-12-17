@@ -25,3 +25,5 @@ CONFIG_PACKAGE_kmod-video-codec-bcm2835=y
 # bug with lan78xx - enabled by default for rpi4 platforms.
 # We enable of-mdio to work around the dependency chain.
 CONFIG_PACKAGE_kmod-of-mdio=y
+# Disable ext4 image creation.
+CONFIG_TARGET_ROOTFS_EXT4FS=n
