@@ -1,0 +1,15 @@
+# This picks up our custom overlay that lets us put our models/board_names
+# into device tree (before we pick up the default RPI
+# model/compatible in 02_sysinfo).
+do_sysinfo_dtoverlay() {
+	mkdir -p /tmp/sysinfo
+	if [ -e /proc/device-tree/sysinfo-board-name ]; then
+		echo "$(cat /proc/device-tree/sysinfo-board-name)" > /tmp/sysinfo/board_name
+	fi
+
+	if [ -e /proc/device-tree/sysinfo-model ]; then
+		echo "$(cat /proc/device-tree/sysinfo-model)" > /tmp/sysinfo/model
+	fi
+}
+
+boot_hook_add preinit_main do_sysinfo_dtoverlay

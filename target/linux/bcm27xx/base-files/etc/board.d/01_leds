@@ -1,0 +1,23 @@
+
+. /lib/functions/leds.sh
+. /lib/functions/uci-defaults.sh
+
+board=$(board_name)
+
+board_config_update
+
+case "$board" in
+morse,ekh01 |\
+morse,mm6108-ekh01-spi |\
+morse,mm8108-ekh01-spi)
+	# RPI's have a green LED that is by default connected to SD card activity.
+	# For our purposes, connecting it to HaLow activity is more useful.
+	# Note that wlan0 is usually the morse chip.
+	# The 'red' LED is controlled by a custom diag.sh (for bcm27xx).
+	ucidef_set_led_netdev "green" "green-wifi-activity" "led0" "wlan0" "link tx rx"
+	;;
+esac
+
+board_config_flush
+
+exit 0
