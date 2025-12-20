@@ -25,7 +25,7 @@ For example, Using seeedstudio's WiFi Halow Modules on Raspberry Pi4.
 
 For the Gateworks 7500
 ```
-> ./scripts/openmanet_setup.sh -i -b gw7500
+> ./scripts/openmanet_setup.sh -i -b venice
 ```
 
 Run this to download all dependencies before starting a build.  It will make building more reliable.
