@@ -90,6 +90,7 @@ CONFIG_PACKAGE_openssl-util=y
 CONFIG_PACKAGE_luci-app-opkg=y
 CONFIG_PACKAGE_luci-app-morseconfig=y
 CONFIG_PACKAGE_luci-app-morseguide=y
+CONFIG_PACKAGE_luci-app-morseapwizard=y
 CONFIG_PACKAGE_luci-mod-home=y
 CONFIG_PACKAGE_luci-theme-morseargon=y
 CONFIG_PACKAGE_luci-lib-morseui=y

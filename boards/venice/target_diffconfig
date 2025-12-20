@@ -13,8 +13,6 @@ CONFIG_WPA_MBO_SUPPORT=y
 CONFIG_WPA_MSG_MIN_PRIORITY=3
 CONFIG_ZRAM_DEF_COMP_LZORLE=y
 CONFIG_ZSTD_OPTIMIZE_O3=y
-CONFIG_PACKAGE_openwrt-keyring=y
-CONFIG_PACKAGE_usign=y
 
 ## Morse Micro Specific ##
 CONFIG_PACKAGE_morsectrl=y
@@ -28,6 +26,7 @@ CONFIG_PACKAGE_kmod-usb-net-asix-ax88179=y
 
 # Gateworks Specific
 CONFIG_PACKAGE_luci-app-gateworks=y
+CONFIG_PACKAGE_openmanet-venice=y
 
 CONFIG_BUSYBOX_CUSTOM=y
 CONFIG_ATH10K-CT_LEDS=y
