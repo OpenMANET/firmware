@@ -17,10 +17,10 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
 +			  "MM_WAKE",
 +			  "MM_RESET",
  			  "GPIO4",
--			  "GPIO5",
+-			  "GPIO5",		/*  5 */
 -			  "GPIO6",
 +			  "MM_BUSY",		/*  5 */
-+			  "GPIO6",		
++			  "GPIO6",
  			  "GPIO7",
  			  "GPIO8",
  			  "GPIO9",
