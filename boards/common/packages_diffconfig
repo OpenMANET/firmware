@@ -81,10 +81,10 @@ CONFIG_PACKAGE_luci-proto-ppp=y
 CONFIG_PACKAGE_rpcd-mod-rrdns=y
 CONFIG_PACKAGE_uhttpd=y
 CONFIG_PACKAGE_uhttpd-mod-ubus=y
-CONFIG_PACKAGE_luci-mod-rpc=y
-CONFIG_PACKAGE_rpcd-mod-luci=y
-CONFIG_PACKAGE_rpcd-mod-iwinfo=y
-CONFIG_PACKAGE_luci-mod-status=y
+# CONFIG_PACKAGE_luci-mod-rpc=y
+# CONFIG_PACKAGE_rpcd-mod-luci=y
+# CONFIG_PACKAGE_rpcd-mod-iwinfo=y
+# CONFIG_PACKAGE_luci-mod-status=y
 
 # Add https support via openssl (luci-ssl-openssl)
 CONFIG_PACKAGE_libustream-openssl=y
