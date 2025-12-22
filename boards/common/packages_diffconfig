@@ -48,7 +48,6 @@ CONFIG_PACKAGE_morse-button=y
 CONFIG_PACKAGE_morse-leds=y
 CONFIG_PACKAGE_morse-bcf-info=y
 CONFIG_PACKAGE_morse-fw=y
-CONFIG_PACKAGE_morse-firmware-sign=m
 CONFIG_PACKAGE_morse-fw-6108=m
 CONFIG_PACKAGE_morse-fw-6108-tlm=m
 CONFIG_PACKAGE_morse-fw-8108=m
@@ -93,7 +92,7 @@ CONFIG_PACKAGE_openssl-util=y
 
 CONFIG_PACKAGE_luci-app-opkg=y
 CONFIG_PACKAGE_luci-app-morseconfig=y
-CONFIG_PACKAGE_luci-app-morseapwizard=y
+# CONFIG_PACKAGE_luci-app-morseapwizard=y
 CONFIG_PACKAGE_luci-mod-home=y
 CONFIG_PACKAGE_luci-app-ekhwizards=y
 CONFIG_PACKAGE_luci-theme-morseargon=y
