@@ -2,6 +2,6 @@ src-git openmanet https://github.com/OpenMANET/packages.git^a47913dd992ecbc1a36b
 src-git morse https://github.com/MorseMicro/morse-feed.git^76f92454aa62f6ad0fa7bfa047dbe433a2a477d2
 src-git gateworks https://github.com/Gateworks/gw-openwrt-packages.git^fa86fdae267c1769c2c9ab960f1709ff28860cbd
 src-git packages https://git.openwrt.org/feed/packages.git^db7e5480779046d47846b718e025182c8f5a7384
-src-git luci https://git.openwrt.org/project/luci.git^b8bc15bef63fcc9899f518417835b74092d2d6aa
+src-git luci src-git luci https://github.com/MorseMicro/luci.git^53e65158f7075109d140f8943b4a1f0eb6d84339
 src-git routing https://git.openwrt.org/feed/routing.git^d8f9eab170bb63024596c4133c04a84a7aa8a454
 src-git telephony https://git.openwrt.org/feed/telephony.git^2a4541d46199ac96fac214d02c908402831c4dc6
