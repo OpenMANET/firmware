@@ -25,7 +25,7 @@ This takes us back to OpenWrt 23.05.2's Makefile.
  
  PKG_BUILD_PARALLEL:=1
  PKG_INSTALL:=1
-@@ -45,8 +44,7 @@ define Package/iperf3-ssl
+@@ -44,8 +43,7 @@ define Package/iperf3-ssl
  $(call Package/iperf3/default)
    TITLE+= with iperf_auth support
    VARIANT:=ssl
@@ -35,7 +35,8 @@ This takes us back to OpenWrt 23.05.2's Makefile.
  endef
  
  define Package/libiperf3
-@@ -54,11 +52,9 @@ define Package/libiperf3
+@@ -52,11 +50,9 @@ define Package/libiperf3
+   SECTION:=libs
    CATEGORY:=Libraries
    TITLE:=Internet Protocol bandwidth measuring library
    URL:=https://github.com/esnet/iperf
