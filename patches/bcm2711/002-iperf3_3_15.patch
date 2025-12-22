@@ -3,8 +3,6 @@ Temporarily downgrade iperf3 due to performance issues as udp server
 
 This takes us back to OpenWrt 23.05.2's Makefile.
 
-diff --git a/feeds/packages/net/iperf3/Makefile b/feeds/packages/net/iperf3/Makefile
-index 44065e6e1a..dbe09c1e03 100644
 --- a/feeds/packages/net/iperf3/Makefile
 +++ b/feeds/packages/net/iperf3/Makefile
 @@ -8,16 +8,15 @@
@@ -12,7 +10,7 @@ index 44065e6e1a..dbe09c1e03 100644
  
  PKG_NAME:=iperf
 -PKG_VERSION:=3.17.1
--PKG_RELEASE:=2
+-PKG_RELEASE:=4
 +PKG_VERSION:=3.15
 +PKG_RELEASE:=1
  
