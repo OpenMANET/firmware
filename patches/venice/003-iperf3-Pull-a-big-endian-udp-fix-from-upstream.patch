@@ -1,0 +1,84 @@
+From 7cba4fabd76d9c2050b9bc313f4c52a8710aeb39 Mon Sep 17 00:00:00 2001
+From: Evan Benn <evan.benn@morsemicro.com>
+Date: Thu, 20 Mar 2025 14:12:09 +1100
+Subject: [PATCH] iperf3: Pull a big endian udp fix from upstream
+
+https://github.com/esnet/iperf/pull/1468
+---
+ ...n-type-of-udp-connect-reply-messages.patch | 65 +++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+ create mode 100644 feeds/packages/net/iperf3/patches/0001-fix-endian-type-of-udp-connect-reply-messages.patch
+
+diff --git a/feeds/packages/net/iperf3/patches/0001-fix-endian-type-of-udp-connect-reply-messages.patch b/feeds/packages/net/iperf3/patches/0001-fix-endian-type-of-udp-connect-reply-messages.patch
+new file mode 100644
+index 000000000000..ad253a3cd889
+--- /dev/null
++++ b/feeds/packages/net/iperf3/patches/0001-fix-endian-type-of-udp-connect-reply-messages.patch
+@@ -0,0 +1,65 @@
++From 9caff37f29e3817d7b03a54c8b029451049d91d5 Mon Sep 17 00:00:00 2001
++From: Sebastian Gottschall <s.gottschall@dd-wrt.com>
++Date: Tue, 7 Feb 2023 12:59:55 +0600
++Subject: [PATCH] fix endian type of udp connect / reply messages
++
++for example. if you run a iperf3 server on a little endian host, but
++client is bug endian it will result in the following error if you try to
++start a udp bandwidth test
++
++Connect received for Socket 5, sz=4, buf=36373839, i=0, max_len_wait_for_reply=4
++iperf3: error - unable to read from stream socket: Invalid argument
++
++the reason that that all messages are reversed. fix this by swapping the
++message values to little endian host order on big endian systems
++
++Signed-off-by: Sebastian Gottschall <s.gottschall@dd-wrt.com>
++---
++ src/iperf.h     | 8 ++++++++
++ src/iperf_udp.c | 1 -
++ 2 files changed, 8 insertions(+), 1 deletion(-)
++
++diff --git a/src/iperf.h b/src/iperf.h
++index e010c2d295cd..46034ba38710 100644
++--- a/src/iperf.h
+++++ b/src/iperf.h
++@@ -67,6 +67,7 @@
++ #include "queue.h"
++ #include "cjson.h"
++ #include "iperf_time.h"
+++#include "portable_endian.h"
++ 
++ #if defined(HAVE_SSL)
++ #include <openssl/bio.h>
++@@ -431,9 +432,16 @@ struct iperf_test
++ extern int gerror; /* error value from getaddrinfo(3), for use in internal error handling */
++ 
++ /* UDP "connect" message and reply (textual value for Wireshark, etc. readability - legacy was numeric) */
+++
+++#if BYTE_ORDER == BIG_ENDIAN
+++#define UDP_CONNECT_MSG 0x39383736
+++#define UDP_CONNECT_REPLY 0x36373839
+++#define LEGACY_UDP_CONNECT_REPLY 0xb168de3a
+++#else
++ #define UDP_CONNECT_MSG 0x36373839          // "6789" - legacy value was 123456789
++ #define UDP_CONNECT_REPLY 0x39383736        // "9876" - legacy value was 987654321
++ #define LEGACY_UDP_CONNECT_REPLY 987654321  // Old servers may still reply with the legacy value
+++#endif
++ 
++ /* In Reverse mode, maximum number of packets to wait for "accept" response - to handle out of order packets */
++ #define MAX_REVERSE_OUT_OF_ORDER_PACKETS 2
++diff --git a/src/iperf_udp.c b/src/iperf_udp.c
++index d41a5690ec63..d483523389e8 100644
++--- a/src/iperf_udp.c
+++++ b/src/iperf_udp.c
++@@ -47,7 +47,6 @@
++ #include "timer.h"
++ #include "net.h"
++ #include "cjson.h"
++-#include "portable_endian.h"
++ 
++ #if defined(HAVE_INTTYPES_H)
++ # include <inttypes.h>
++-- 
++2.48.1
++
+-- 
+2.48.1
