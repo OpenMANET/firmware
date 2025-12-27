@@ -1,0 +1,19 @@
+commit 444be678c590d2c5a317bca5e61c1a628ac6caa7
+Author: Prabha Murugesan <prabha.murugesan@morsemicro.com>
+Date:   Tue Mar 25 14:18:15 2025 +1100
+
+    APP-4385 Allow positive RSSI reported by WiFi HaLow chip
+
+diff --git a/iwinfo.c b/iwinfo.c
+index 3f4c1e6..7a89083 100644
+--- a/iwinfo.c
++++ b/iwinfo.c
+@@ -431,7 +431,7 @@ rpc_iwinfo_scan(struct ubus_context *ctx, struct ubus_object *obj,
+ 				blobmsg_add_u32(&buf, "band", band);
+ 			blobmsg_add_u32(&buf, "channel", e->channel);
+ 			blobmsg_add_u32(&buf, "mhz", e->mhz);
+-			blobmsg_add_u32(&buf, "signal", (uint32_t)(e->signal - 0x100));
++			blobmsg_add_u32(&buf, "signal", iwinfo_sanitise_rssi(e->signal));
+ 
+ 			blobmsg_add_u32(&buf, "quality", e->quality);
+ 			blobmsg_add_u32(&buf, "quality_max", e->quality_max);

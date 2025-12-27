@@ -1,0 +1,63 @@
+From 60d2e714b5f3f050b5b77019739215265e860497 Mon Sep 17 00:00:00 2001
+From: Arien Judge <arien.judge@morsemicro.com>
+Date: Wed, 10 May 2023 21:08:12 +1000
+Subject: [PATCH] add ah channel entry info to blobmsg output
+
+---
+ iwinfo.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+
+diff --git a/iwinfo.c b/iwinfo.c
+index c93982f..4c09d33 100644
+--- a/iwinfo.c
++++ b/iwinfo.c
+@@ -272,6 +272,33 @@ static void rpc_iwinfo_call_hw_ht_mode(int hwmodelist)
+ 		return;
+ 	}
+ 
++	if (hwmodelist == IWINFO_80211_AH) {
++		blobmsg_add_string(&buf, "hwmode", "ah");
++		if (iw->htmode(ifname, &htmode))
++			return;
++
++		switch(htmode) {
++			case 1:
++				htmode_str = "2";
++				break;
++			case 2:
++				htmode_str = "4";
++				break;
++			case 3:
++				htmode_str = "8";
++				break;
++			case 4:
++				htmode_str = "16";
++				break;
++			case 0:
++			default:
++				htmode_str = "1";
++				break;
++		}
++		blobmsg_add_string(&buf, "htmode", htmode_str);
++		return;
++	}
++
+ 	if (iw->htmode(ifname, &htmode))
+ 		return;
+ 
+@@ -421,6 +448,13 @@ rpc_iwinfo_scan(struct ubus_context *ctx, struct ubus_object *obj,
+ 				blobmsg_close_table(&buf, t);
+ 			}
+ 
++			if (e->ah_chan_info.primary_chan) {
++				t = blobmsg_open_table(&buf, "ah_operation");
++				blobmsg_add_u32(&buf, "primary_channel", e->ah_chan_info.primary_chan);
++				blobmsg_add_u32(&buf, "channel_width", ah_chan_width[e->ah_chan_info.chan_width]);
++				blobmsg_close_table(&buf, t);
++			}
++
+ 			rpc_iwinfo_add_encryption("encryption", &e->crypto);
+ 
+ 			blobmsg_close_table(&buf, d);
+-- 
+2.25.1

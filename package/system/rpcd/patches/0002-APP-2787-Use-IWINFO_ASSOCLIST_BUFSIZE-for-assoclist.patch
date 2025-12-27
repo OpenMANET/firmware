@@ -1,0 +1,67 @@
+From 49ee6cdf14a7d4948a3980113e6e093d0ac19144 Mon Sep 17 00:00:00 2001
+From: Evan Benn <evan.benn@morsemicro.com>
+Date: Thu, 20 Mar 2025 16:13:17 +1100
+Subject: [PATCH] APP-2787: Use IWINFO_ASSOCLIST_BUFSIZE for assoclist
+
+Because the buffer is now large (1.38MiB), use the heap.
+---
+ iwinfo.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
+
+diff --git a/iwinfo.c b/iwinfo.c
+index f8dec8005889..b7465e9db191 100644
+--- a/iwinfo.c
++++ b/iwinfo.c
+@@ -474,19 +474,25 @@ rpc_iwinfo_assoclist(struct ubus_context *ctx, struct ubus_object *obj,
+ {
+ 	int i, rv, len;
+ 	char mac[18];
+-	char res[IWINFO_BUFSIZE];
+ 	struct iwinfo_assoclist_entry *a;
+ 	struct ether_addr *macaddr = NULL;
+ 	void *c = NULL, *d, *e;
+ 	struct blob_attr *tb[__RPC_A_MAX];
+ 	bool found = false;
++	int ret = UBUS_STATUS_OK;
++	char *res = malloc(IWINFO_ASSOCLIST_BUFSIZE);
++
++	if (!res)
++		return UBUS_STATUS_UNKNOWN_ERROR;
+ 
+ 	blobmsg_parse(rpc_assoclist_policy, __RPC_A_MAX, tb,
+ 	              blob_data(msg), blob_len(msg));
+ 
+ 	rv = __rpc_iwinfo_open(tb[RPC_A_DEVICE]);
+-	if (rv)
+-		return rv;
++	if (rv) {
++		ret = rv;
++		goto err;
++	}
+ 
+ 	if (tb[RPC_A_MACADDR])
+ 		macaddr = ether_aton(blobmsg_data(tb[RPC_A_MACADDR]));
+@@ -557,14 +563,17 @@ rpc_iwinfo_assoclist(struct ubus_context *ctx, struct ubus_object *obj,
+ 
+ 	if (!macaddr)
+ 		blobmsg_close_array(&buf, c);
+-	else if (!found)
+-		return UBUS_STATUS_NOT_FOUND;
++	else if (!found) {
++		ret = UBUS_STATUS_NOT_FOUND;
++		goto err;
++	}
+ 
+ 	ubus_send_reply(ctx, req, buf.head);
+ 
+ 	rpc_iwinfo_close();
+-
+-	return UBUS_STATUS_OK;
++err:
++	free(res);
++	return ret;
+ }
+ 
+ static int
+-- 
+2.48.1
