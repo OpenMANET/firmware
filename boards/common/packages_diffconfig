@@ -40,7 +40,7 @@ CONFIG_BUSYBOX_CONFIG_FEATURE_LESS_ASK_TERMINAL=y
 # Morse specific
 CONFIG_PACKAGE_kmod-morse=y
 CONFIG_PACKAGE_morsectrl=y
-CONFIG_PACKAGE_morse-bundle=n
+CONFIG_PACKAGE_morse-bundle=y
 CONFIG_PACKAGE_morse-copy-coredump=y
 CONFIG_PACKAGE_smart_manager=y
 CONFIG_PACKAGE_morse_mesh11sd=y
