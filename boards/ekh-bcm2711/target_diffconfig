@@ -7,6 +7,7 @@ CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_morse_mmx108-ekh01-sdio=y
 CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_morse_mm8108-ekh01-spi=y
 CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_morse_mm6108-ekh01-spi=y
 
+CONFIG_PACKAGE_morse_driver-1.15=y
 CONFIG_PACKAGE_morsectrl=y
 CONFIG_PACKAGE_morse-fw-6108-tlm=y
 CONFIG_PACKAGE_morse-fw-8108-tlm=y
