@@ -13,16 +13,15 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
 @@ -80,11 +80,11 @@
  	gpio-line-names = "ID_SDA",		/*  0 */
  			  "ID_SCL",
--			  "GPIO2",
+			  "GPIO2",
 -			  "GPIO3",
 +			  "MM_WAKE",
-+			  "MM_RESET",
  			  "GPIO4",
 -			  "GPIO5",		/*  5 */
--			  "GPIO6",
-+			  "MM_BUSY",		/*  5 */
-+			  "GPIO6",
- 			  "GPIO7",
++			  "MM_RESET",
+			  "GPIO6",
+- 			  "GPIO7",
++			  "MM_BUSY",
  			  "GPIO8",
  			  "GPIO9",
 
@@ -32,14 +31,14 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
  &gpio {
  	gpio-line-names = "ID_SDA",
  			  "ID_SCL",
--			  "GPIO2",
+			  "GPIO2",
 -			  "GPIO3",
 +			  "MM_WAKE",
-+			  "MM_RESET",
  			  "GPIO4",
 -			  "GPIO5",
-+			  "MM_BUSY",
++			  "MM_RESET",
  			  "GPIO6",
- 			  "GPIO7",
+- 			  "GPIO7",
++			  "MM_BUSY",
  			  "GPIO8",
  			  "GPIO9",
