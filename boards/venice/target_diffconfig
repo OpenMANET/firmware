@@ -15,7 +15,6 @@ CONFIG_ZRAM_DEF_COMP_LZORLE=y
 CONFIG_ZSTD_OPTIMIZE_O3=y
 
 ## Morse Micro Specific ##
-CONFIG_PACKAGE_morse_driver-1.16=y
 CONFIG_PACKAGE_morsectrl=y
 CONFIG_PACKAGE_morse-board-config=y
 CONFIG_PACKAGE_morse-board-config-hotplug-model=y
