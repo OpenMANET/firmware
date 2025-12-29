@@ -311,7 +311,7 @@ define Device/morse_mm6108-ekh01-spi
   DEVICE_MODEL := MM6108-EKH01
   DEVICE_VARIANT := SPI
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us raspberrypi,4-compute-module raspberrypi,4-model-b
+  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us
   DISTROCONFIG_EXTRA := mm610x-spi
 endef
 ifeq ($(SUBTARGET),bcm2711)
