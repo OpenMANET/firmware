@@ -109,6 +109,8 @@ CONFIG_PACKAGE_alsa-lib=y
 CONFIG_PACKAGE_alsa-utils=y
 CONFIG_PACKAGE_libopus=y
 CONFIG_PACKAGE_portaudio=y
+CONFIG_PACKAGE_kmod-input-gpio-keys=y
+CONFIG_PACKAGE_kmod-input-gpio-encoder=y
 #
 # GPS Support
 #

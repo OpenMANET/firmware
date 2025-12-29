@@ -127,6 +127,8 @@ CONFIG_PACKAGE_gpioctl-sysfs=y
 CONFIG_PACKAGE_gpiod-tools=y
 CONFIG_PACKAGE_kmod-i2c-core=y
 CONFIG_PACKAGE_kmod-sdhci=y
+CONFIG_PACKAGE_kmod-mux-gpio=y
+CONFIG_PACKAGE_kmod-gpio-button-hotplug=y
 
 # Basic network utils
 CONFIG_PACKAGE_ip-tiny=y
