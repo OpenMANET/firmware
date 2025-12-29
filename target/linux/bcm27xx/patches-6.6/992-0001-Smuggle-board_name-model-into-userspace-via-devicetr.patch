@@ -1,0 +1,57 @@
+From 77f824290faad8408705d7ff56592eba23e161ba Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Wed, 7 Aug 2024 21:01:03 +1000
+Subject: [PATCH] Smuggle board_name/model into userspace via devicetree
+ overlay
+
+---
+ arch/arm/boot/dts/overlays/Makefile           |  1 +
+ .../arm/boot/dts/overlays/sysinfo-overlay.dts | 28 +++++++++++++++++++
+ 2 files changed, 29 insertions(+)
+ create mode 100644 arch/arm/boot/dts/overlays/sysinfo-overlay.dts
+
+
+--- a/arch/arm/boot/dts/overlays/Makefile
++++ b/arch/arm/boot/dts/overlays/Makefile
+@@ -296,6 +296,7 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
+	sunfounder-pironman5.dtbo \
+	superaudioboard.dtbo \
+	sx150x.dtbo \
++	sysinfo.dtbo \
+    tc358743.dtbo \
+	tc358743-audio.dtbo \
+	tinylcd35.dtbo \
+
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/sysinfo-overlay.dts
+@@ -0,0 +1,28 @@
++/dts-v1/;
++/plugin/;
++
++// Smuggle custom model/boards into userspace for setting in /tmp/sysinfo/
++// Why is this so dodgy?
++//   - we can't set the actual model in a boot time overlay, because
++//     the RPI4 firmware overwrites it (to add the revision)
++//   - I can't figure out how to pass the compatible in an overlay parameter
++//     (i.e. I would have to have a separate overlay for each board,
++//     which _still_ wouldn't be able to set the Model so we'd need
++//     special handling for that anyway)
++//
++// So, we set some arbitrary values, and use them in preference to
++// model and compatible when /tmp/sysinfo is created.
++//
++// Use like:
++//   dtoverlay=sysinfo,board-name="morse,ekh01",model="MorseMicro EKH01"
++/ {
++	fragment@0 {
++		target-path = "/";
++		overlay: __overlay__ {};
++	};
++
++	__overrides__ {
++		model = <&overlay>,"sysinfo-model";
++		board-name = <&overlay>,"sysinfo-board-name";
++	};
++};
+-- 
+2.25.1
