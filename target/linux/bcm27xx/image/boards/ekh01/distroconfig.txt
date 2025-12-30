@@ -41,14 +41,9 @@ dtparam=sdio_overclock=42
 #enable uart5
 dtoverlay=uart5
 
-#enable morse gpio configuration
-#dtoverlay=mm_wlan
+# MM SDIO Overlay
+dtoverlay=mm_wlan
 
-#adds morse-ps device tree
-#dtoverlay=morse-ps
-
-#enable spi
-#tparam=spi=on
 
 #disable SD activity LED by default
 #(we configure it for HaLow later in userspace)
