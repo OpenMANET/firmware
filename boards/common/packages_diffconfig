@@ -95,8 +95,8 @@ CONFIG_PACKAGE_luci-app-morseconfig=y
 # CONFIG_PACKAGE_luci-app-morseapwizard=y
 CONFIG_PACKAGE_luci-mod-home=y
 CONFIG_PACKAGE_luci-app-ekhwizards=y
-CONFIG_PACKAGE_luci-theme-openmanetargon=y
-CONFIG_PACKAGE_luci-theme-morseargon=m
+CONFIG_PACKAGE_luci-theme-morseargon=y
+CONFIG_PACKAGE_luci-theme-openmanetargon=m
 
 # Remove mbedtls (we use openssl)
 CONFIG_PACKAGE_wpad-basic-mbedtls=n
