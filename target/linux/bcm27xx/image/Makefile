@@ -318,4 +318,16 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += morse_mm6108-ekh01-spi
 endif
 
+define Device/morse_mm6108-ekh01-sdio
+  $(Device/morse_ekh01_base)
+  DEVICE_MODEL := MM6108-EKH01
+  DEVICE_VARIANT := SDIO
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us
+  DISTROCONFIG_EXTRA := mm610x-sdio
+endef
+ifeq ($(SUBTARGET),bcm2711)
+  TARGET_DEVICES += morse_mm6108-ekh01-sdio
+endif
+
 $(eval $(call BuildImage))
