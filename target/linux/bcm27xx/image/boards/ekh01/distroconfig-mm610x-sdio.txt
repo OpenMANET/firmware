@@ -1,0 +1,5 @@
+dtoverlay=morse-ps
+dtoverlay=sdio,poll_once=on
+#setup sub 50MHz SDIO clock
+dtparam=sdio_overclock=42
+dtoverlay=mm_wlan
