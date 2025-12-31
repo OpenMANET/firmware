@@ -810,7 +810,6 @@ CONFIG_PACKAGE_kmod-openvswitch=m
 CONFIG_PACKAGE_kmod-openvswitch-geneve=m
 CONFIG_PACKAGE_kmod-openvswitch-gre=m
 CONFIG_PACKAGE_kmod-openvswitch-vxlan=m
-CONFIG_PACKAGE_kmod-ovpn-dco-v2=m
 CONFIG_PACKAGE_kmod-owl-loader=m
 CONFIG_PACKAGE_kmod-parport-pc=m
 CONFIG_PACKAGE_kmod-pcnet32=m
