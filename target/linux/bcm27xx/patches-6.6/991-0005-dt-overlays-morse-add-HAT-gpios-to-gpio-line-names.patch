@@ -103,7 +103,7 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
  
 --- a/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
 +++ b/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
-@@ -681,15 +681,15 @@
+@@ -674,15 +674,15 @@
  &rp1_gpio {
  	gpio-line-names =
 		"ID_SDA", // GPIO0
