@@ -82,42 +82,39 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
  			  "GPIO10",
 --- a/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
 +++ b/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
-@@ -680,16 +680,16 @@
- 
+@@ -681,11 +681,11 @@
  &rp1_gpio {
- 	gpio-line-names =
-		"ID_SDA", // GPIO0
-		"ID_SCL", // GPIO1
-		"GPIO2", // GPIO2
--		"GPIO3", // GPIO3
-+		"MM_WAKE", // GPIO3
-		"GPIO4", // GPIO4
--		"GPIO5", // GPIO5
-+		"MM_RESET", // GPIO5
-		"GPIO6", // GPIO6
--		"GPIO7", // GPIO7
-+		"MM_BUSY", // GPIO7
-		"GPIO8", // GPIO8
-		"GPIO9", // GPIO9
-		"GPIO10", // GPIO10
- 
+     gpio-line-names =
+             "ID_SDA", // GPIO0
+             "ID_SCL", // GPIO1
+             "GPIO2", // GPIO2
+-            "GPIO3", // GPIO3
++            "MM_WAKE", // GPIO3
+             "GPIO4", // GPIO4
+-            "GPIO5", // GPIO5
++            "MM_RESET", // GPIO5
+             "GPIO6", // GPIO6
+-            "GPIO7", // GPIO7
++            "MM_BUSY", // GPIO7
+             "GPIO8", // GPIO8
+             "GPIO9", // GPIO9
+             "GPIO10", // GPIO10
 --- a/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
 +++ b/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
-@@ -673,16 +673,16 @@
- 
+@@ -674,11 +674,11 @@
  &rp1_gpio {
- 	gpio-line-names =
-		"ID_SDA", // GPIO0
-		"ID_SCL", // GPIO1
-		"GPIO2", // GPIO2
--		"GPIO3", // GPIO3
-+		"MM_WAKE", // GPIO3
-		"GPIO4", // GPIO4
--		"GPIO5", // GPIO5
-+		"MM_RESET", // GPIO5
-		"GPIO6", // GPIO6
--		"GPIO7", // GPIO7
-+		"MM_BUSY", // GPIO7
-		"GPIO8", // GPIO8
-		"GPIO9", // GPIO9
-		"GPIO10", // GPIO10
+     gpio-line-names =
+             "ID_SDA", // GPIO0
+             "ID_SCL", // GPIO1
+             "GPIO2", // GPIO2
+-            "GPIO3", // GPIO3
++            "MM_WAKE", // GPIO3
+             "GPIO4", // GPIO4
+-            "GPIO5", // GPIO5
++            "MM_RESET", // GPIO5
+             "GPIO6", // GPIO6
+-            "GPIO7", // GPIO7
++            "MM_BUSY", // GPIO7
+             "GPIO8", // GPIO8
+             "GPIO9", // GPIO9
+             "GPIO10", // GPIO10
