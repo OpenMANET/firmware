@@ -1,15 +1,7 @@
-
-
-## Morse Micro Specific ##
-CONFIG_PACKAGE_morsectrl=m
-CONFIG_PACKAGE_morse-board-config=m
-CONFIG_PACKAGE_morse-board-config-hotplug-model=m
-CONFIG_PACKAGE_morse-fw-8108=m
-CONFIG_MORSE_USB=m
-
 ## Necessary for USB to Ethernet Adapters ##
 CONFIG_PACKAGE_kmod-usb-net-asix=m
 CONFIG_PACKAGE_kmod-usb-net-asix-ax88179=m
+
 CONFIG_PACKAGE_agetty=m
 CONFIG_PACKAGE_airoha-en8811h-firmware=m
 CONFIG_PACKAGE_alsa-lib=m
@@ -603,5 +595,16 @@ CONFIG_PACKAGE_rtl8852ae-firmware=m
 CONFIG_PACKAGE_rtl8852be-firmware=m
 CONFIG_PACKAGE_rtl8852ce-firmware=m
 CONFIG_PACKAGE_rtl8922ae-firmware=m
-
+CONFIG_PACKAGE_ucode-mod-html=m
+CONFIG_PACKAGE_ucode-mod-lua=m
+CONFIG_PACKAGE_ucode-mod-math=m
+CONFIG_PACKAGE_ucode-mod-nl80211=m
+CONFIG_PACKAGE_ucode-mod-rtnl=m
+CONFIG_PACKAGE_ucode-mod-uloop=m
+CONFIG_PACKAGE_uhttpd=m
+CONFIG_PACKAGE_uhttpd-mod-ubus=m
+CONFIG_PACKAGE_uqmi=m
+CONFIG_PACKAGE_usb-modeswitch=m
+CONFIG_PACKAGE_usbids=m
+CONFIG_PACKAGE_usbutils=m
 
