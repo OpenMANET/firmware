@@ -276,6 +276,21 @@ define Device/morse_ekh01_base
   IMAGE/factory.img.gz := boot-common | boot-2711 | boot-ekh01 | sdcard-img | gzip
 endef
 
+define Device/morse_pi3_base
+  $(Device/rpi-3)
+  SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
+  SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
+  DEVICE_VENDOR := MorseMicro
+  # remove the factory image (causes confusion)
+  IMAGES := sysupgrade.img.gz
+  # Simplify by removing board and OpenWRT version.
+  IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
+  DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
+  DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-6108 morse-fw-8108
+  IMAGE/sysupgrade.img.gz := boot-common | boot-2710 | boot-ekh01 | sdcard-img | gzip | append-metadata
+  IMAGE/factory.img.gz := boot-common | boot-2710 | boot-ekh01 | sdcard-img | gzip
+endef
+
 define Device/morse_mmx108-ekh01-sdio
   $(Device/morse_ekh01_base)
   DEVICE_MODEL := MMx108-EKH01
@@ -328,6 +343,54 @@ define Device/morse_mm6108-ekh01-sdio
 endef
 ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += morse_mm6108-ekh01-sdio
+endif
+
+define Device/bcm2711_mm6108-seeed-spi
+  $(Device/morse_ekh01_base)
+  DEVICE_MODEL := RPI4-MM6108-SEEED
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-seeed-spi
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2711)
+  TARGET_DEVICES += bcm2711_mm6108-seeed-spi
+endif
+
+define Device/bcm2711_mm6108-alfa-sdio
+  $(Device/morse_ekh01_base)
+  DEVICE_MODEL := RPI4-MM6108-ALFA
+  DEVICE_VARIANT := SDIO
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-alfa-sdio
+  DISTROCONFIG_EXTRA := mm610x-sdio
+endef
+ifeq ($(SUBTARGET),bcm2711)
+  TARGET_DEVICES += bcm2711_mm6108-alfa-sdio
+endif
+
+define Device/bcm2710_mm6108-seeed-spi
+  $(Device/morse_pi3_base)
+  DEVICE_MODEL := RPI3-MM6108-SEEED
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2710,mm6108-seeed-spi
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_mm6108-seeed-spi
+endif
+
+define Device/bcm2710_mm6108-sdio
+  $(Device/morse_pi3_base)
+  DEVICE_MODEL := RPI3-MM6108
+  DEVICE_VARIANT := SDIO
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2710,mm6108-sdio
+  DISTROCONFIG_EXTRA := mm610x-sdio
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_mm6108-sdio
 endif
 
 $(eval $(call BuildImage))

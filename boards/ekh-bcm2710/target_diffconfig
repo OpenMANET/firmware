@@ -1,26 +1,28 @@
 CONFIG_TARGET_MULTI_PROFILE=y
 CONFIG_TARGET_bcm27xx=y
 CONFIG_TARGET_bcm27xx_bcm2710=y
-CONFIG_TARGET_bcm27xx_bcm2710_DEVICE_rpi-3-om=y
+CONFIG_TARGET_DEVICE_bcm27xx_bcm2710_DEVICE_bcm2710_mm6108-seeed-spi=y
+CONFIG_TARGET_DEVICE_bcm27xx_bcm2710_DEVICE_bcm2710_mm6108-sdio=y
 
-
-CONFIG_TARGET_PREINIT_IP="10.42.0.1"
-CONFIG_TARGET_PREINIT_BROADCAST="10.42.0.255"
-CONFIG_TARGET_DEFAULT_LAN_IP_FROM_PREINIT=y
 CONFIG_PACKAGE_morsectrl=y
-CONFIG_PACKAGE_morse-fw-6108-tlm=y
+CONFIG_PACKAGE_morse-fw-6108=y
+CONFIG_PACKAGE_morse-fw-6108-tlm=m
+CONFIG_PACKAGE_morse-fw-8108-tlm=m
+CONFIG_PACKAGE_morse-fw-8108-flm=m
 CONFIG_PACKAGE_morse-board-config-hotplug-model=y
 CONFIG_PACKAGE_luci-app-ekhwizards=y
-CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER="US"
-CONFIG_MORSE_REGDB_CHANNEL_NEGATIVE_FILTER="1|2|50|51"
 
-CONFIG_TARGET_ROOTFS_PARTSIZE=300
+#CONFIG_MORSE_REGDB_COUNTRY_CODE_FILTER="US"
+#CONFIG_MORSE_REGDB_CHANNEL_NEGATIVE_FILTER="1|2|50|51"
+
+CONFIG_TARGET_ROOTFS_PARTSIZE=1024
 
 # Video encode/decode
 CONFIG_PACKAGE_kmod-video-core=y
 CONFIG_PACKAGE_kmod-video-codec-bcm2835=y
 
-# Enabling CONFIG_ALL_KMODS triggered a package installation
 # bug with lan78xx - enabled by default for rpi4 platforms.
 # We enable of-mdio to work around the dependency chain.
 CONFIG_PACKAGE_kmod-of-mdio=y
+# Disable ext4 image creation.
+CONFIG_TARGET_ROOTFS_EXT4FS=n
