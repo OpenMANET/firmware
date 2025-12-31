@@ -82,7 +82,10 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
  			  "GPIO10",
 --- a/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
 +++ b/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
-@@ -684,11 +684,11 @@
+@@ -681,14 +681,14 @@
+         gpio-line-names =
+                 "ID_SDA", // GPIO0
+                 "ID_SCL", // GPIO1
                  "GPIO2", // GPIO2
 -                "GPIO3", // GPIO3
 +                "MM_WAKE", // GPIO3
@@ -93,9 +96,14 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
 -                "GPIO7", // GPIO7
 +                "MM_BUSY", // GPIO7
                  "GPIO8", // GPIO8
+                 "GPIO9", // GPIO9
+                 "GPIO10", // GPIO10
 --- a/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
 +++ b/arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi
-@@ -684,11 +684,11 @@
+@@ -681,14 +681,14 @@
+         gpio-line-names =
+                 "ID_SDA", // GPIO0
+                 "ID_SCL", // GPIO1
                  "GPIO2", // GPIO2
 -                "GPIO3", // GPIO3
 +                "MM_WAKE", // GPIO3
@@ -106,3 +114,5 @@ Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
 -                "GPIO7", // GPIO7
 +                "MM_BUSY", // GPIO7
                  "GPIO8", // GPIO8
+                 "GPIO9", // GPIO9
+                 "GPIO10", // GPIO10
