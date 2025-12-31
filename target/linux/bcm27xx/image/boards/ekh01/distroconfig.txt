@@ -32,18 +32,8 @@ gpu_mem_1024=128
 # enable uart
 uart_enable=1
 
-#enable sdio
-#dtoverlay=sdio,poll_once=on
-
-#setup sub 50MHz SDIO clock
-#dtparam=sdio_overclock=42
-
 #enable uart5
 dtoverlay=uart5
-
-# MM SDIO Overlay
-#dtoverlay=mm_wlan
-
 
 #disable SD activity LED by default
 #(we configure it for HaLow later in userspace)
