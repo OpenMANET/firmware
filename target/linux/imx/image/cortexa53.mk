@@ -79,3 +79,19 @@ define Device/gateworks_venice
   IMAGE/img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip | append-metadata
 endef
 TARGET_DEVICES += gateworks_venice
+
+define Device/openmanet_gateworks_base
+  $(Device/gateworks_venice)
+  SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
+  SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
+  DEVICE_VENDOR := Gateworks
+  DEVICE_MODEL := $(subst gw,Venice GW,$(subst gateworks,Venice GW,$(1)))
+  DEVICE_VARIANT := USB
+
+  # Simplify by removing board and OpenWRT version.
+  IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
+  DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
+  DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-8108
+  IMAGES := img.gz
+  IMAGE/img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip | append-metadata
+endef
