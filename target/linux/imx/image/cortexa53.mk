@@ -80,7 +80,7 @@ define Device/gateworks_venice
 endef
 TARGET_DEVICES += gateworks_venice
 
-define Device/openmanet_gateworks_base
+define Device/gw_venice
   $(Device/gateworks_venice)
   SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
   SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
@@ -95,3 +95,6 @@ define Device/openmanet_gateworks_base
   IMAGES := img.gz
   IMAGE/img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip | append-metadata
 endef
+ifeq ($(SUBTARGET),cortexa53)
+  TARGET_DEVICES += gw_venice
+endif
