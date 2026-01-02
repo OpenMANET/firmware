@@ -39,3 +39,7 @@ For verbose compilation, consider using
 ```
 
 Once the build is complete a compiled image can be found in `bin/target/<platform>/<target>/`
+
+## Extending OpenMANET
+
+If you want to contribute a custom package for OpenMANET, and can build it as an OpenWRT package, feel free to open a pull request in the [OpenMANET Packages Repository](https://github.com/OpenMANET/packages).
