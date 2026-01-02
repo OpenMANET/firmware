@@ -23,11 +23,6 @@ For example, Using seeedstudio's WiFi Halow Modules on Raspberry Pi4.
 > ./scripts/openmanet_setup.sh -i -b ekh-bcm2711
 ```
 
-For the Gateworks 7500
-```
-> ./scripts/openmanet_setup.sh -i -b venice
-```
-
 Run this to download all dependencies before starting a build.  It will make building more reliable.
 ```
 > make download
