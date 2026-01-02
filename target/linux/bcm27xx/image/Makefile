@@ -265,7 +265,7 @@ define Device/morse_ekh01_base
   $(Device/rpi-4)
   SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
   SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
-  DEVICE_VENDOR := MorseMicro
+  DEVICE_VENDOR := RPI
   # remove the factory image (causes confusion)
   IMAGES := sysupgrade.img.gz
   # Simplify by removing board and OpenWRT version.
@@ -280,7 +280,7 @@ define Device/morse_pi3_base
   $(Device/rpi-3)
   SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
   SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
-  DEVICE_VENDOR := MorseMicro
+  DEVICE_VENDOR := RPI
   # remove the factory image (causes confusion)
   IMAGES := sysupgrade.img.gz
   # Simplify by removing board and OpenWRT version.

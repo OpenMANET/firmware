@@ -32,14 +32,14 @@ gpu_mem_1024=128
 # enable uart
 uart_enable=1
 
-#enable uart5
+# enable uart5
 dtoverlay=uart5
 
-#disable SD activity LED by default
+# disable SD activity LED by default
 #(we configure it for HaLow later in userspace)
 dtparam=act_led_trigger=none
 
-#adds ramoops device tree overlay
+# adds ramoops device tree overlay
 dtoverlay=ramoops
 
 # automatically load sensor dtoverlays
