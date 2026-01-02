@@ -23,11 +23,6 @@ For example, Using seeedstudio's WiFi Halow Modules on Raspberry Pi4.
 > ./scripts/openmanet_setup.sh -i -b ekh-bcm2711
 ```
 
-For the Gateworks 7500
-```
-> ./scripts/openmanet_setup.sh -i -b venice
-```
-
 Run this to download all dependencies before starting a build.  It will make building more reliable.
 ```
 > make download
@@ -44,3 +39,7 @@ For verbose compilation, consider using
 ```
 
 Once the build is complete a compiled image can be found in `bin/target/<platform>/<target>/`
+
+## Extending OpenMANET
+
+If you want to contribute a custom package for OpenMANET, and can build it as an OpenWRT package, feel free to open a pull request in the [OpenMANET Packages Repository](https://github.com/OpenMANET/packages).
