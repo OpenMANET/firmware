@@ -1,7 +1,30 @@
 # OpenMANET Firmware
-OpenMANET firmware is based on OpenWRT.
+A MANET (Mobile Ad-Hoc Network) is a self-forming wireless mesh where each node connects directly without centralized infrastructure. This technology is especially useful in the civilian space for search and rescue, disaster response, airsoft events, and any disconnected communications scenario. Designed to be budget-friendly with excellent long-range performance. The build is designed to integrate with ATAK over multicast, but works equally well over standard IP and internet links.
 
-## Dependencies
+**Software Specifications**
+- OpenWRT 24.10 Base
+- Linux Kernel 6.6.102
+- Wifi Drivers back-ported from 6.12.6
+- Morse Micro Drivers 1.16
+
+## Supported Hardware
+### SBC
+| Device            | Status    | Onboard WiFi      | Notes                        |
+|-------------------|-----------|-------------------|------------------------------|
+| Raspberry Pi 3B   | ✅ Tested |                   |                              |
+| Raspberry Pi 4    | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
+| Raspberry Pi CM4  | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
+
+### HaLow
+
+| Device              | Status    | Interface  | MM Chipset | Notes                                 |
+|---------------------|-----------|------------|------------|---------------------------------------|
+| Wio-WM6108 + WM1302 | ✅ Tested |    SPI     | 6106       | Best performing with HaLow currently  |
+| Silex SX-SDMAH      | ✅ Tested |   SDIO     | 6106       | Very low dBm and high amount of noise |
+| Alfa AHPI6108E      | ✅ Tested |   SDIO     | 6106       | Decent performance                    |
+
+## Building OpenMANET Firmware
+### Dependencies
 
 To build the OpenMANET OpenWrt, you need a working Linux environment. This has been tested with Ubuntu 24.04 and higher.
 
@@ -14,7 +37,7 @@ Install build environment packages with
   libopusfile-dev portaudio19-dev net-tools libpcre3-dev libpcre3
 ```
 
-## Usage
+### Usage
 
 Run the `./scripts/openmanet_setup.sh` script to configure the build for your board of choice.
 
@@ -40,6 +63,6 @@ For verbose compilation, consider using
 
 Once the build is complete a compiled image can be found in `bin/target/<platform>/<target>/`
 
-## Extending OpenMANET
+### Extending OpenMANET
 
 If you want to contribute a custom package for OpenMANET, and can build it as an OpenWRT package, feel free to open a pull request in the [OpenMANET Packages Repository](https://github.com/OpenMANET/packages).
