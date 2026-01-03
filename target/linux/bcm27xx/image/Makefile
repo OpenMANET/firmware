@@ -56,6 +56,16 @@ define Build/boot-2711
 	mcopy -i $@.boot $(KDIR)/fixup4x.dat ::
 endef
 
+define Build/boot-2710
+	mcopy -i $@.boot $(KDIR)/bootcode.bin ::
+	mcopy -i $@.boot $(KDIR)/start.elf ::
+	mcopy -i $@.boot $(KDIR)/start_cd.elf ::
+	mcopy -i $@.boot $(KDIR)/start_x.elf ::
+	mcopy -i $@.boot $(KDIR)/fixup.dat ::
+	mcopy -i $@.boot $(KDIR)/fixup_cd.dat ::
+	mcopy -i $@.boot $(KDIR)/fixup_x.dat ::
+endef
+
 define Build/boot-ekh01
 	# Put ekh01 model info into device tree (picked up by 01_sysinfo).
 	# This uses a custom overlay which accepts parameters (via RPI's __overrides__ mechanism),
@@ -351,7 +361,7 @@ define Device/bcm2711_mm6108-seeed-spi
   DEVICE_VARIANT := SPI
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-seeed-spi
-  DISTROCONFIG_EXTRA := mm610x-spi
+  DISTROCONFIG_EXTRA := mm6108-seeed-spi
 endef
 ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm6108-seeed-spi
@@ -375,7 +385,7 @@ define Device/bcm2710_mm6108-seeed-spi
   DEVICE_VARIANT := SPI
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   SUPPORTED_DEVICES += bcm2710,mm6108-seeed-spi
-  DISTROCONFIG_EXTRA := mm610x-spi
+  DISTROCONFIG_EXTRA := mm6108-seeed-spi
 endef
 ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm6108-seeed-spi

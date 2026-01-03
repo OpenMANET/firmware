@@ -1,0 +1,2 @@
+dtparam=spi=on
+dtoverlay=mm6108-seeed-spi

@@ -1,0 +1,88 @@
+From 3b1cf3b8bf0b0c38d0d2c8f04e4d8bd1fdc7b0a3 Mon Sep 17 00:00:00 2001
+From: OpenWrt <openwrt@localhost>
+Date: Thu, 12 Sep 2024 00:00:00 +0000
+Subject: [PATCH] dt-overlays: morse: add Seeed MM6108 SPI overlay
+
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/mm6108-seeed-spi-overlay.dts
+@@ -0,0 +1,80 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2837",
++	             "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2710", "brcm,bcm2711";
++
++	fragment@0 {
++		target = <&spi0>;
++		frag0: __overlay__ {
++			pinctrl-0 = <&spi0_pins &spi0_cs_pins &morse_wake &morse_busy &morse_irq &morse_reset>;
++			cs-gpios = <&gpio 8 1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++
++			mm6108: mm6108@0 {
++				compatible = "morse,mm610x-spi";
++				reg = <0>; /* CE0 */
++				reset-gpios = <&gpio 17 0>;
++				power-gpios = <&gpio 23 0>,
++				              <&gpio 24 0>;
++				spi-irq-gpios = <&gpio 5 0>;
++				spi-max-frequency = <50000000>;
++				status = "okay";
++			};
++
++			spidev0: spidev@0 {
++				reg = <0>; /* CE0 */
++				status = "disabled";
++			};
++
++			spidev1: spidev@1 {
++				reg = <1>; /* CE1 */
++				status = "disabled";
++			};
++		};
++	};
++
++	fragment@1 {
++		target = <&gpio>;
++		__overlay__ {
++			spi0_cs_pins: spi0_cs_pins {
++				brcm,pins = <8>;
++				brcm,function = <1>; /* BCM2835_FSEL_GPIO_OUT */
++				brcm,pull = <2>;     /* SET SPI PINS AS PULL HIGH */
++			};
++			spi0_pins: spi0_pins {
++				brcm,pins = <9 10 11>;
++				brcm,function = <4>; /* BCM2835_FSEL_ALT0 (SPI0) */
++				brcm,pull = <2 2 2>; /* SET SPI PINS AS PULL HIGH */
++			};
++
++			morse_wake: morse_wake {
++				brcm,pins = <23>;
++				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
++				brcm,pull = <2>;     /* PULL UP */
++			};
++
++			morse_busy: morse_busy {
++				brcm,pins = <24>;
++				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
++				brcm,pull = <1>;     /* PULL DOWN */
++			};
++
++			morse_irq: morse_irq {
++				brcm,pins = <5>;
++				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
++				brcm,pull = <2>;     /* PULL UP */
++			};
++
++			morse_reset: morse_reset {
++				brcm,pins = <17>;
++				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
++				brcm,pull = <2>;     /* PULL UP */
++			};
++
++		};
++	};
++};

@@ -1,9 +1,10 @@
 --- a/arch/arm/boot/dts/overlays/Makefile
 +++ b/arch/arm/boot/dts/overlays/Makefile
-@@ -170,7 +170,11 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
+@@ -170,7 +170,12 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
  	miniuart-bt.dtbo \
  	mipi-dbi-spi.dtbo \
  	mlx90640.dtbo \
++	mm6108-seeed-spi.dtbo \
 +	mm610x-spi.dtbo \
 +	mm810x-spi.dtbo \
 +	mm_wlan.dtbo \
