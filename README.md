@@ -11,9 +11,10 @@ A MANET (Mobile Ad-Hoc Network) is a self-forming wireless mesh where each node 
 ### SBC
 | Device            | Status    | Onboard WiFi      | Notes                        |
 |-------------------|-----------|-------------------|------------------------------|
-| Raspberry Pi 3B   | ✅ Tested |                   |                              |
 | Raspberry Pi 4    | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
 | Raspberry Pi CM4  | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
+| Raspberry Pi 3B   | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
+| Raspberry Pi 2W   | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
 
 ### HaLow
 
