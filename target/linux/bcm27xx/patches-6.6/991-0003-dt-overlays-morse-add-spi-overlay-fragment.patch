@@ -6,18 +6,17 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 
 --- /dev/null
 +++ b/arch/arm/boot/dts/overlays/mm610x-spi-overlay.dts
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,53 @@
 +/dts-v1/;
 +/plugin/;
 +
 +/ {
-+	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2837",
-+	             "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2710", "brcm,bcm2711";
++	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2711";
 +
 +	fragment@0 {
 +		target = <&spi0>;
 +		frag0: __overlay__ {
-+			pinctrl-0 = <&spi0_pins &spi0_cs_pins &morse_wake &morse_busy &morse_irq &morse_reset>;
++			pinctrl-0 = <&spi0_pins &spi0_cs_pins>;
 +			cs-gpios = <&gpio 8 1>;
 +			#address-cells = <1>;
 +			#size-cells = <0>;
@@ -25,22 +24,22 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +
 +			mm6108: mm6108@0 {
 +				compatible = "morse,mm610x-spi";
-+				reg = <0>; /* CE0 */
++				reg = <0>;	/* CE0 */
 +				reset-gpios = <&gpio 17 0>;
-+				power-gpios = <&gpio 23 0>,
-+				              <&gpio 24 0>;
++				power-gpios = <&gpio 3 0>,
++				              <&gpio 7 0>;
 +				spi-irq-gpios = <&gpio 5 0>;
 +				spi-max-frequency = <50000000>;
 +				status = "okay";
 +			};
 +
 +			spidev0: spidev@0 {
-+				reg = <0>; /* CE0 */
++				reg = <0>;	/* CE0 */
 +				status = "disabled";
 +			};
 +
 +			spidev1: spidev@1 {
-+				reg = <1>; /* CE1 */
++				reg = <1>;	/* CE1 */
 +				status = "disabled";
 +			};
 +		};
@@ -52,36 +51,10 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +			spi0_cs_pins: spi0_cs_pins {
 +				brcm,pins = <8>;
 +				brcm,function = <1>; /* BCM2835_FSEL_GPIO_OUT */
-+				brcm,pull = <2>;     /* SET SPI PINS AS PULL HIGH */
++				brcm,pull = <2>; 	 /* SET SPI PINS AS PULL HIGH */
 +			};
 +			spi0_pins: spi0_pins {
-+				brcm,pins = <9 10 11>;
-+				brcm,function = <4>; /* BCM2835_FSEL_ALT0 (SPI0) */
 +				brcm,pull = <2 2 2>; /* SET SPI PINS AS PULL HIGH */
-+			};
-+
-+			morse_wake: morse_wake {
-+				brcm,pins = <23>;
-+				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
-+				brcm,pull = <2>;     /* PULL UP */
-+			};
-+
-+			morse_busy: morse_busy {
-+				brcm,pins = <24>;
-+				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
-+				brcm,pull = <1>;     /* PULL DOWN */
-+			};
-+
-+			morse_irq: morse_irq {
-+				brcm,pins = <5>;
-+				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
-+				brcm,pull = <2>;     /* PULL UP */
-+			};
-+
-+			morse_reset: morse_reset {
-+				brcm,pins = <17>;
-+				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
-+				brcm,pull = <2>;     /* PULL UP */
 +			};
 +
 +		};
@@ -90,18 +63,17 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 \ No newline at end of file
 --- /dev/null
 +++ b/arch/arm/boot/dts/overlays/mm810x-spi-overlay.dts
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,53 @@
 +/dts-v1/;
 +/plugin/;
 +
 +/ {
-+	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2837",
-+	             "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2710", "brcm,bcm2711";
++	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2711";
 +
 +	fragment@0 {
 +		target = <&spi0>;
 +		frag0: __overlay__ {
-+			pinctrl-0 = <&spi0_pins &spi0_cs_pins &morse_wake &morse_busy &morse_irq &morse_reset>;
++			pinctrl-0 = <&spi0_pins &spi0_cs_pins>;
 +			cs-gpios = <&gpio 8 1>;
 +			#address-cells = <1>;
 +			#size-cells = <0>;
@@ -109,22 +81,22 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +
 +			mm8108: mm8108@0 {
 +				compatible = "morse,mm810x-spi";
-+				reg = <0>; /* CE0 */
-+				reset-gpios = <&gpio 17 0>;
-+				power-gpios = <&gpio 23 0>,
-+				              <&gpio 24 0>;
-+				spi-irq-gpios = <&gpio 5 0>;
++				reg = <0>;	/* CE0 */
++				reset-gpios = <&gpio 5 0>;
++				power-gpios = <&gpio 3 0>,
++				              <&gpio 7 0>;
++				spi-irq-gpios = <&gpio 25 0>;
 +				spi-max-frequency = <50000000>;
 +				status = "okay";
 +			};
 +
 +			spidev0: spidev@0 {
-+				reg = <0>; /* CE0 */
++				reg = <0>;	/* CE0 */
 +				status = "disabled";
 +			};
 +
 +			spidev1: spidev@1 {
-+				reg = <1>; /* CE1 */
++				reg = <1>;	/* CE1 */
 +				status = "disabled";
 +			};
 +		};
@@ -136,36 +108,10 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +			spi0_cs_pins: spi0_cs_pins {
 +				brcm,pins = <8>;
 +				brcm,function = <1>; /* BCM2835_FSEL_GPIO_OUT */
-+				brcm,pull = <2>;     /* SET SPI PINS AS PULL HIGH */
++				brcm,pull = <2>; 	 /* SET SPI PINS AS PULL HIGH */
 +			};
 +			spi0_pins: spi0_pins {
-+				brcm,pins = <9 10 11>;
-+				brcm,function = <4>; /* BCM2835_FSEL_ALT0 (SPI0) */
 +				brcm,pull = <2 2 2>; /* SET SPI PINS AS PULL HIGH */
-+			};
-+
-+			morse_wake: morse_wake {
-+				brcm,pins = <23>;
-+				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
-+				brcm,pull = <2>;     /* PULL UP */
-+			};
-+
-+			morse_busy: morse_busy {
-+				brcm,pins = <24>;
-+				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
-+				brcm,pull = <1>;     /* PULL DOWN */
-+			};
-+
-+			morse_irq: morse_irq {
-+				brcm,pins = <5>;
-+				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
-+				brcm,pull = <2>;     /* PULL UP */
-+			};
-+
-+			morse_reset: morse_reset {
-+				brcm,pins = <17>;
-+				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
-+				brcm,pull = <2>;     /* PULL UP */
 +			};
 +
 +		};

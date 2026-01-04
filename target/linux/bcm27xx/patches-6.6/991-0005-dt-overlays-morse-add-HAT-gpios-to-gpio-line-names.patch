@@ -5,81 +5,79 @@ Date: Fri, 28 Jun 2024 09:28:52 +1000
 Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
 
 ---
- arch/arm/boot/dts/broadcom/bcm2710-rpi-3-b.dts      | 6 +++---
- arch/arm/boot/dts/broadcom/bcm2710-rpi-zero-2-w.dts | 6 +++---
- arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts      | 6 +++---
- arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts      | 6 +++---
- 4 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/broadcom/bcm2710-rpi-3-b.dts       | 6 +++---
+ arch/arm/boot/dts/broadcom/bcm2710-rpi-zero-2-w.dts  | 6 +++---
+ arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts       | 6 +++---
+ arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts       | 6 +++---
+ arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts     | 6 +++---
+ arch/arm64/boot/dts/broadcom/bcm2712-rpi-cm5.dtsi    | 6 +++---
+ 6 files changed, 18 insertions(+), 18 deletions(-)
 
 --- a/arch/arm/boot/dts/broadcom/bcm2710-rpi-3-b.dts
 +++ b/arch/arm/boot/dts/broadcom/bcm2710-rpi-3-b.dts
-@@ -46,9 +46,9 @@
- 			  "GPIO14",
- 			  "GPIO15",
- 			  "GPIO16",
--			  "GPIO17",
-+			  "MM_RESET",
- 			  "GPIO18",
- 			  "GPIO19",
- 			  "GPIO20",
- 			  "GPIO21",
- 			  "GPIO22",
--			  "GPIO23",
--			  "GPIO24",
+@@ -32,11 +32,11 @@
+ 	gpio-line-names = "ID_SDA",
+ 			  "ID_SCL",
+ 			  "GPIO2",
+-			  "GPIO3",
 +			  "MM_WAKE",
+ 			  "GPIO4",
+-			  "GPIO5",
++			  "MM_RESET",
+ 			  "GPIO6",
+-			  "GPIO7",
 +			  "MM_BUSY",
- 			  "GPIO25",
+ 			  "GPIO8",
+ 			  "GPIO9",
+ 			  "GPIO10",
 --- a/arch/arm/boot/dts/broadcom/bcm2710-rpi-zero-2-w.dts
 +++ b/arch/arm/boot/dts/broadcom/bcm2710-rpi-zero-2-w.dts
-@@ -44,9 +44,9 @@
- 			  "GPIO14",
- 			  "GPIO15",
- 			  "GPIO16",
--			  "GPIO17",
-+			  "MM_RESET",
- 			  "GPIO18",
- 			  "GPIO19",
- 			  "GPIO20",
- 			  "GPIO21",
- 			  "GPIO22",
--			  "GPIO23",
--			  "GPIO24",
+@@ -30,11 +30,11 @@
+ 	gpio-line-names = "ID_SDA",
+ 			  "ID_SCL",
+ 			  "GPIO2",
+-			  "GPIO3",
 +			  "MM_WAKE",
+ 			  "GPIO4",
+-			  "GPIO5",
++			  "MM_RESET",
+ 			  "GPIO6",
+-			  "GPIO7",
 +			  "MM_BUSY",
- 			  "GPIO25",
+ 			  "GPIO8",
+ 			  "GPIO9",
+ 			  "GPIO10",
 --- a/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
 +++ b/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
-@@ -96,9 +96,9 @@
- 			  "GPIO14",
- 			  "GPIO15",		/* 15 */
- 			  "GPIO16",
--			  "GPIO17",
-+			  "MM_RESET",
- 			  "GPIO18",
- 			  "GPIO19",
- 			  "GPIO20",		/* 20 */
- 			  "GPIO21",
- 			  "GPIO22",
--			  "GPIO23",
--			  "GPIO24",
+@@ -81,11 +81,11 @@
+ 	gpio-line-names = "ID_SDA",		/*  0 */
+ 			  "ID_SCL",
+ 			  "GPIO2",
+-			  "GPIO3",
 +			  "MM_WAKE",
+ 			  "GPIO4",
+-			  "GPIO5",		/*  5 */
++			  "MM_RESET",		/*  5 */
+ 			  "GPIO6",
+-			  "GPIO7",
 +			  "MM_BUSY",
- 			  "GPIO25",		/* 25 */
+ 			  "GPIO8",
+ 			  "GPIO9",
+ 			  "GPIO10",		/* 10 */
 --- a/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts
 +++ b/arch/arm/boot/dts/broadcom/bcm2711-rpi-cm4.dts
-@@ -108,9 +108,9 @@
- 			  "TXD1",
- 			  "RXD1",
- 			  "GPIO16",
--			  "GPIO17",
-+			  "MM_RESET",
- 			  "GPIO18",
- 			  "GPIO19",
- 			  "GPIO20",
- 			  "GPIO21",
- 			  "GPIO22",
--			  "GPIO23",
--			  "GPIO24",
+@@ -319,11 +319,11 @@
+ 	gpio-line-names = "ID_SDA",
+ 			  "ID_SCL",
+ 			  "GPIO2",
+-			  "GPIO3",
 +			  "MM_WAKE",
+ 			  "GPIO4",
+-			  "GPIO5",
++			  "MM_RESET",
+ 			  "GPIO6",
+-			  "GPIO7",
 +			  "MM_BUSY",
- 			  "GPIO25",
+ 			  "GPIO8",
+ 			  "GPIO9",
+ 			  "GPIO10",
