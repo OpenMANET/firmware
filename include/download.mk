@@ -236,13 +236,13 @@ define DownloadMethod/rawgit
 	rm -rf $(SUBDIR) && mkdir $(SUBDIR) && \
 	$(TAR) -C $(SUBDIR) -xf $(SUBDIR).tar.git && \
 	(cd $(SUBDIR) && \
-	if [ -f .gitmodules ]; then \
+	if [ -f .gitmodules ] && [ -n "$$FORCE_GIT_HTTPS_SUBMODULES" ]; then \
 		sed -i -e 's#git@github.com:#https://github.com/#g' \
 		       -e 's#ssh://git@github.com/#https://github.com/#g' .gitmodules; \
 		git submodule sync --recursive; \
+		git config url."https://github.com/".insteadOf git@github.com:; \
+		git config url."https://github.com/".insteadOf ssh://git@github.com/; \
 	fi && \
-	git config url."https://github.com/".insteadOf git@github.com: && \
-	git config url."https://github.com/".insteadOf ssh://git@github.com/ && \
 	$(if $(filter skip,$(SUBMODULES)),true,git submodule update --init --recursive -- $(SUBMODULES) && \
 	rm -rf .git .gitmodules)) && \
 	echo "Packing checkout..." && \
