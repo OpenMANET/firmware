@@ -275,7 +275,7 @@ define Device/morse_ekh01_base
   $(Device/rpi-4)
   SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
   SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
-  DEVICE_VENDOR := MorseMicro
+  DEVICE_VENDOR := RPI
   # remove the factory image (causes confusion)
   IMAGES := sysupgrade.img.gz
   # Simplify by removing board and OpenWRT version.
@@ -290,7 +290,7 @@ define Device/morse_pi3_base
   $(Device/rpi-3)
   SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
   SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
-  DEVICE_VENDOR := MorseMicro
+  DEVICE_VENDOR := RPI
   # remove the factory image (causes confusion)
   IMAGES := sysupgrade.img.gz
   # Simplify by removing board and OpenWRT version.
@@ -355,40 +355,40 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += morse_mm6108-ekh01-sdio
 endif
 
-define Device/bcm2711_mm6108-seeed-spi
+define Device/bcm2711_mm6108-spi
   $(Device/morse_ekh01_base)
-  DEVICE_MODEL := RPI4-MM6108-SEEED
+  DEVICE_MODEL := RPI4-MM6108
   DEVICE_VARIANT := SPI
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-seeed-spi
   DISTROCONFIG_EXTRA := mm6108-seeed-spi
 endef
 ifeq ($(SUBTARGET),bcm2711)
-  TARGET_DEVICES += bcm2711_mm6108-seeed-spi
+  TARGET_DEVICES += bcm2711_mm6108-spi
 endif
 
-define Device/bcm2711_mm6108-alfa-sdio
+define Device/bcm2711_mm6108-sdio
   $(Device/morse_ekh01_base)
-  DEVICE_MODEL := RPI4-MM6108-ALFA
+  DEVICE_MODEL := RPI4-MM6108
   DEVICE_VARIANT := SDIO
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-alfa-sdio
+  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-sdio
   DISTROCONFIG_EXTRA := mm610x-sdio
 endef
 ifeq ($(SUBTARGET),bcm2711)
-  TARGET_DEVICES += bcm2711_mm6108-alfa-sdio
+  TARGET_DEVICES += bcm2711_mm6108-sdio
 endif
 
-define Device/bcm2710_mm6108-seeed-spi
+define Device/bcm2710_mm6108-spi
   $(Device/morse_pi3_base)
-  DEVICE_MODEL := RPI3-MM6108-SEEED
+  DEVICE_MODEL := RPI3-MM6108
   DEVICE_VARIANT := SPI
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   SUPPORTED_DEVICES += bcm2710,mm6108-seeed-spi
   DISTROCONFIG_EXTRA := mm6108-seeed-spi
 endef
 ifeq ($(SUBTARGET),bcm2710)
-  TARGET_DEVICES += bcm2710_mm6108-seeed-spi
+  TARGET_DEVICES += bcm2710_mm6108-spi
 endif
 
 define Device/bcm2710_mm6108-sdio
