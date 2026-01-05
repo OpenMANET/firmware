@@ -1,3 +1,2 @@
-dtoverlay=morse-ps
 dtparam=spi=on
 dtoverlay=mm610x-spi
