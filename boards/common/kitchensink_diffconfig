@@ -149,4 +149,4 @@ CONFIG_PACKAGE_dockerd=m
 CONFIG_PACKAGE_docker=m
 CONFIG_PACKAGE_docker-compose=m
 CONFIG_PACKAGE_luci-lib-docker=m
-CONFIG_PACAKGE_luci-app-dockerman=m
+CONFIG_PACKAGE_luci-app-dockerman=m
