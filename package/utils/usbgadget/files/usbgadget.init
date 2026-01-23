@@ -5,9 +5,39 @@ START=19
 GADGET_FS=/sys/kernel/config/usb_gadget
 GADGET_PRESETS_DIR=/usr/share/usbgadget
 GADGET_PREFIX=owrt_
+GADGET_MAC_FILE=/etc/usbgadget-mac
 
 log() {
 	logger -t usbgadget "$@"
+}
+
+ensure_gadget_mac() {
+	if [ -s "$GADGET_MAC_FILE" ]; then
+		return 0
+	fi
+
+	local hex b1 b1i mac
+	hex=$(dd if=/dev/urandom bs=6 count=1 2>/dev/null | hexdump -v -e '/1 "%02x"')
+	if [ -z "$hex" ]; then
+		hex=$(dd if=/dev/urandom bs=6 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n')
+	fi
+	[ -n "$hex" ] || return 1
+
+	b1=${hex:0:2}
+	b1i=$((0x$b1))
+	b1i=$((b1i & 0xFC))
+	b1=$(printf "%02x" "$b1i")
+	hex="${b1}${hex:2}"
+
+	mac=$(echo "$hex" | sed 's/../&:/g; s/:$//')
+	echo "$mac" > "$GADGET_MAC_FILE"
+}
+
+gadget_mac_prefix() {
+	local base
+	ensure_gadget_mac || return 1
+	base=$(cat "$GADGET_MAC_FILE")
+	echo "$base" | awk -F: '{print $1":"$2":"$3":"$4":"$5}'
 }
 
 apply_configs() {
@@ -77,6 +107,27 @@ setup_function() {
 	}
 
 	apply_configs "$fun_path" "$cfg"
+
+	local dev_addr host_addr mac_prefix dev_suffix host_suffix
+	config_get dev_addr "$cfg" dev_addr
+	config_get host_addr "$cfg" host_addr
+	if [ -z "$dev_addr" ] && [ -z "$host_addr" ]; then
+		case "$usbfun" in
+			ecm)
+				dev_suffix=01
+				host_suffix=02
+				;;
+			rndis)
+				dev_suffix=03
+				host_suffix=04
+				;;
+		esac
+		if [ -n "$dev_suffix" ]; then
+			mac_prefix=$(gadget_mac_prefix) || return
+			echo "${mac_prefix}:${dev_suffix}" > "$fun_path/dev_addr"
+			echo "${mac_prefix}:${host_suffix}" > "$fun_path/host_addr"
+		fi
+	fi
 
 	ln -s "$fun_path" "$cfg_path"
 }

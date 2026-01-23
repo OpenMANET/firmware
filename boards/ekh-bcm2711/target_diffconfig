@@ -22,6 +22,9 @@ CONFIG_PACKAGE_morse-board-config-hotplug-model=y
 CONFIG_PACKAGE_luci-app-ekhwizards=y
 
 CONFIG_PACKAGE_bsp-bcm271x=y
+CONFIG_PACKAGE_kmod-fs-configfs=y
+CONFIG_PACKAGE_usbgadget=y
+CONFIG_PACKAGE_usbgadget-ecm-rndis=y
 
 CONFIG_TARGET_ROOTFS_PARTSIZE=4092
 CONFIG_PACKAGE_persistent-vars-storage-bcm2711=y

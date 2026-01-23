@@ -1,0 +1,7 @@
+################################################################################
+# Bootloader configuration - distroconfig-otg.txt
+################################################################################
+
+[cm4]
+# Enable OTG/peripheral mode on the carrier USB port.
+dtoverlay=dwc2,dr_mode=peripheral

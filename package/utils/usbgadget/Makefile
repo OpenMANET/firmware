@@ -52,3 +52,4 @@ endef
 
 $(eval $(call GadgetPreset,ncm,CDC-NCM,+kmod-usb-gadget-ncm))
 $(eval $(call GadgetPreset,acm,CDC-ACM,+kmod-usb-gadget-serial))
+$(eval $(call GadgetPreset,ecm-rndis,ECM+RNDIS,+kmod-usb-gadget-eth))
