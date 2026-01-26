@@ -1,7 +1,7 @@
-src-git openmanet https://github.com/OpenMANET/packages.git^c0619c05c43052ddb28b36dff95a7baf030e2d91
+src-git openmanet https://github.com/OpenMANET/packages.git^af5641b92de564952e7acdd78b4864dae69a5e66
 src-git morse https://github.com/MorseMicro/morse-feed.git^263b4c4ed8ae1683a180ce9cd28d3516c40dbce5
 src-git gateworks https://github.com/Gateworks/gw-openwrt-packages.git^fa86fdae267c1769c2c9ab960f1709ff28860cbd
-src-git packages https://git.openwrt.org/feed/packages.git^db7e5480779046d47846b718e025182c8f5a7384
+src-git packages https://github.com/openwrt/packages.git^db7e5480779046d47846b718e025182c8f5a7384
 src-git luci https://github.com/OpenMANET/luci.git^53e65158f7075109d140f8943b4a1f0eb6d84339
-src-git routing https://git.openwrt.org/feed/routing.git^d8f9eab170bb63024596c4133c04a84a7aa8a454
-src-git telephony https://git.openwrt.org/feed/telephony.git^2a4541d46199ac96fac214d02c908402831c4dc6
+src-git routing https://github.com/openwrt/routing.git^d8f9eab170bb63024596c4133c04a84a7aa8a454
+src-git telephony https://github.com/openwrt/telephony.git^2a4541d46199ac96fac214d02c908402831c4dc6

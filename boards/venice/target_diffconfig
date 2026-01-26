@@ -19,7 +19,17 @@ CONFIG_PACKAGE_morsectrl=y
 CONFIG_PACKAGE_morse-board-config=y
 CONFIG_PACKAGE_morse-board-config-hotplug-model=y
 CONFIG_PACKAGE_morse-fw-8108=y
+CONFIG_MORSE_SDIO=y
 CONFIG_MORSE_USB=y
+CONFIG_MORSE_USER_ACCESS=y
+CONFIG_MORSE_VENDOR_COMMAND=y
+CONFIG_MORSE_SDIO_ALIGNMENT=4
+CONFIG_MORSE_POWERSAVE_MODE=0
+CONFIG_MORSE_RC=y
+CONFIG_MORSE_MONITOR=y
+CONFIG_MORSE_DEBUGFS=y
+CONFIG_WLAN_VENDOR_MORSE=m
+CONFIG_PACKAGE_libusb-1.0=y
 
 ## Necessary for USB to Ethernet Adapters ##
 CONFIG_PACKAGE_kmod-usb-net-asix=y
@@ -1230,8 +1240,6 @@ CONFIG_DRIVER_11BE_SUPPORT=y
 # CONFIG_PACKAGE_libstdcpp=y
 # CONFIG_PACKAGE_libubus-lua=y
 # CONFIG_PACKAGE_libudev-zero=y
-# CONFIG_PACKAGE_libusb-1.0=y
-# CONFIG_PACKAGE_libusb-compat=y
 # CONFIG_PACKAGE_libwebp=y
 # CONFIG_PACKAGE_libxml2=y
 # CONFIG_PACKAGE_libxtables=y
@@ -1240,7 +1248,6 @@ CONFIG_DRIVER_11BE_SUPPORT=y
 # CONFIG_PACKAGE_lua=y
 # # CONFIG_PACKAGE_luci=y
 # # CONFIG_PACKAGE_luci-app-firewall=y
-
 # # CONFIG_PACKAGE_luci-app-package-manager=y
 # # CONFIG_PACKAGE_luci-app-qos=y
 # # CONFIG_PACKAGE_luci-app-statistics=y

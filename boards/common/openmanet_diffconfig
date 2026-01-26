@@ -25,10 +25,10 @@ CONFIG_PACKAGE_ALFRED_BATHOSTS=y
 CONFIG_PACKAGE_alfred=y
 
 # Added for ADSB to COT
-CONFIG_PACKAGE_adsbtocot=y
-CONFIG_PACKAGE_dump1090=y
+CONFIG_PACKAGE_adsbtocot=m
+CONFIG_PACKAGE_dump1090=m
 # (optional tools; dump1090 only needs librtlsdr, but these are handy)
-CONFIG_PACKAGE_rtl-sdr=y
+CONFIG_PACKAGE_rtl-sdr=m
 
 # OpenMANETd
 CONFIG_PACKAGE_golang=y
@@ -41,6 +41,7 @@ CONFIG_PACKAGE_avahi-daemon-service-ssh=y
 CONFIG_PACKAGE_avahi-utils=y
 
 # WIFI
+CONFIG_PACKAGE_kmod-iwlwifi=y
 CONFIG_PACKAGE_iwlwifi-firmware-ax210=y
 CONFIG_PACKAGE_iwlwifi-firmware-ax200=y
 
@@ -50,6 +51,8 @@ CONFIG_PACKAGE_kmod-ath11k=y
 CONFIG_PACKAGE_kmod-ath11k-pci=y
 CONFIG_PACKAGE_ath10k-firmware-qca6174=y
 CONFIG_PACKAGE_kmod-ath10k=y
+CONFIG_PACKAGE_kmod-ath9k=y
+CONFIG_PACKAGE_kmod-ath9k-htc=y
 
 CONFIG_PACKAGE_kmod-mt76=y
 CONFIG_PACKAGE_kmod-mt7915-firmware=y

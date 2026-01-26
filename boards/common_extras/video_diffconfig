@@ -3,7 +3,7 @@
 # and hardware encode/decode via v4l).
 
 # ffmpeg
-CONFIG_PACKAGE_ffmpeg=y
+CONFIG_PACKAGE_ffmpeg=m
 # ffmpeg won't build without specifying this (maybe upstream dep error)
 CONFIG_PACKAGE_libopus=y
 # Include _software_ h264 encode/decode.
@@ -12,17 +12,17 @@ CONFIG_BUILD_PATENTED=y
 CONFIG_PACKAGE_libx264=y
 
 # gstreamer
-CONFIG_PACKAGE_gstreamer1-libs=y
-CONFIG_PACKAGE_gstreamer1-utils=y
-CONFIG_PACKAGE_gstreamer1-plugins-base=y
-CONFIG_PACKAGE_gstreamer1-plugins-good=y
-CONFIG_PACKAGE_gst1-mod-video4linux2=y
-CONFIG_PACKAGE_gst1-mod-udp=y
-CONFIG_PACKAGE_gst1-mod-rtsp=y
-CONFIG_PACKAGE_gst1-mod-jpeg=y
-CONFIG_PACKAGE_gst1-mod-videotestsrc=y
-CONFIG_PACKAGE_gst1-mod-videoconvert=y
-CONFIG_PACKAGE_gst1-mod-rtspclientsink=y
+CONFIG_PACKAGE_gstreamer1-libs=m
+CONFIG_PACKAGE_gstreamer1-utils=m
+CONFIG_PACKAGE_gstreamer1-plugins-base=m
+CONFIG_PACKAGE_gstreamer1-plugins-good=m
+CONFIG_PACKAGE_gst1-mod-video4linux2=m
+CONFIG_PACKAGE_gst1-mod-udp=m
+CONFIG_PACKAGE_gst1-mod-rtsp=m
+CONFIG_PACKAGE_gst1-mod-jpeg=m
+CONFIG_PACKAGE_gst1-mod-videotestsrc=m
+CONFIG_PACKAGE_gst1-mod-videoconvert=m
+CONFIG_PACKAGE_gst1-mod-rtspclientsink=m
 
 # v4l
-CONFIG_PACKAGE_v4l-utils=y
+CONFIG_PACKAGE_v4l-utils=m

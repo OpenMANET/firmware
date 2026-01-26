@@ -15,27 +15,18 @@ body:
   - type: input
     id: version
     attributes:
-      label: OpenWrt version
+      label: OpenMANET version
       description: |
-        The OpenWrt release or commit hash where this bug occurs (use command below).
-        ```. /etc/openwrt_release && echo $DISTRIB_REVISION```
-    validations:
-      required: true
-  - type: input
-    id: release
-    attributes:
-      label: OpenWrt release
-      description: |
-        The OpenWrt release or commit hash where this bug occurs (use command below).
-        ```. /etc/openwrt_release && echo $DISTRIB_RELEASE```
+        The OpenMANET release or commit hash where this bug occurs (use command below).
+        ```. /etc/openwrt_release && echo $DISTRIB_DESCRIPTION```
     validations:
       required: true
   - type: input
     id: target
     attributes:
-      label: OpenWrt target/subtarget
+      label: OpenMANET target/subtarget
       description: |
-        The OpenWrt target and subtarget where this bug is observed (use command below).
+        The OpenMANET target and subtarget where this bug is observed (use command below).
         ```. /etc/openwrt_release && echo $DISTRIB_TARGET```
     validations:
       required: true
@@ -46,15 +37,6 @@ body:
       description: |
         The device exhibiting this bug (if unsure, use command below).
         ```cat /tmp/sysinfo/model```
-    validations:
-      required: true
-  - type: dropdown
-    id: image_kind
-    attributes:
-      label: Image kind
-      options:
-        - Official downloaded image
-        - Self-built image
     validations:
       required: true
   - type: textarea
@@ -78,12 +60,20 @@ body:
       label: Additional info
       description: Add any additional info you think might be helfpul.
   - type: textarea
-    id: diffconfig
+    id: logs
     attributes:
-      label: Diffconfig
+      label: Logs
       description: |
-        In case of a self-built image, please attach diffconfig.
-        ```./scripts/diffconfig.sh```
+        Please provide relevant log output (use command below to capture system log).
+        ```logread```
+      render: text
+  - type: textarea
+    id: dmesg
+    attributes:
+      label: dmesg output
+      description: |
+        Please provide relevant kernel message output (use command below to capture kernel messages).
+        ```dmesg```
       render: text
   - type: checkboxes
     id: terms
@@ -91,5 +81,5 @@ body:
       label: Terms
       description: By submitting this issue, you agree to the terms below.
       options:
-        - label: I am reporting an issue for OpenWrt, not an unsupported fork.
+        - label: I have not modified the OpenMANET software. (Installed packages that are not included by default).
           required: true

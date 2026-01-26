@@ -92,8 +92,9 @@ define Device/gw_venice
   IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
   DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
   DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-8108
-  IMAGES := img.gz
-  IMAGE/img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip | append-metadata
+  IMAGES := sysupgrade.img.gz
+  IMAGE/sysupgrade.img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip | append-metadata
+  IMAGE/factory.img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip
 endef
 ifeq ($(SUBTARGET),cortexa53)
   TARGET_DEVICES += gw_venice
