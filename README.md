@@ -20,9 +20,10 @@ A MANET (Mobile Ad-Hoc Network) is a self-forming wireless mesh where each node 
 
 | Device              | Status    | Interface  | MM Chipset | Notes                                 |
 |---------------------|-----------|------------|------------|---------------------------------------|
-| Wio-WM6108 + WM1302 | ✅ Tested |    SPI     | 6108       | Best performing with HaLow currently  |
+| Wio-WM6108 + WM1302 | ✅ Tested |   SPI      | 6108       | Best performing with HaLow currently  |
 | Silex SX-SDMAH      | ✅ Tested |   SDIO     | 6108       | Very low dBm and high amount of noise |
 | Alfa AHPI6108E      | ✅ Tested |   SDIO     | 6108       | Decent performance                    |
+| TBD                 | ✅ Tested |   USB      | 8108       | Great performance                     |
 
 ## Building OpenMANET Firmware
 ### Dependencies
