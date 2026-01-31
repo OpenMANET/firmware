@@ -377,6 +377,18 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm6108-sdio
 endif
 
+define Device/bcm2711_mm8108-spi
+  $(Device/morse_ekh01_base)
+  DEVICE_MODEL := RPI4-MM8108
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm8108-spi
+  DISTROCONFIG_EXTRA := mm810x-spi
+endef
+ifeq ($(SUBTARGET),bcm2711)
+  TARGET_DEVICES += bcm2711_mm8108-spi
+endif
+
 define Device/bcm2710_mm6108-spi
   $(Device/morse_pi3_base)
   DEVICE_MODEL := RPI3-MM6108
@@ -399,6 +411,18 @@ define Device/bcm2710_mm6108-sdio
 endef
 ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm6108-sdio
+endif
+
+define Device/bcm2710_mm8108-spi
+  $(Device/morse_pi3_base)
+  DEVICE_MODEL := RPI3-MM8108
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2710,mm8108-spi
+  DISTROCONFIG_EXTRA := mm810x-spi
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_mm8108-spi
 endif
 
 $(eval $(call BuildImage))
