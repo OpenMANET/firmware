@@ -67,7 +67,7 @@ CONFIG_CFG80211_REQUIRE_SIGNED_REGDB=n
 CONFIG_PACKAGE_vxlan=y
 CONFIG_PACKAGE_luci-proto-vxlan=y
 CONFIG_PACKAGE_ip-bridge=y
-CONFIG_PACKAGE_tailscale=y
+CONFIG_PACKAGE_tailscale=m
 
 # Disable Packages not needed for OpenMANET
 CONFIG_PACKAGE_dahdi-linux=n
