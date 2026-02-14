@@ -147,5 +147,5 @@ CONFIG_PACKAGE_luci-lib-docker=m
 CONFIG_PACKAGE_luci-app-dockerman=m
 
 # Random
-#CONFIG_PACKAGE_mediamtx=m
+CONFIG_PACKAGE_mediamtx=m
 CONFIG_PACKAGE_adsbtocot=m
