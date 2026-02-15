@@ -64,9 +64,10 @@ CONFIG_CFG80211_CERTIFICATION_ONUS=y
 CONFIG_CFG80211_REQUIRE_SIGNED_REGDB=n
 
 # Network
+CONFIG_PACKAGE_ip-full=y
+CONFIG_PACKAGE_ip-bridge=y
 CONFIG_PACKAGE_vxlan=y
 CONFIG_PACKAGE_luci-proto-vxlan=y
-CONFIG_PACKAGE_ip-bridge=y
 CONFIG_PACKAGE_tailscale=y
 
 # Disable Packages not needed for OpenMANET
