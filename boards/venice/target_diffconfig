@@ -34,6 +34,10 @@ CONFIG_PACKAGE_libusb-1.0=y
 ## Necessary for USB to Ethernet Adapters ##
 CONFIG_PACKAGE_kmod-usb-net-asix=y
 CONFIG_PACKAGE_kmod-usb-net-asix-ax88179=y
+CONFIG_PACKAGE_kmod-fs-configfs=y
+CONFIG_PACAKGE_kmod-usb-gadget=y
+CONFIG_PACKAGE_kmod-usb-eth-gadget=y
+CONFIG_PACKAGE_usbgadget=y
 
 # Gateworks Specific
 CONFIG_PACKAGE_luci-app-gateworks=y
