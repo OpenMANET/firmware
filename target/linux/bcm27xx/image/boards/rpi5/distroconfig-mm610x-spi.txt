@@ -1,2 +1,0 @@
-dtparam=spi=on
-dtoverlay=mm610x-spi
