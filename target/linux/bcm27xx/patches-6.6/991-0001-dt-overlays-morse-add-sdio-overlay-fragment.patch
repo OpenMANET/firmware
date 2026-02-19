@@ -61,7 +61,7 @@ index 000000000..8c4a9f2e1
 +			status = "okay";
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			mm6108_sdio: mm6108_sdio@0 {
++			mm6108_sdio@0 {
 +				compatible = "morse,mm610x";
 +				reset-gpios = <&gpio 17 0>;
 +				power-gpios = <&gpio 3 0>,
