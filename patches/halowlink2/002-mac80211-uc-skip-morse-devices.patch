@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET HaLow Link 2 <noreply@openmanet.org>
+Date: Tue, 18 Feb 2026 00:00:00 +0000
+Subject: [PATCH] wifi-scripts: skip morse (HaLow) devices in mac80211.uc
+
+On HaLow Link 2, the morse SDIO device is detected by both mac80211.uc
+and morse.sh, creating a duplicate/bogus radio entry. Skip morse devices
+in mac80211.uc since they are managed by morse.sh.
+
+---
+ package/network/config/wifi-scripts/files/lib/wifi/mac80211.uc | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/package/network/config/wifi-scripts/files/lib/wifi/mac80211.uc b/package/network/config/wifi-scripts/files/lib/wifi/mac80211.uc
+index 3333333..4444444 100644
+--- a/package/network/config/wifi-scripts/files/lib/wifi/mac80211.uc
++++ b/package/network/config/wifi-scripts/files/lib/wifi/mac80211.uc
+@@ -34,6 +34,10 @@ for (let phy_name, phy in board.wlan) {
+ 	if (!info || !length(info.bands))
+ 		continue;
+
++	/* Skip morse (HaLow) devices - they are managed by morse.sh, not mac80211 */
++	if (match(readfile(`/sys/class/ieee80211/${phy_name}/device/uevent`) ?? "", /DRIVER=morse/))
++		continue;
++
+ 	let radios = length(info.radios) > 0 ? info.radios : [{ bands: info.bands }];
+ 	for (let radio in radios) {
+ 		while (config[`radio${idx}`])

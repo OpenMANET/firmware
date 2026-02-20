@@ -155,6 +155,10 @@ meig,slt866)
 mikrotik,routerboard-760igs)
 	ucidef_set_led_netdev "sfp" "SFP" "blue:sfp" "sfp"
 	;;
+morse,artini)
+	ucidef_set_led_netdev "halow" "rgb-halow" "rgb:led2" "wlan0" "link tx rx"
+	ucidef_set_led_netdev "80211n-ap" "rgb-80211n-ap" "rgb:led0" "phy0-ap0" "link tx rx"
+	;;
 mikrotik,ltap-2hnd|\
 mikrotik,routerboard-m11g)
 	ucidef_set_rssimon "wlan0" "200000" "1"
