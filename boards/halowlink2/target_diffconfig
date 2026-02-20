@@ -768,8 +768,7 @@ CONFIG_VERSION_SUPPORT_URL=""
 CONFIG_ZRAM_DEF_COMP_LZORLE=y
 
 # === HaLow Link 2: Override common configs that don't fit in 32MB flash ===
-# CONFIG_PACKAGE_tailscale is not set
-# CONFIG_PACKAGE_golang is not set
+CONFIG_PACKAGE_tailscale=y
 # CONFIG_PACKAGE_golang-src is not set
 # CONFIG_PACKAGE_ath10k-firmware-qca6174 is not set
 # CONFIG_PACKAGE_ath11k-firmware-wcn6855 is not set
