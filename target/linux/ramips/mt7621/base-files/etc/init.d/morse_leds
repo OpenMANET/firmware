@@ -1,0 +1,28 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+start() {
+    local board
+    board=$(cat /tmp/sysinfo/board_name 2>/dev/null)
+
+    [ "$board" = "morse,artini" ] || return 0
+
+    # Top (led1) - solid green status
+    echo none > /sys/class/leds/rgb:led1/trigger
+    echo 255 > /sys/class/leds/rgb:led1/brightness
+    echo '0 255 0' > /sys/class/leds/rgb:led1/multi_intensity
+
+    # Middle (led2) - purple HaLow
+    echo 255 > /sys/class/leds/rgb:led2/brightness
+    echo '255 0 127' > /sys/class/leds/rgb:led2/multi_intensity
+
+    # Bottom (led0) - green, flashes on WiFi 2.4GHz activity
+    echo 255 > /sys/class/leds/rgb:led0/brightness
+    echo '0 255 0' > /sys/class/leds/rgb:led0/multi_intensity
+    echo netdev > /sys/class/leds/rgb:led0/trigger
+    echo phy1-ap0 > /sys/class/leds/rgb:led0/device_name
+    echo 1 > /sys/class/leds/rgb:led0/link
+    echo 1 > /sys/class/leds/rgb:led0/tx
+    echo 1 > /sys/class/leds/rgb:led0/rx
+}

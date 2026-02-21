@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET HaLow Link 2 <noreply@openmanet.org>
+Date: Tue, 18 Feb 2026 00:00:00 +0000
+Subject: [PATCH] ramips: mt7621: add MorseMicro Artini (HaLow Link 2) device
+
+Add device definition and DTS for the MorseMicro HaLow Link 2
+(morse,artini) board based on MT7621 with MM8108 HaLow via SDIO.
+
+---
+ target/linux/ramips/dts/mt7621_morse_artini.dts | 380 ++++++++++++++++++
+ target/linux/ramips/image/mt7621.mk             |  10 +
+ 2 files changed, 390 insertions(+)
+ create mode 100644 target/linux/ramips/dts/mt7621_morse_artini.dts
+
+diff --git a/target/linux/ramips/image/mt7621.mk b/target/linux/ramips/image/mt7621.mk
+index aaaaaa..bbbbbb 100644
+--- a/target/linux/ramips/image/mt7621.mk
++++ b/target/linux/ramips/image/mt7621.mk
+@@ -2072,6 +2072,16 @@ endef
+ TARGET_DEVICES += mikrotik_routerboard-m33g
+
++define Device/morse_artini
++  $(Device/dsa-migration)
++  IMAGE_SIZE := 32448k
++  DEVICE_VENDOR := MorseMicro
++  DEVICE_MODEL := Artini
++  DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 kmod-mt7603 \
++	kmod-morse netifd-morse morse-fw-6108 morse-fw-8108
++endef
++TARGET_DEVICES += morse_artini
++
+ define Device/mqmaker_witi

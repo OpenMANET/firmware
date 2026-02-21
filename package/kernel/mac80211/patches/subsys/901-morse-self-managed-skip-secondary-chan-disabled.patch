@@ -1,0 +1,19 @@
+--- a/net/wireless/chan.c
++++ b/net/wireless/chan.c
+@@ -1466,6 +1466,16 @@ bool _cfg80211_chandef_usable(struct wiphy *wiphy,
+ 	if (width < 20)
+ 		prohibited_flags |= IEEE80211_CHAN_NO_OFDM;
+
++	/*
++	 * For self-managed regulatory wiphys (e.g. S1G drivers using a 5 GHz
++	 * channel shim), the driver is authoritative about which channels are
++	 * usable. Only enforce CHAN_DISABLED on the primary/control channel;
++	 * allow secondary sub-channels that carry CHAN_DISABLED so that wider
++	 * bandwidths (160 MHz) are not blocked by stale or shim-only flags.
++	 */
++	if (wiphy->regulatory_flags & REGULATORY_WIPHY_SELF_MANAGED)
++		prohibited_flags &= ~IEEE80211_CHAN_DISABLED;
++
+
+ 	if (!cfg80211_secondary_chans_ok(wiphy,
+ 					 ieee80211_chandef_to_khz(chandef),

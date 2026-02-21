@@ -1,0 +1,70 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET HaLow Link 2 <noreply@openmanet.org>
+Date: Tue, 18 Feb 2026 00:00:00 +0000
+Subject: [PATCH] openmanetd: fix MIPS32 build by swapping modernc sqlite for CGO
+
+modernc.org/sqlite has no mipsle support. Replace with mattn/go-sqlite3
+(CGO-based) which works on all architectures. Also fix alfred bindings
+cross-compilation.
+
+---
+ feeds/openmanet/openmanetd/Makefile | 38 +++++++++++++++++++++++++----
+ 1 file changed, 34 insertions(+), 4 deletions(-)
+
+diff --git a/feeds/openmanet/openmanetd/Makefile b/feeds/openmanet/openmanetd/Makefile
+index 4f73124..71929fd 100644
+--- a/feeds/openmanet/openmanetd/Makefile
++++ b/feeds/openmanet/openmanetd/Makefile
+@@ -31,7 +31,7 @@ define Package/openmanetd
+   TITLE:=OpenMANET Manager
+   DEPENDS:=$(GO_ARCH_DEPENDS) +kmod-batman-adv +alfred +libc @IPV6 +libnl-tiny +librt \
+ 		+portaudio +libopus +libevdev +alsa-lib +kmod-usb-core +kmod-usb-audio \
+-		+kmod-sound-core +libopusfile +gpsd
++		+kmod-sound-core +libopusfile +gpsd +libcap
+ endef
+
+ define Package/openmanetd/description
+@@ -40,9 +40,41 @@ Includes:
+ - pttgo: A multicast push-to-talk voice application written in Go using PortAudio, Opus, and evdev.
+ endef
+
++define Build/Prepare
++	$(call Build/Prepare/Default)
++	# Swap modernc.org/sqlite (no mipsle support) for mattn/go-sqlite3 (CGO-based, all arches)
++	$(SED) 's|_ "modernc.org/sqlite"|_ "github.com/mattn/go-sqlite3"|' $(PKG_BUILD_DIR)/internal/database/db.go
++	$(SED) 's|sql.Open("sqlite"|sql.Open("sqlite3"|' $(PKG_BUILD_DIR)/internal/database/db.go
++	$(SED) '/modernc.org\/sqlite/d' $(PKG_BUILD_DIR)/go.mod
++	$(SED) '/modernc.org\/libc/d' $(PKG_BUILD_DIR)/go.mod
++	$(SED) '/modernc.org\/mathutil/d' $(PKG_BUILD_DIR)/go.mod
++	$(SED) '/modernc.org\/memory/d' $(PKG_BUILD_DIR)/go.mod
++	$(SED) '/ncruces\/go-strftime/d' $(PKG_BUILD_DIR)/go.mod
++	$(SED) '/remyoudompheng\/bigfft/d' $(PKG_BUILD_DIR)/go.mod
++	$(SED) '/dustin\/go-humanize/d' $(PKG_BUILD_DIR)/go.mod
++	$(SED) '/hashicorp\/golang-lru/d' $(PKG_BUILD_DIR)/go.mod
++	cd $(PKG_BUILD_DIR) && \
++		echo 'require github.com/mattn/go-sqlite3 v1.14.24' >> go.mod && \
++		GO_MOD_ARGS="-modcacherw" \
++		GOMODCACHE="$(DL_DIR)/go-mod-cache" \
++		PATH="$(STAGING_DIR_HOSTPKG)/lib/go-1.25/bin:$(PATH)" \
++		go mod tidy
++endef
++
+ define Build/Configure
+-	# Compile Alfred Bindings
+-	$(MAKE) -C $(PKG_BUILD_DIR)/internal/alfred/alfred
++	# Compile Alfred Bindings (cross-compile for target)
++	$(MAKE) -C $(PKG_BUILD_DIR)/internal/alfred/alfred \
++		CC="$(TARGET_CC)" \
++		CFLAGS="$(TARGET_CFLAGS) -I$(STAGING_DIR)/usr/include -I$(STAGING_DIR)/usr/include/libnl-tiny" \
++		LDFLAGS="$(TARGET_LDFLAGS) -L$(STAGING_DIR)/usr/lib" \
++		LIBNL_CFLAGS="-I$(STAGING_DIR)/usr/include/libnl-tiny" \
++		LIBNL_LDLIBS="-lnl-tiny" \
++		LIBNL_GENL_CFLAGS="-I$(STAGING_DIR)/usr/include/libnl-tiny" \
++		LIBNL_GENL_LDLIBS="-lnl-tiny" \
++		LIBCAP_CFLAGS="" \
++		LIBCAP_LDLIBS="-lcap" \
++		CONFIG_ALFRED_VIS=n \
++		CONFIG_ALFRED_GPSD=n
+ 	$(call GoPackage/Build/Configure,$(1))
+ 	$(call Build/Configure/Default,$(1))
+ endef
