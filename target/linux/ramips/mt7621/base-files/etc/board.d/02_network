@@ -85,9 +85,6 @@ ramips_setup_interfaces()
 	zyxel,nr7101)
 		ucidef_set_interfaces_lan_wan "lan" "wan"
 		;;
-	morse,halowlink2)
-		ucidef_set_interfaces_lan_wan "usblan lan" "wan"
-		;;
 	asiarf,ap7621-nv1|\
 	beeline,smartbox-flash|\
 	beeline,smartbox-giga|\
