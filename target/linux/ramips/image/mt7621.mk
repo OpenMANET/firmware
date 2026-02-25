@@ -2077,7 +2077,7 @@ define Device/morse_halowlink2
   DEVICE_MODEL := HaLowLink2
   DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 kmod-mt7603 \
 	kmod-morse netifd-morse morse-fw-8108 \
-	-alsa-ucm-conf -alsa-utils
+	bsp-halowlink2 -alsa-ucm-conf -alsa-utils
 endef
 TARGET_DEVICES += morse_halowlink2
 
