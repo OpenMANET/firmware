@@ -1,0 +1,30 @@
+CONFIG_TARGET_ramips=y
+CONFIG_TARGET_ramips_mt7621=y
+CONFIG_TARGET_DEVICE_ramips_mt7621_DEVICE_morse_halowlink2=y
+
+CONFIG_VERSION_MANUFACTURER="MorseMicro"
+CONFIG_VERSION_PRODUCT="HaLowLink2"
+
+CONFIG_PACKAGE_bsp-halowlink2=y
+CONFIG_PACKAGE_morse-fw-8108=y
+CONFIG_PACKAGE_kmod-morse=y
+CONFIG_PACKAGE_kmod-mmc=y
+CONFIG_PACKAGE_kmod-sdhci-mt7620=y
+CONFIG_PACKAGE_kmod-mt7603=y
+CONFIG_PACKAGE_netifd-morse=y
+
+# HaLow Link 2 uses MM8108 only - exclude MM6108 firmware
+CONFIG_PACKAGE_morse-fw-6108=n
+CONFIG_PACKAGE_morse-fw-6108-tlm=n
+
+# No audio hardware on this board
+CONFIG_PACKAGE_alsa-ucm-conf=n
+CONFIG_PACKAGE_alsa-utils=n
+
+# Kernel support for RGB LEDs (PWM multicolor)
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_LEDS_CLASS_MULTICOLOR=y
+CONFIG_LEDS_PWM_MULTICOLOR=y
+CONFIG_PWM=y
+CONFIG_PWM_GPIO=y
+CONFIG_PWM_SYSFS=y
