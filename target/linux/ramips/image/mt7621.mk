@@ -2076,7 +2076,8 @@ define Device/morse_halowlink2
   DEVICE_VENDOR := MorseMicro
   DEVICE_MODEL := HaLowLink2
   DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 kmod-mt7603 \
-	kmod-morse netifd-morse morse-fw-6108 morse-fw-8108
+	kmod-morse netifd-morse morse-fw-8108 \
+	-alsa-ucm-conf -alsa-utils
 endef
 TARGET_DEVICES += morse_halowlink2
 
