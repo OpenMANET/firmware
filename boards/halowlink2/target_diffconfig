@@ -17,6 +17,9 @@ CONFIG_PACKAGE_netifd-morse=y
 CONFIG_PACKAGE_morse-fw-6108=n
 CONFIG_PACKAGE_morse-fw-6108-tlm=n
 
+# Not needed for this board
+CONFIG_PACKAGE_ftdi-usb-spi=n
+
 # No audio hardware on this board
 CONFIG_PACKAGE_alsa-ucm-conf=n
 CONFIG_PACKAGE_alsa-utils=n
