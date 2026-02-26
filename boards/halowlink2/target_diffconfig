@@ -13,6 +13,7 @@ CONFIG_PACKAGE_kmod-mmc=y
 CONFIG_PACKAGE_kmod-sdhci-mt7620=y
 CONFIG_PACKAGE_kmod-mt7603=y
 CONFIG_PACKAGE_netifd-morse=y
+CONFIG_PACKAGE_libcap=y
 
 # HaLow Link 2 uses MM8108 only - exclude MM6108 firmware
 CONFIG_PACKAGE_morse-fw-6108=n
