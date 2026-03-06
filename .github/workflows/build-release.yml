@@ -1,0 +1,191 @@
+name: Build and Release Firmware
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Create and push a new tag (e.g., v1.7.0-rc1). Leave empty to build without creating a tag.'
+        required: false
+        type: string
+
+jobs:
+  build-ekh-bcm2711:
+    name: Build ekh-bcm2711
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: ekh-bcm2711
+      target: bcm27xx
+      subtarget: bcm2711
+      description: "Raspberry Pi 4, CM4"
+
+  build-ekh-bcm2710:
+    name: Build ekh-bcm2710
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: ekh-bcm2710
+      target: bcm27xx
+      subtarget: bcm2710
+      description: "Raspberry Pi 3B, 2W"
+
+  build-venice:
+    name: Build venice
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: venice
+      target: imx
+      subtarget: cortexa53
+      description: "Gateworks Venice"
+
+  release:
+    name: Create GitHub Release
+    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-venice]
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.tag != ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push tag if provided
+        if: github.event.inputs.tag != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ github.event.inputs.tag }}';
+            const sha = context.sha;
+
+            try {
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${tag}`,
+                sha: sha
+              });
+              console.log(`Created tag ${tag} at ${sha}`);
+            } catch (error) {
+              if (error.status === 422) {
+                console.log(`Tag ${tag} already exists`);
+              } else {
+                throw error;
+              }
+            }
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+            echo "version=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-*
+          path: release-artifacts
+          merge-multiple: false
+
+      - name: Organize release files
+        run: |
+          mkdir -p release-files
+
+          # Move all firmware files to release-files directory
+          for board_dir in release-artifacts/firmware-*; do
+            if [ -d "$board_dir" ]; then
+              board_name=$(basename "$board_dir" | sed 's/firmware-//')
+              echo "Processing $board_name..."
+
+              # Copy firmware images with board prefix
+              find "$board_dir" -name "*.img.gz" -exec cp {} release-files/ \;
+
+              # Copy checksums with board prefix
+              if [ -f "$board_dir/sha256sums" ]; then
+                cp "$board_dir/sha256sums" "release-files/sha256sums-${board_name}.txt"
+              fi
+            fi
+          done
+
+          echo "=== Release files prepared ==="
+          ls -lah release-files/
+
+          # Create combined checksums file
+          cd release-files
+          if command -v sha256sum &> /dev/null; then
+            sha256sum *.img.gz 2>/dev/null > SHA256SUMS.txt || true
+          fi
+          cd ..
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## OpenMANET Firmware ${{ steps.tag.outputs.version }}
+
+          **Build Information:**
+          - OpenWrt Version: 24.10
+          - Linux Kernel: 6.6.102
+          - WiFi Drivers: Backported from 6.12.6
+          - Morse Micro Drivers: 1.16
+          - Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          ### Supported Hardware
+
+          #### ekh-bcm2711 (Raspberry Pi 4 Family)
+          - Raspberry Pi 4
+          - Raspberry Pi CM4
+          - Compatible with Morse Micro HaLow modules (6108/8108) via SPI/SDIO
+
+          #### ekh-bcm2710 (Raspberry Pi 3 Family)
+          - Raspberry Pi 3B
+          - Raspberry Pi 2W
+          - Compatible with Morse Micro HaLow modules (6108/8108) via SPI/SDIO
+
+          #### venice (Gateworks)
+          - Gateworks Venice boards
+          - HaLowLink 2
+          - Morse Micro 8108 support via SDIO/USB
+
+          ### Installation
+
+          1. Download the appropriate `.img.gz` file for your hardware
+          2. Extract the image: `gunzip <filename>.img.gz`
+          3. Flash to SD card/storage: `dd if=<filename>.img of=/dev/sdX bs=4M status=progress`
+          4. Boot your device from the flashed storage
+
+          For detailed documentation, visit the [OpenMANET Firmware Repository](https://github.com/OpenMANET/firmware).
+
+          ### Checksums
+
+          Verify your download using the SHA256 checksums provided in the `SHA256SUMS.txt` file or individual board checksum files.
+
+          ---
+
+          **Note:** This is a draft release. Please test thoroughly before deploying to production environments.
+          EOF
+
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: OpenMANET Firmware ${{ steps.tag.outputs.version }}
+          body_path: release_notes.md
+          draft: true
+          prerelease: false
+          files: |
+            release-files/*.img.gz
+            release-files/SHA256SUMS.txt
+            release-files/sha256sums-*.txt
+          fail_on_unmatched_files: false
