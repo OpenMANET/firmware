@@ -1,0 +1,112 @@
+name: Build Firmware
+
+on:
+  workflow_call:
+    inputs:
+      board:
+        description: 'Board name (e.g., ekh-bcm2711)'
+        required: true
+        type: string
+      target:
+        description: 'OpenWrt target platform (e.g., bcm27xx)'
+        required: true
+        type: string
+      subtarget:
+        description: 'OpenWrt subtarget (e.g., bcm2711)'
+        required: true
+        type: string
+      description:
+        description: 'Human-readable description of supported hardware'
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build ${{ inputs.board }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex g++ gawk gcc-multilib g++-multilib \
+            git gettext libncurses5-dev libssl-dev python3-setuptools rsync unzip golang-go \
+            zlib1g-dev swig file wget libnl-3-dev libnl-genl-3-dev libgps-dev libcap-dev \
+            pkg-config libopus-dev libopusfile-dev portaudio19-dev net-tools libpcre3-dev \
+            libpcre3 upx-ucl
+
+      - name: Setup cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            tmp/dl
+            staging_dir/host
+            staging_dir/hostpkg
+            staging_dir/toolchain-*
+            build_dir/host
+            build_dir/hostpkg
+          key: ${{ inputs.board }}-${{ runner.os }}-${{ hashFiles('feeds.conf.default') }}
+          restore-keys: |
+            ${{ inputs.board }}-${{ runner.os }}-
+
+      - name: Configure build for ${{ inputs.board }}
+        run: |
+          ./scripts/openmanet_setup.sh -i -b ${{ inputs.board }}
+
+      - name: Download dependencies
+        run: |
+          make download -j$(nproc)
+
+      - name: Build firmware
+        run: |
+          make -j$(nproc) V=s 2>&1 | tee build.log
+          echo "Build completed for ${{ inputs.board }}"
+
+      - name: Check build output
+        run: |
+          ls -lah bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/
+          echo "=== Images created ==="
+          find bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/ -name "*.img.gz" -o -name "*.bin"
+          echo "=== Build info files ==="
+          find bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/ -name "*.buildinfo"
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts/${{ inputs.board }}
+          cp bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/*.img.gz artifacts/${{ inputs.board }}/ 2>/dev/null || true
+          cp bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/sha256sums artifacts/${{ inputs.board }}/ 2>/dev/null || true
+          echo "Board: ${{ inputs.board }}" > artifacts/${{ inputs.board }}/BOARD_INFO.txt
+          echo "Description: ${{ inputs.description }}" >> artifacts/${{ inputs.board }}/BOARD_INFO.txt
+          echo "Target: ${{ inputs.target }}/${{ inputs.subtarget }}" >> artifacts/${{ inputs.board }}/BOARD_INFO.txt
+          echo "Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> artifacts/${{ inputs.board }}/BOARD_INFO.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ inputs.board }}
+          path: artifacts/${{ inputs.board }}/*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ inputs.board }}
+          path: build.log
+          retention-days: 30
