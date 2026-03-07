@@ -15,6 +15,7 @@ A MANET (Mobile Ad-Hoc Network) is a self-forming wireless mesh where each node 
 | Raspberry Pi CM4  | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
 | Raspberry Pi 3B   | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
 | Raspberry Pi 2W   | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
+| HaLowLink 2       | ✅ Tested | ✅ Working        | Storage limited              |
 
 ### HaLow
 
@@ -34,9 +35,9 @@ Install build environment packages with
 ```
 > sudo apt update
 > sudo apt install build-essential clang flex g++ gawk gcc-multilib g++-multilib git gettext \
-  libncurses5-dev libssl-dev python3-setuptools rsync unzip zlib1g-dev swig file wget libnl-3-dev \
+  libncurses5-dev libssl-dev python3-setuptools rsync unzip golang-go zlib1g-dev swig file wget libnl-3-dev \
   libnl-genl-3-dev libgps-dev libcap-dev pkg-config libopus-dev \
-  libopusfile-dev portaudio19-dev net-tools libpcre3-dev libpcre3
+  libopusfile-dev portaudio19-dev net-tools libpcre3-dev libpcre3 upx-ucl
 ```
 
 ### Usage

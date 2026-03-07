@@ -6,11 +6,11 @@ permissions:
 on:
   push:
     tags:
-      - "v*"
+      - "*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Create and push a new tag (e.g., v1.7.0-rc1). Leave empty to build without creating a tag.'
+        description: 'Create and push a new tag (e.g., 1.7.0-rc1). Leave empty to build without creating a tag.'
         required: false
         type: string
 
@@ -23,6 +23,8 @@ jobs:
       target: bcm27xx
       subtarget: bcm2711
       description: "Raspberry Pi 4, CM4"
+      releasepackages: true
+      cpu_arch: aarch64_cortex-a72
 
   build-ekh-bcm2710:
     name: Build ekh-bcm2710
@@ -32,6 +34,8 @@ jobs:
       target: bcm27xx
       subtarget: bcm2710
       description: "Raspberry Pi 3B, 2W"
+      releasepackages: true
+      cpu_arch: ''
 
   build-venice:
     name: Build venice
@@ -41,6 +45,80 @@ jobs:
       target: imx
       subtarget: cortexa53
       description: "Gateworks Venice"
+      releasepackages: true
+      cpu_arch: aarch64_cortex-a53
+
+  publish-packages:
+    name: Publish Packages to packages-repo
+    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-venice]
+    runs-on: ubuntu-24.04
+    if: github.event.inputs.tag != ''
+
+    steps:
+      - name: Download target packages artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: packages-targets-*
+          path: downloaded-packages/targets
+          merge-multiple: false
+
+      - name: Download arch packages artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: packages-arch-*
+          path: downloaded-packages/arch
+          merge-multiple: false
+
+      - name: Checkout packages-repo
+        uses: actions/checkout@v4
+        with:
+          repository: OpenMANET/packages-repo
+          token: ${{ secrets.PACKAGES_REPO_TOKEN }}
+          path: packages-repo
+
+      - name: Publish target packages
+        run: |
+          set -euo pipefail
+          for artifact_dir in downloaded-packages/targets/packages-targets-*/; do
+            [ -d "$artifact_dir" ] || continue
+            artifact_name=$(basename "$artifact_dir")
+            # Strip the 'packages-targets-' prefix, then split on '--'
+            remainder="${artifact_name#packages-targets-}"
+            target="${remainder%%--*}"
+            subtarget="${remainder#*--}"
+            dest="packages-repo/24.10/targets/${target}/${subtarget}/packages"
+            echo "Clearing and repopulating: ${dest}"
+            rm -rf "${dest}"
+            mkdir -p "${dest}"
+            cp -r "${artifact_dir}/"* "${dest}/"
+          done
+
+      - name: Publish arch packages
+        run: |
+          set -euo pipefail
+          for artifact_dir in downloaded-packages/arch/packages-arch-*/; do
+            [ -d "$artifact_dir" ] || continue
+            artifact_name=$(basename "$artifact_dir")
+            cpu_arch="${artifact_name#packages-arch-}"
+            dest="packages-repo/24.10/packages/${cpu_arch}"
+            echo "Clearing and repopulating: ${dest}"
+            rm -rf "${dest}"
+            mkdir -p "${dest}"
+            cp -r "${artifact_dir}/"* "${dest}/"
+          done
+
+      - name: Commit and push packages
+        run: |
+          cd packages-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No package changes to commit."
+          else
+            git commit -m "chore: update packages from firmware release ${{ github.ref_name }}"
+            git push
+          fi
 
   release:
     name: Create GitHub Release
