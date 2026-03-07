@@ -257,19 +257,6 @@ ifeq ($(SUBTARGET),bcm2712)
   TARGET_DEVICES += rpi-5
 endif
 
-define Device/rpi-4-mmeval
-  $(Device/rpi-4)
-  DEVICE_VARIANT := (64bit) (Morse Micro Eval)
-  IMAGES := factory.img.gz sysupgrade.img.gz
-  IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)rpi-4-mmeval
-  DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
-  DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-8108
-  SUPPORTED_DEVICES += morse,ekh01-01
-endef
-ifeq ($(SUBTARGET),bcm2711)
-  TARGET_DEVICES += rpi-4-mmeval
-endif
-
 define Device/morse_ekh01_base
   $(Device/rpi-4)
   SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
@@ -298,60 +285,6 @@ define Device/morse_pi3_base
   IMAGE/sysupgrade.img.gz := boot-common | boot-2710 | boot-ekh01 | sdcard-img | gzip | append-metadata
   IMAGE/factory.img.gz := boot-common | boot-2710 | boot-ekh01 | sdcard-img | gzip
 endef
-
-define Device/morse_mmx108-ekh01-sdio
-  $(Device/morse_ekh01_base)
-  DEVICE_MODEL := MMx108-EKH01
-  DEVICE_VARIANT := SDIO
-  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  # We name ourselves a generic morse,ekh01, and allow upgrading to this
-  # from any of the legacy images, even those that will require BCF forcing (at least on
-  # an upgrade the BCF will remain set).
-  # We keep morse,mmx108-ekh01-sdio on the list of supported devices for
-  # now as we temporarily used this name for internal builds.
-  SYSINFO_BOARD_NAME := morse,ekh01
-  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01-01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us
-  DISTROCONFIG_EXTRA := mmx10x-sdio
-endef
-ifeq ($(SUBTARGET),bcm2711)
-  TARGET_DEVICES += morse_mmx108-ekh01-sdio
-endif
-
-define Device/morse_mm8108-ekh01-spi
-  $(Device/morse_ekh01_base)
-  DEVICE_MODEL := MM8108-EKH01
-  DEVICE_VARIANT := SPI
-  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01-01
-  DISTROCONFIG_EXTRA := mm810x-spi
-endef
-ifeq ($(SUBTARGET),bcm2711)
-  TARGET_DEVICES += morse_mm8108-ekh01-spi
-endif
-
-define Device/morse_mm6108-ekh01-spi
-  $(Device/morse_ekh01_base)
-  DEVICE_MODEL := MM6108-EKH01
-  DEVICE_VARIANT := SPI
-  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us
-  DISTROCONFIG_EXTRA := mm610x-spi
-endef
-ifeq ($(SUBTARGET),bcm2711)
-  TARGET_DEVICES += morse_mm6108-ekh01-spi
-endif
-
-define Device/morse_mm6108-ekh01-sdio
-  $(Device/morse_ekh01_base)
-  DEVICE_MODEL := MM6108-EKH01
-  DEVICE_VARIANT := SDIO
-  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us
-  DISTROCONFIG_EXTRA := mm610x-sdio
-endef
-ifeq ($(SUBTARGET),bcm2711)
-  TARGET_DEVICES += morse_mm6108-ekh01-sdio
-endif
 
 define Device/bcm2711_mm6108-spi
   $(Device/morse_ekh01_base)
