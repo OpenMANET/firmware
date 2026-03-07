@@ -259,7 +259,7 @@ jobs:
           draft: true
           prerelease: false
           files: |
-            release-files/*.img.gz
+            release-files/*img.gz
             release-files/SHA256SUMS.txt
             release-files/sha256sums-*.txt
           fail_on_unmatched_files: false
