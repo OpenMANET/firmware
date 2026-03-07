@@ -52,8 +52,6 @@ jobs:
     name: Publish Packages to packages-repo
     needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-venice]
     runs-on: ubuntu-24.04
-    if: github.event.inputs.tag != ''
-
     steps:
       - name: Download target packages artifacts
         uses: actions/download-artifact@v4
@@ -124,8 +122,6 @@ jobs:
     name: Create GitHub Release
     needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-venice]
     runs-on: ubuntu-24.04
-    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.tag != ''
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
