@@ -71,7 +71,7 @@ jobs:
             build_dir/hostpkg
           key: ${{ inputs.board }}-${{ runner.os }}-${{ hashFiles('feeds.conf.default') }}
           restore-keys: |
-            ${{ inputs.board }}-${{ runner.os }}-
+            ${{ inputs.board }}-${{ runner.os }}-${{ hashFiles('feeds.conf.default') }}
 
       - name: Configure build for ${{ inputs.board }}
         run: |
