@@ -63,7 +63,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            tmp/dl
+            dl
             staging_dir/host
             staging_dir/hostpkg
             staging_dir/toolchain-*
@@ -71,7 +71,7 @@ jobs:
             build_dir/hostpkg
           key: ${{ inputs.board }}-${{ runner.os }}-${{ hashFiles('feeds.conf.default') }}
           restore-keys: |
-            ${{ inputs.board }}-${{ runner.os }}-${{ hashFiles('feeds.conf.default') }}
+            ${{ inputs.board }}-${{ runner.os }}-
 
       - name: Configure build for ${{ inputs.board }}
         run: |
@@ -113,7 +113,7 @@ jobs:
           name: firmware-${{ inputs.board }}
           path: artifacts/${{ inputs.board }}/*
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 5
 
       - name: Upload target packages
         if: inputs.releasepackages
