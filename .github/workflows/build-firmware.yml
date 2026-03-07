@@ -19,6 +19,16 @@ on:
         description: 'Human-readable description of supported hardware'
         required: true
         type: string
+      releasepackages:
+        description: 'Upload built packages as artifacts for release publishing'
+        required: false
+        type: boolean
+        default: false
+      cpu_arch:
+        description: 'CPU architecture directory name under bin/packages/ (e.g., aarch64_cortex-a72). Leave empty to skip arch package upload.'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   build:
@@ -104,6 +114,24 @@ jobs:
           path: artifacts/${{ inputs.board }}/*
           if-no-files-found: error
           retention-days: 90
+
+      - name: Upload target packages
+        if: inputs.releasepackages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-targets-${{ inputs.target }}--${{ inputs.subtarget }}
+          path: bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/packages/
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Upload arch packages
+        if: inputs.releasepackages && inputs.cpu_arch != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-arch-${{ inputs.cpu_arch }}
+          path: bin/packages/${{ inputs.cpu_arch }}/
+          if-no-files-found: warn
+          retention-days: 1
 
       - name: Upload build log on failure
         if: failure()
