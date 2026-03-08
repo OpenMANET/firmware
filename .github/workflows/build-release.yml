@@ -37,6 +37,17 @@ jobs:
       releasepackages: true
       cpu_arch: ''
 
+  build-halowlink2:
+    name: Build HalowLink2
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: halowlink2
+      target: ramips
+      subtarget: mt7621
+      description: "HalowLink 2 (MT7621)"
+      releasepackages: true
+      cpu_arch: mipsel_24kc
+
   build-venice:
     name: Build venice
     uses: ./.github/workflows/build-firmware.yml
@@ -50,7 +61,7 @@ jobs:
 
   publish-packages:
     name: Publish Packages to packages-repo
-    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-venice]
+    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-halowlink2, build-venice]
     runs-on: ubuntu-24.04
     steps:
       - name: Download target packages artifacts
@@ -120,7 +131,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-venice]
+    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-halowlink2,build-venice]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository

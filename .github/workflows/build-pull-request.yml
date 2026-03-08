@@ -31,6 +31,15 @@ jobs:
       subtarget: bcm2710
       description: "Raspberry Pi 3B, 2W"
 
+  build-halowlink2:
+    name: Build HalowLink2
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: halowlink2
+      target: ramips
+      subtarget: mt7621
+      description: "HalowLink 2 (MT7621)"
+
   build-venice:
     name: Build venice
     uses: ./.github/workflows/build-firmware.yml
