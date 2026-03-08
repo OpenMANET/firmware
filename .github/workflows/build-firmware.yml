@@ -100,7 +100,6 @@ jobs:
         run: |
           mkdir -p artifacts/${{ inputs.board }}
           cp bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/*.img.gz artifacts/${{ inputs.board }}/ 2>/dev/null || true
-          cp bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/*.bin artifacts/${{ inputs.board }}/ 2>/dev/null || true
           cp bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/sha256sums artifacts/${{ inputs.board }}/ 2>/dev/null || true
           echo "Board: ${{ inputs.board }}" > artifacts/${{ inputs.board }}/BOARD_INFO.txt
           echo "Description: ${{ inputs.description }}" >> artifacts/${{ inputs.board }}/BOARD_INFO.txt

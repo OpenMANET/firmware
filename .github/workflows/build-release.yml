@@ -206,36 +206,7 @@ jobs:
           cat > release_notes.md << 'EOF'
           ## OpenMANET Firmware ${{ steps.tag.outputs.version }}
 
-          **Build Information:**
-          - OpenWrt Version: 24.10
-          - Linux Kernel: 6.6.102
-          - WiFi Drivers: Backported from 6.12.6
-          - Morse Micro Drivers: 1.16
-          - Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-
-          ### Supported Hardware
-
-          #### ekh-bcm2711 (Raspberry Pi 4 Family)
-          - Raspberry Pi 4
-          - Raspberry Pi CM4
-          - Compatible with Morse Micro HaLow modules (6108/8108) via SPI/SDIO
-
-          #### ekh-bcm2710 (Raspberry Pi 3 Family)
-          - Raspberry Pi 3B
-          - Raspberry Pi 2W
-          - Compatible with Morse Micro HaLow modules (6108/8108) via SPI/SDIO
-
-          #### venice (Gateworks)
-          - Gateworks Venice boards
-          - HaLowLink 2
-          - Morse Micro 8108 support via SDIO/USB
-
           ### Installation
-
-          1. Download the appropriate `.img.gz` file for your hardware
-          2. Extract the image: `gunzip <filename>.img.gz`
-          3. Flash to SD card/storage: `dd if=<filename>.img of=/dev/sdX bs=4M status=progress`
-          4. Boot your device from the flashed storage
 
           For detailed documentation, visit the [OpenMANET Firmware Repository](https://github.com/OpenMANET/firmware).
 
