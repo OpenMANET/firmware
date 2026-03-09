@@ -193,6 +193,7 @@ jobs:
 
               # Copy firmware images with board prefix
               find "$board_dir" -name "*.img.gz" -exec cp {} release-files/ \;
+              find "$board_dir" -name "*sysupgrade.bin" -exec cp {} release-files/ \;
 
               # Copy checksums with board prefix
               if [ -f "$board_dir/sha256sums" ]; then
@@ -241,7 +242,8 @@ jobs:
           draft: true
           prerelease: false
           files: |
-            release-files/*img.gz
+            release-files/*.img.gz
+            release-files/*sysupgrade.bin
             release-files/SHA256SUMS.txt
             release-files/sha256sums-*.txt
           fail_on_unmatched_files: false
