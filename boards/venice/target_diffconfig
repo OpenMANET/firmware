@@ -1,7 +1,6 @@
 CONFIG_TARGET_MULTI_PROFILE=y
 CONFIG_TARGET_imx=y
 CONFIG_TARGET_imx_cortexa53=y
-CONFIG_TARGET_imx_cortexa53_DEVICE_gateworks_venice=y
 CONFIG_TARGET_DEVICE_imx_cortexa53_DEVICE_gw_venice=y
 
 CONFIG_VERSION_HWREV=""
