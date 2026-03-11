@@ -216,11 +216,10 @@ jobs:
         id: release_notes
         run: |
           cat > release_notes.md << 'EOF'
-          ## OpenMANET Firmware ${{ steps.tag.outputs.version }}
-
+          ## ${{ steps.tag.outputs.version }}
           ### Installation
 
-          For detailed documentation, visit the [OpenMANET Firmware Repository](https://github.com/OpenMANET/firmware).
+          For detailed documentation, visit the [OpenMANET Documentation](https://openmanet.github.io/docs/).
 
           ### Checksums
 
@@ -228,7 +227,6 @@ jobs:
 
           ---
 
-          **Note:** This is a draft release. Please test thoroughly before deploying to production environments.
           EOF
 
           cat release_notes.md
@@ -237,7 +235,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: OpenMANET Firmware ${{ steps.tag.outputs.version }}
+          name: ${{ steps.tag.outputs.version }}
           body_path: release_notes.md
           draft: true
           prerelease: false
