@@ -1,4 +1,4 @@
-name: Build Firmware for Pull Request
+name: Build Firmware for Pull Request on ht-hd01-v2
 
 permissions:
   contents: read
