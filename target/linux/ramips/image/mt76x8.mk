@@ -276,7 +276,7 @@ TARGET_DEVICES += hak5_wifi-pineapple-mk7
 define Device/heltec_ht-hd01-v2
   IMAGE_SIZE := 32448k
   DEVICE_VENDOR := Heltec
-  DEVICE_MODEL := HT-HD01 V2
+  DEVICE_MODEL := HT-HD01-V2
   DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 \
 	kmod-morse netifd-morse morse-fw-6108
   SUPPORTED_DEVICES += heltec,ht-hd01-v2
