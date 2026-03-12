@@ -2079,7 +2079,7 @@ define Device/morse_halowlink2
 	bsp-halowlink2 -alsa-ucm-conf -alsa-utils
 
   SUPPORTED_DEVICES += morse,halowlink2
-  IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
+  IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL))
   DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
 endef
 TARGET_DEVICES += morse_halowlink2
