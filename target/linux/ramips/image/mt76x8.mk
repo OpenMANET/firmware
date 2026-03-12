@@ -273,6 +273,27 @@ define Device/hak5_wifi-pineapple-mk7
 endef
 TARGET_DEVICES += hak5_wifi-pineapple-mk7
 
+define Device/heltec_ht-hd01-v1
+  IMAGE_SIZE := 32448k
+  DEVICE_VENDOR := Heltec
+  DEVICE_MODEL := HT-HD01
+  DEVICE_VARIANT := V1
+  DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 \
+	kmod-morse netifd-morse morse-fw-6108
+endef
+TARGET_DEVICES += heltec_ht-hd01-v1
+
+define Device/heltec_ht-hd01-v2
+  IMAGE_SIZE := 32448k
+  DEVICE_VENDOR := Heltec
+  DEVICE_MODEL := HT-HD01
+  DEVICE_VARIANT := V2
+  DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 \
+	kmod-morse netifd-morse morse-fw-6108
+  SUPPORTED_DEVICES += Heltec,HT-HD01-V2
+endef
+TARGET_DEVICES += heltec_ht-hd01-v2
+
 define Device/hilink_hlk-7628n
   IMAGE_SIZE := 32448k
   DEVICE_VENDOR := HILINK
