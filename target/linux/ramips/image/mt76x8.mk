@@ -280,7 +280,7 @@ define Device/heltec_ht-hd01-v2
   DEVICE_VARIANT := V2
   DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 \
 	kmod-morse netifd-morse morse-fw-6108
-  SUPPORTED_DEVICES += Heltec,HT-HD01-V2
+  SUPPORTED_DEVICES += heltec,ht-hd01-v2
 endef
 TARGET_DEVICES += heltec_ht-hd01-v2
 
