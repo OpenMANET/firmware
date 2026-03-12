@@ -1,6 +1,5 @@
 CONFIG_TARGET_ramips=y
 CONFIG_TARGET_ramips_mt76x8=y
-CONFIG_TARGET_ramips_mt76x8_DEVICE_heltec_ht-hd01-v2=y
 CONFIG_TARGET_DEVICE_ramips_mt76x8_DEVICE_heltec_ht-hd01-v2=y
 
 CONFIG_VERSION_MANUFACTURER="Heltec"
