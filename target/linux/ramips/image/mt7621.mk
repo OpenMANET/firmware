@@ -2073,10 +2073,14 @@ TARGET_DEVICES += mikrotik_routerboard-m33g
 define Device/morse_halowlink2
   IMAGE_SIZE := 32128k
   DEVICE_VENDOR := MorseMicro
-  DEVICE_MODEL := HaLowLink2
+  DEVICE_MODEL := HaLowLink2-MM8108
   DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 kmod-mt7603 \
 	kmod-morse netifd-morse morse-fw-8108 \
 	bsp-halowlink2 -alsa-ucm-conf -alsa-utils
+
+  SUPPORTED_DEVICES += morse,halowlink2
+  IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
+  DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
 endef
 TARGET_DEVICES += morse_halowlink2
 
