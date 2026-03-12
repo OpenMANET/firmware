@@ -1,0 +1,23 @@
+name: Build Firmware for Pull Request
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+    - 'boards/ht-hd01-v2/**'
+    - 'include/kernel*'
+    - 'package/kernel/**'
+    - 'target/linux/ramips/**'
+    - 'feeds.conf.default'
+
+jobs:
+  build-hd01-v2:
+    name: Build HD01 V2
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: ht-hd01-v2
+      target: ramips
+      subtarget: mt76x8
+      description: "Heltec HT-HD01 V2 (MT76x8)"

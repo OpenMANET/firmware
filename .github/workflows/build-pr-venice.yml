@@ -1,0 +1,23 @@
+name: Build Firmware for Pull Request
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+    - 'boards/venice/**'
+    - 'include/kernel*'
+    - 'package/kernel/**'
+    - 'target/linux/imx/**'
+    - 'feeds.conf.default'
+
+jobs:
+  build-venice:
+    name: Build venice
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: venice
+      target: imx
+      subtarget: cortexa53
+      description: "Gateworks Venice"

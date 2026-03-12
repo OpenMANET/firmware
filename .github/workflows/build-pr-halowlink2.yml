@@ -1,0 +1,23 @@
+name: Build Firmware for Pull Request
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+    - 'boards/halowlink2/**'
+    - 'include/kernel*'
+    - 'package/kernel/**'
+    - 'target/linux/ramips/**'
+    - 'feeds.conf.default'
+
+jobs:
+  build-halowlink2:
+    name: Build HalowLink2
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: halowlink2
+      target: ramips
+      subtarget: mt7621
+      description: "HalowLink 2 (MT7621)"
