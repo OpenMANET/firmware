@@ -128,7 +128,7 @@ jobs:
         if: inputs.releasepackages && inputs.cpu_arch != ''
         uses: actions/upload-artifact@v7
         with:
-          name: packages-arch-${{ inputs.cpu_arch }}
+          name: packages-arch-${{ inputs.cpu_arch }}--${{ inputs.board }}
           path: bin/packages/${{ inputs.cpu_arch }}/
           if-no-files-found: warn
           retention-days: 1

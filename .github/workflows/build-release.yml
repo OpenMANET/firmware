@@ -119,10 +119,11 @@ jobs:
           for artifact_dir in downloaded-packages/arch/packages-arch-*/; do
             [ -d "$artifact_dir" ] || continue
             artifact_name=$(basename "$artifact_dir")
-            cpu_arch="${artifact_name#packages-arch-}"
+            # Strip 'packages-arch-' prefix, then extract cpu_arch before '--board'
+            remainder="${artifact_name#packages-arch-}"
+            cpu_arch="${remainder%%--*}"
             dest="packages-repo/24.10/packages/${cpu_arch}"
-            echo "Clearing and repopulating: ${dest}"
-            rm -rf "${dest}"
+            echo "Merging into: ${dest} (from ${artifact_name})"
             mkdir -p "${dest}"
             cp -r "${artifact_dir}/"* "${dest}/"
           done
