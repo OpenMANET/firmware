@@ -9,7 +9,7 @@ on:
       - '.github/workflows/push-containers.yml'
       - 'toolchain/**'
     branches-ignore:
-      - master
+      - '24.10'
 
 permissions:
   contents: read

@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -60,7 +60,7 @@ jobs:
             libopusfile-dev portaudio19-dev net-tools libpcre3-dev libpcre3 upx-ucl
 
       - name: Setup cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             dl
@@ -108,7 +108,7 @@ jobs:
           echo "Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> artifacts/${{ inputs.board }}/BOARD_INFO.txt
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: firmware-${{ inputs.board }}
           path: artifacts/${{ inputs.board }}/*
@@ -117,7 +117,7 @@ jobs:
 
       - name: Upload target packages
         if: inputs.releasepackages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-targets-${{ inputs.target }}--${{ inputs.subtarget }}
           path: bin/targets/${{ inputs.target }}/${{ inputs.subtarget }}/packages/
@@ -126,7 +126,7 @@ jobs:
 
       - name: Upload arch packages
         if: inputs.releasepackages && inputs.cpu_arch != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages-arch-${{ inputs.cpu_arch }}
           path: bin/packages/${{ inputs.cpu_arch }}/
@@ -135,7 +135,7 @@ jobs:
 
       - name: Upload build log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-log-${{ inputs.board }}
           path: build.log
