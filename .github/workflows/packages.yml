@@ -18,7 +18,7 @@ on:
       - 'target/linux/generic/**'
       - 'toolchain/**'
     branches-ignore:
-      - master
+      - '24.10'
 
 permissions:
   contents: read
