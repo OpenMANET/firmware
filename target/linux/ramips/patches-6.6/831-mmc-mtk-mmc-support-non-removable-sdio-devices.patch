@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET <noreply@openmanet.org>
+Date: Tue, 11 Mar 2026 00:00:00 +0000
+Subject: [PATCH] mmc: mtk-mmc: support non-removable SDIO devices
+
+The old mtk-mmc driver has hardcoded msdc0_hw.flags with MSDC_CD_PIN_EN
+and MSDC_REMOVABLE, which causes msdc_ops_get_cd() to read the hardware
+card-detect pin status register (MSDC_PS_CDSTS) to determine card
+presence. For soldered SDIO devices like the Morse Micro MM6108 HaLow
+radio, there is no physical CD pin, so the driver never detects the card
+and mmc_add_host() never enumerates the SDIO bus.
+
+Fix this by checking for the standard "non-removable" device tree
+property in the probe function. When set, clear both MSDC_REMOVABLE and
+MSDC_CD_PIN_EN flags so msdc_ops_get_cd() takes the SDIO path and
+always reports card present.
+
+Signed-off-by: OpenMANET <noreply@openmanet.org>
+---
+ drivers/mmc/host/mtk-mmc/sd.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+--- a/drivers/mmc/host/mtk-mmc/sd.c
++++ b/drivers/mmc/host/mtk-mmc/sd.c
+@@ -2215,6 +2215,12 @@ static int msdc_drv_probe(struct platfor
+ 	if (of_property_read_bool(pdev->dev.of_node, "mtk,wp-en"))
+ 		msdc0_hw.flags |= MSDC_WP_PIN_EN;
+
++	/* For non-removable devices (e.g. soldered SDIO chips), clear
++	 * MSDC_REMOVABLE so msdc_ops_get_cd() always reports card present,
++	 * and clear MSDC_CD_PIN_EN since there is no card-detect pin. */
++	if (of_property_read_bool(pdev->dev.of_node, "non-removable"))
++		msdc0_hw.flags &= ~(MSDC_CD_PIN_EN | MSDC_REMOVABLE);
++
+ 	/* Allocate MMC host for this device */
+ 	mmc = mmc_alloc_host(sizeof(struct msdc_host), &pdev->dev);
+ 	if (!mmc)
