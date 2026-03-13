@@ -57,7 +57,7 @@ jobs:
       subtarget: mt76x8
       description: "Heltec HT-HD01 V2 (MT76x8)"
       releasepackages: true
-      cpu_arch: mipsel_24kc
+      cpu_arch: ''
 
   build-venice:
     name: Build venice
