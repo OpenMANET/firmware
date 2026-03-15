@@ -180,6 +180,10 @@ ramips_setup_interfaces()
 		ucidef_add_switch "switch0" \
 			"0:lan" "1:lan" "2:lan" "3:wan" "6@eth0"
 		;;
+	heltec,ht-hd01-v2)
+		ucidef_add_switch "switch0" \
+			"0:lan" "2:lan" "6t@eth0"
+		;;
 	vocore,vocore2|\
 	vocore,vocore2-lite)
 		ucidef_add_switch "switch0" \
@@ -300,6 +304,7 @@ ramips_setup_macs()
 		label_mac=$(mtd_get_mac_binary factory 0x4)
 		wan_mac=$(macaddr_add "$label_mac" 2)
 		;;
+	heltec,ht-hd01-v2|\
 	onion,omega2|\
 	onion,omega2p|\
 	vocore,vocore2|\

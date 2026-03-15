@@ -1,0 +1,54 @@
+#!/bin/sh
+
+rled=499
+gled=498
+bled=497
+
+r_h=1
+r_l=0
+g_h=0
+g_l=1
+b_h=0
+b_l=1
+case $1 in
+"r")
+	gpio $rled  $r_h
+	gpio $gled  $g_l
+	gpio $bled  $b_l
+	;;
+"g")
+	gpio $rled  $r_l
+	gpio $gled  $g_h
+	gpio $bled  $b_l
+  ;;
+"b")
+	gpio $rled  $r_l
+	gpio $gled  $g_l
+	gpio $bled  $b_h
+  ;;
+"p")
+	gpio $rled  $r_h
+	gpio $gled  $g_l
+	gpio $bled  $b_h
+  ;;
+"y")
+	gpio $rled  $r_h
+	gpio $gled  $g_h
+	gpio $bled  $b_l
+  ;;
+"c")
+	gpio $rled  $r_l
+	gpio $gled  $g_h
+	gpio $bled  $b_h
+  ;;
+"w")
+	gpio $rled  $r_h
+	gpio $gled  $g_h
+	gpio $bled  $b_h
+  ;;
+"n")
+	gpio $rled  $r_l
+	gpio $gled  $g_l
+	gpio $bled  $b_l
+  ;;
+esac

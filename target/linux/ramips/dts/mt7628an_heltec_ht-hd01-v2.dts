@@ -40,6 +40,18 @@
 		clock-frequency = <48000000>;
 	};
 
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		ramoops@7efffff {
+			compatible = "ramoops";
+			reg = <0x7efffff 0x100000>;
+			record-size = <0x4000>;
+			console-size = <0x4000>;
+		};
+	};
 };
 
 &state_default {
@@ -119,6 +131,7 @@
 	vqmmc-supply = <&mmc_reg_3v3>;
 
 	cap-sd-highspeed;
+	cap-mmc-highspeed;
 	cap-sdio-irq;
 	non-removable;
 	disable-wp;

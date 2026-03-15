@@ -1,0 +1,12 @@
+#/bin/sh
+PIN=$1
+VALUE=$2
+if test -d /sys/class/gpio/gpio$PIN/
+then
+    echo $VALUE > /sys/class/gpio/gpio$PIN/value
+else
+    echo $PIN > /sys/class/gpio/export
+    echo out > /sys/class/gpio/gpio$PIN/direction
+    echo $VALUE > /sys/class/gpio/gpio$PIN/value
+fi
+

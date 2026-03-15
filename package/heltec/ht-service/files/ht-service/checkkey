@@ -1,0 +1,98 @@
+#!/bin/sh
+
+PIN=494
+gpio 498 1
+echo $PIN > /sys/class/gpio/export
+echo in > /sys/class/gpio/gpio$PIN/direction
+
+target=$(uci get system.@system[0].target)
+
+#if [ "$target" = "" ]
+#then
+#      uci set network.lan.target='eth'
+#      uci commit network
+#      target=$(uci get network.privlan.target)
+#fi
+echo  $target
+if [ "$target" = "eth" ]
+then
+        gpio 495 0
+else
+        gpio 495 1
+fi
+keylongtime="0"
+keylonglongtime="0"
+echo "0" > /tmp/keystatus
+while true
+do
+val=$(cat /sys/class/gpio/gpio$PIN/value)
+if [ "$val" = "0" ]
+then
+   echo "uesr key down"
+   time1=$(expr "$(date +%s%N)")
+   sleep 0.1
+   /ht-service/rgb r
+   echo "1" > /tmp/keystatus
+   while [ "$val" = "0" ]
+   do
+     time2=$(expr "$(date +%s%N)")
+     diff=$(expr "$time2" - "$time1")
+     #echo $time1 $time1 $diff
+     if [ $diff -gt 7 ];
+     then
+         if [ "$keylonglongtime" = "0" ]
+         then
+         echo "uesr key down for long long time"
+         keylonglongtime="1"
+         /ht-service/rgb w
+         fi
+     elif [ $diff -gt 2 ];
+     then
+         if [ "$keylongtime" = "0" ]
+         then
+         echo "uesr key down for long time"
+         keylongtime="1"
+         /ht-service/rgb y
+         fi
+     else
+         sleep 0.1
+         /ht-service/rgb r
+     fi
+     sleep 0.1
+     val=$(cat /sys/class/gpio/gpio$PIN/value)
+   done
+   if [ $diff -gt 7 ];
+   then
+        echo firstboot
+        firstboot -y
+        sync
+        sleep 1
+        reboot
+   elif [ $diff -gt 2 ];
+   then
+      echo  /ht-service/config.sh
+      /ht-service/config.sh
+   else
+      target=$(uci get system.@system[0].target)
+      gateway=$(uci get mesh11sd.mesh_params.mesh_gate_announcements)
+
+      if [ "$target" = "eth" ]
+      then
+          uci set system.@system[0].target='usb'
+          gpio 495 1
+          echo switch to usb
+      else
+          gpio 495 0
+          uci set system.@system[0].target='eth'
+          echo switch to eth
+      fi
+      uci commit system
+      target=$(uci get system.@system[0].target)
+   fi
+   keylongtime="0"
+   keylonglongtime="0"
+   echo "0" > /tmp/keystatus
+fi
+sleep 0.1
+done
+
