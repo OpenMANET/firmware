@@ -9,7 +9,7 @@ CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_morse_mm6108-ekh01-spi=y
 CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_morse_mm6108-ekh01-sdio=y
 CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_bcm2711_mm6108-spi=y
 CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_bcm2711_mm6108-sdio=y
-CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_bcm2711_mm8108-spi=y
+CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_bcm2711_mm8108-usb=y
 
 CONFIG_VERSION_MANUFACTURER="Raspberry Pi"
 CONFIG_VERSION_PRODUCT="BCM2711"
@@ -31,6 +31,9 @@ CONFIG_PACKAGE_persistent-vars-storage-bcm2711=y
 # Video encode/decode
 CONFIG_PACKAGE_kmod-video-core=y
 CONFIG_PACKAGE_kmod-video-codec-bcm2835=y
+
+# 2.5Gb Ethernet
+CONFIG_PACKAGE_kmod-r8125=y
 
 # Enabling CONFIG_ALL_KMODS triggered a package installation
 # bug with lan78xx - enabled by default for rpi4 platforms.

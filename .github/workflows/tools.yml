@@ -12,7 +12,7 @@ on:
       - 'tools/**'
       - '.github/workflows/tools.yml'
     branches-ignore:
-      - master
+      - '24.10'
 
 permissions:
   contents: read
