@@ -310,16 +310,15 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm6108-sdio
 endif
 
-define Device/bcm2711_mm8108-spi
+define Device/bcm2711_mm8108-usb
   $(Device/morse_ekh01_base)
   DEVICE_MODEL := RPI4-MM8108
-  DEVICE_VARIANT := SPI
+  DEVICE_VARIANT := USB
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm8108-spi
-  DISTROCONFIG_EXTRA := mm810x-spi
+  SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm8108-spi bcm2711,mm8108-usb
 endef
 ifeq ($(SUBTARGET),bcm2711)
-  TARGET_DEVICES += bcm2711_mm8108-spi
+  TARGET_DEVICES += bcm2711_mm8108-usb
 endif
 
 define Device/bcm2710_mm6108-spi
