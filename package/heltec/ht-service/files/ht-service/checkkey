@@ -1,7 +1,7 @@
 #!/bin/sh
 
-PIN=494
-gpio 498 1
+PIN=550
+gpio 530 1
 echo $PIN > /sys/class/gpio/export
 echo in > /sys/class/gpio/gpio$PIN/direction
 
@@ -16,9 +16,9 @@ target=$(uci get system.@system[0].target)
 echo  $target
 if [ "$target" = "eth" ]
 then
-        gpio 495 0
+        gpio 551 0
 else
-        gpio 495 1
+        gpio 551 1
 fi
 keylongtime="0"
 keylonglongtime="0"
@@ -79,10 +79,10 @@ then
       if [ "$target" = "eth" ]
       then
           uci set system.@system[0].target='usb'
-          gpio 495 1
+          gpio 551 1
           echo switch to usb
       else
-          gpio 495 0
+          gpio 551 0
           uci set system.@system[0].target='eth'
           echo switch to eth
       fi

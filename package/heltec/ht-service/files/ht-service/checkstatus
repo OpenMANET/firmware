@@ -211,7 +211,7 @@ do
         assoctime=$(iwinfo wlan0 assoclist|grep ago|head -$i|tail -1|awk '{print $(NF-2)}')
         if [ $assoctime -lt 5000 ];then  n=`expr $n + 1`;fi
       done
-      if [ "$connect_number" = "$n" ] && [ "$connect_number" != "0" ]
+      if [ "$n" != "0" ]
       then
         led_mode="0"
       fi

@@ -1,54 +1,56 @@
 #!/bin/sh
 
-rled=499
-gled=498
-bled=497
+# HT-HD01-V2 RGB LED control (kernel 6.6)
+# Red:   GPIO 44 — claimed by LED subsystem, use brightness
+# Green: GPIO 18 — sysfs 530, active low
+# Blue:  GPIO 17 — sysfs 529, active low
 
-r_h=1
-r_l=0
-g_h=0
-g_l=1
-b_h=0
-b_l=1
+RLED=/sys/class/leds/fuchsia:status/brightness
+gled=530
+bled=529
+
+r_on() { echo 1 > $RLED; }
+r_off() { echo 0 > $RLED; }
+
 case $1 in
 "r")
-	gpio $rled  $r_h
-	gpio $gled  $g_l
-	gpio $bled  $b_l
+	r_on
+	gpio $gled  1
+	gpio $bled  1
 	;;
 "g")
-	gpio $rled  $r_l
-	gpio $gled  $g_h
-	gpio $bled  $b_l
-  ;;
+	r_off
+	gpio $gled  0
+	gpio $bled  1
+	;;
 "b")
-	gpio $rled  $r_l
-	gpio $gled  $g_l
-	gpio $bled  $b_h
-  ;;
+	r_off
+	gpio $gled  1
+	gpio $bled  0
+	;;
 "p")
-	gpio $rled  $r_h
-	gpio $gled  $g_l
-	gpio $bled  $b_h
-  ;;
+	r_on
+	gpio $gled  1
+	gpio $bled  0
+	;;
 "y")
-	gpio $rled  $r_h
-	gpio $gled  $g_h
-	gpio $bled  $b_l
-  ;;
+	r_on
+	gpio $gled  0
+	gpio $bled  1
+	;;
 "c")
-	gpio $rled  $r_l
-	gpio $gled  $g_h
-	gpio $bled  $b_h
-  ;;
+	r_off
+	gpio $gled  0
+	gpio $bled  0
+	;;
 "w")
-	gpio $rled  $r_h
-	gpio $gled  $g_h
-	gpio $bled  $b_h
-  ;;
+	r_on
+	gpio $gled  0
+	gpio $bled  0
+	;;
 "n")
-	gpio $rled  $r_l
-	gpio $gled  $g_l
-	gpio $bled  $b_l
-  ;;
+	r_off
+	gpio $gled  1
+	gpio $bled  1
+	;;
 esac
