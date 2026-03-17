@@ -1,4 +1,4 @@
-name: Build Firmware for Pull Request on halowlink2
+name: Build Firmware (PR) on halowlink2
 
 permissions:
   contents: read
