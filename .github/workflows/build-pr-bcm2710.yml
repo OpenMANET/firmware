@@ -1,0 +1,24 @@
+name: Build Firmware (PR) on bcm2710
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+    - 'boards/ekh-bcm2710/**'
+    - 'boards/common/**'
+    - 'include/kernel*'
+    - 'package/kernel/**'
+    - 'target/linux/bcm27xx/**'
+    - 'feeds.conf.default'
+
+jobs:
+  build-ekh-bcm2710:
+    name: Build ekh-bcm2710
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: ekh-bcm2710
+      target: bcm27xx
+      subtarget: bcm2710
+      description: "Raspberry Pi 3B, 2W"
