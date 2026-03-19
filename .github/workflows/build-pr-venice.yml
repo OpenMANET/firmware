@@ -1,4 +1,4 @@
-name: Build Firmware for Pull Request on venice
+name: Build Firmware (PR) on Venice
 
 permissions:
   contents: read
@@ -14,7 +14,7 @@ on:
 
 jobs:
   build-venice:
-    name: Build venice
+    name: Build Venice
     uses: ./.github/workflows/build-firmware.yml
     with:
       board: venice
