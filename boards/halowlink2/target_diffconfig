@@ -44,6 +44,10 @@ CONFIG_PACKAGE_kmod-mt7915e=n
 CONFIG_PACKAGE_kmod-mt7915-firmware=n
 CONFIG_PACKAGE_kmod-mt7916-firmware=n
 
+# Exclude GPS packages
+CONFIG_PACKAGE_gpsd=n
+CONFIG_PACKAGE_gpsd-clients=n
+
 # Exclude USB/misc firmware not needed
 CONFIG_PACKAGE_edgeport-firmware=n
 CONFIG_PACKAGE_r8152-firmware=n
