@@ -40,11 +40,25 @@
 		clock-frequency = <48000000>;
 	};
 
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		ramoops@7efffff {
+			compatible = "ramoops";
+			reg = <0x7efffff 0x100000>;
+			record-size = <0x4000>;
+			console-size = <0x4000>;
+		};
+	};
 };
 
 &state_default {
 	gpio {
-		groups = "wled_an", "refclk", "wdt", "i2s", "uart1", "uart2";
+		groups = "wled_an", "p0led_an", "p1led_an", "p2led_an",
+			 "p3led_an", "p4led_an",
+			 "refclk", "wdt", "i2s", "uart1", "uart2";
 		function = "gpio";
 	};
 };
@@ -119,6 +133,7 @@
 	vqmmc-supply = <&mmc_reg_3v3>;
 
 	cap-sd-highspeed;
+	cap-mmc-highspeed;
 	cap-sdio-irq;
 	non-removable;
 	disable-wp;
