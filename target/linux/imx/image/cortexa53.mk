@@ -99,5 +99,5 @@ define Device/gw_venice
   IMAGE/factory.img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip
 endef
 ifeq ($(SUBTARGET),cortexa53)
-  TARGET_DEVICES += gateworks,imx8mp-gw71xx-2x gateworks,imx8mp-gw72xx-2x gateworks,imx8mp-gw73xx-2x gateworks,imx8mp-gw74xx gateworks,imx8mm-gw75xx-0x gateworks,imx8mp-gw75xx-2x gateworks,imx8mm-gw7904 gateworks,imx8mm-gw7905-0x gateworks,imx8mp-gw7905-2x
+  TARGET_DEVICES += gw_venice
 endif
