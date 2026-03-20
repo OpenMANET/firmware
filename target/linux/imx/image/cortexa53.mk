@@ -84,8 +84,6 @@ TARGET_DEVICES += gateworks_venice
 
 define Device/gw_venice
   $(Device/gateworks_venice)
-  SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
-  SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
   DEVICE_VENDOR := Gateworks
   DEVICE_MODEL := Venice-MM8108
   DEVICE_VARIANT := USB
