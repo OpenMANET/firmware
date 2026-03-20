@@ -82,11 +82,11 @@ define Device/gateworks_venice
 endef
 TARGET_DEVICES += gateworks_venice
 
-define Device/gw_venice_base
+define Device/gw_venice
   $(Device/gateworks_venice)
-  SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
-  SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
   DEVICE_VENDOR := Gateworks
+  DEVICE_MODEL := Venice-MM8108
+  DEVICE_VARIANT := USB
 
   # Simplify by removing board and OpenWRT version.
   IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
@@ -95,35 +95,6 @@ define Device/gw_venice_base
   IMAGES := sysupgrade.img.gz
   IMAGE/sysupgrade.img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip | append-metadata
   IMAGE/factory.img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip
-endef
-
-define Device/venice_openmanet
-  $(Device/gw_venice_base)
-  DEVICE_MODEL := Venice-MM8108
-  DEVICE_VARIANT := USB
-
-  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  SUPPORTED_DEVICES := \
-	gw,imx8mm-gw71xx-0x \
-	gw,imx8mm-gw72xx-0x \
-	gw,imx8mp-gw72xx-2x \
-	gw,imx8mm-gw73xx-0x \
-	gw,imx8mp-gw73xx-2x \
-	gw,imx8mm-gw75xx-0x \
-	gw,imx8mp-gw75xx-2x \
-	gw,imx8mm-gw7901 \
-	gw,imx8mm-gw7902 \
-	gw,imx8mn-gw7902 \
-	gw,imx8mm-gw7903 \
-	gateworks,imx8mp-gw71xx-2x \
-	gateworks,imx8mp-gw72xx-2x \
-	gateworks,imx8mp-gw73xx-2x \
-	gateworks,imx8mp-gw74xx \
-	gateworks,imx8mm-gw75xx-0x \
-	gateworks,imx8mp-gw75xx-2x \
-	gateworks,imx8mm-gw7904 \
-	gateworks,imx8mm-gw7905-0x \
-	gateworks,imx8mp-gw7905-2x
 endef
 ifeq ($(SUBTARGET),cortexa53)
   TARGET_DEVICES += gw_venice
