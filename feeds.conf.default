@@ -1,4 +1,4 @@
-src-git openmanet https://github.com/OpenMANET/packages.git;1.7.0-dev
+src-git openmanet https://github.com/OpenMANET/packages.git;ptt-test
 src-git morse https://github.com/MorseMicro/morse-feed.git^263b4c4ed8ae1683a180ce9cd28d3516c40dbce5
 src-git gateworks https://github.com/Gateworks/gw-openwrt-packages.git^fa86fdae267c1769c2c9ab960f1709ff28860cbd
 src-git packages https://github.com/openwrt/packages.git^ef7746c5e9ffc9ba128c4cf76e9e22fb52872f7a
