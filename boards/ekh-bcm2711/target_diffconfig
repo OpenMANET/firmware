@@ -29,7 +29,6 @@ CONFIG_PACKAGE_alsa-lib=y
 CONFIG_PACKAGE_dbus=y
 CONFIG_PACKAGE_libdbus=y
 CONFIG_PACKAGE_glib2=y
-CONFIG_PACKAGE_adsbtocot=n
 
 CONFIG_PACKAGE_bsp-bcm271x=y
 
