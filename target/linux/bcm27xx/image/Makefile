@@ -335,6 +335,19 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm6108-spi
 endif
 
+define Device/bcm2711_ht-hc01p-spi
+  $(Device/morse_ekh01_base)
+  DEVICE_MODEL := RPI4-HT-HC01P
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += heltec,ht-hc01p bcm2711,ht-hc01p-spi
+  DEVICE_PACKAGES += -morse-fw-8108 -morse-fw-8108-tlm -morse-fw-8108-flm
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2711)
+  TARGET_DEVICES += bcm2711_ht-hc01p-spi
+endif
+
 define Device/bcm2711_mm6108-sdio
   $(Device/morse_ekh01_base)
   DEVICE_MODEL := RPI4-MM6108
@@ -382,6 +395,19 @@ ifeq ($(SUBTARGET),bcm2712)
   TARGET_DEVICES += bcm2712_mm6108-spi
 endif
 
+define Device/bcm2712_ht-hc01p-spi
+  $(Device/morse_rpi5_base)
+  DEVICE_MODEL := RPI5-HT-HC01P
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += heltec,ht-hc01p bcm2712,ht-hc01p-spi
+  DEVICE_PACKAGES += -morse-fw-8108 -morse-fw-8108-tlm -morse-fw-8108-flm
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_ht-hc01p-spi
+endif
+
 define Device/bcm2712_mm6108-sdio
   $(Device/morse_rpi5_base)
   DEVICE_MODEL := RPI5-MM6108
@@ -416,6 +442,19 @@ define Device/bcm2710_mm6108-spi
 endef
 ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm6108-spi
+endif
+
+define Device/bcm2710_ht-hc01p-spi
+  $(Device/morse_pi3_base)
+  DEVICE_MODEL := RPI3-HT-HC01P
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += heltec,ht-hc01p bcm2710,ht-hc01p-spi
+  DEVICE_PACKAGES += -morse-fw-8108 -morse-fw-8108-tlm -morse-fw-8108-flm
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_ht-hc01p-spi
 endif
 
 define Device/bcm2710_mm6108-sdio
