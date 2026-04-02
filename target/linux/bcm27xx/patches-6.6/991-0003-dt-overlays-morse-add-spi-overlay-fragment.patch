@@ -2,18 +2,19 @@ From a7f068bc6332aa17a3be03cb69ad18c4c546eddf Mon Sep 17 00:00:00 2001
 From: Sophronia Koilpillai <sophronia.koilpillai@morsemicro.com>
 Date: Fri, 1 Nov 2024 10:55:11 +1100
 Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
- for MM610x and MM810x
+ for MM610x and MM810x - Unified for RPi1-4 and RPi5
 
 --- /dev/null
 +++ b/arch/arm/boot/dts/overlays/mm610x-spi-overlay.dts
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,142 @@
 +/dts-v1/;
 +/plugin/;
 +
 +/ {
 +	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2837",
-+	             "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2710", "brcm,bcm2711";
++	             "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2710", "brcm,bcm2711", "brcm,bcm2712";
 +
++	// Fragment for older Raspberry Pi models (RPi1-4) using BCM2835/6/7 SPI0
 +	fragment@0 {
 +		target = <&spi0>;
 +		frag0: __overlay__ {
@@ -46,7 +47,31 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +		};
 +	};
 +
++	// Fragment for Raspberry Pi 5 using RP1 SPI0
 +	fragment@1 {
++		target = <&rp1_spi0>;
++		frag1: __overlay__ {
++			pinctrl-0 = <&rp1_spi0_gpio9 &rp1_spi0_cs_gpio7 &rp1_morse_wake &rp1_morse_busy &rp1_morse_irq &rp1_morse_reset>;
++			cs-gpios = <&rp1_gpio 8 1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++
++			mm6108_rpi5: mm6108@0 {
++				compatible = "morse,mm610x-spi";
++				reg = <0>; /* CE0 */
++				reset-gpios = <&rp1_gpio 17 0>;
++				power-gpios = <&rp1_gpio 23 0>,
++				              <&rp1_gpio 24 0>;
++				spi-irq-gpios = <&rp1_gpio 5 0>;
++				spi-max-frequency = <50000000>;
++				status = "okay";
++			};
++		};
++	};
++
++	// GPIO pinctrl for older Raspberry Pi models (BCM2835 format)
++	fragment@2 {
 +		target = <&gpio>;
 +		__overlay__ {
 +			spi0_cs_pins: spi0_cs_pins {
@@ -83,21 +108,59 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
 +				brcm,pull = <2>;     /* PULL UP */
 +			};
++		};
++	};
 +
++	// GPIO pinctrl for Raspberry Pi 5 (RP1 format) - custom pins for morse signals
++	fragment@3 {
++		target = <&rp1_gpio>;
++		__overlay__ {
++			rp1_morse_wake: rp1_morse_wake {
++				pin_wake {
++					function = "gpio";
++					pins = "gpio23";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_busy: rp1_morse_busy {
++				pin_busy {
++					function = "gpio";
++					pins = "gpio24";
++					bias-pull-down;
++				};
++			};
++
++			rp1_morse_irq: rp1_morse_irq {
++				pin_irq {
++					function = "gpio";
++					pins = "gpio5";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_reset: rp1_morse_reset {
++				pin_reset {
++					function = "gpio";
++					pins = "gpio17";
++					bias-pull-up;
++				};
++			};
 +		};
 +	};
 +};
 \ No newline at end of file
 --- /dev/null
 +++ b/arch/arm/boot/dts/overlays/mm810x-spi-overlay.dts
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,142 @@
 +/dts-v1/;
 +/plugin/;
 +
 +/ {
 +	compatible = "brcm,bcm2835", "brcm,bcm2836", "brcm,bcm2837",
-+	             "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2710", "brcm,bcm2711";
++	             "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2710", "brcm,bcm2711", "brcm,bcm2712";
 +
++	// Fragment for older Raspberry Pi models (RPi1-4) using BCM2835/6/7 SPI0
 +	fragment@0 {
 +		target = <&spi0>;
 +		frag0: __overlay__ {
@@ -130,7 +193,31 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +		};
 +	};
 +
++	// Fragment for Raspberry Pi 5 using RP1 SPI0
 +	fragment@1 {
++		target = <&rp1_spi0>;
++		frag1: __overlay__ {
++			pinctrl-0 = <&rp1_spi0_gpio9 &rp1_spi0_cs_gpio7 &rp1_morse_wake &rp1_morse_busy &rp1_morse_irq &rp1_morse_reset>;
++			cs-gpios = <&rp1_gpio 8 1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++
++			mm8108_rpi5: mm8108@0 {
++				compatible = "morse,mm810x-spi";
++				reg = <0>; /* CE0 */
++				reset-gpios = <&rp1_gpio 17 0>;
++				power-gpios = <&rp1_gpio 23 0>,
++				              <&rp1_gpio 24 0>;
++				spi-irq-gpios = <&rp1_gpio 5 0>;
++				spi-max-frequency = <50000000>;
++				status = "okay";
++			};
++		};
++	};
++
++	// GPIO pinctrl for older Raspberry Pi models (BCM2835 format)
++	fragment@2 {
 +		target = <&gpio>;
 +		__overlay__ {
 +			spi0_cs_pins: spi0_cs_pins {
@@ -167,7 +254,44 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +				brcm,function = <0>; /* BCM2835_FSEL_GPIO_IN */
 +				brcm,pull = <2>;     /* PULL UP */
 +			};
++		};
++	};
 +
++	// GPIO pinctrl for Raspberry Pi 5 (RP1 format) - custom pins for morse signals
++	fragment@3 {
++		target = <&rp1_gpio>;
++		__overlay__ {
++			rp1_morse_wake: rp1_morse_wake {
++				pin_wake {
++					function = "gpio";
++					pins = "gpio23";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_busy: rp1_morse_busy {
++				pin_busy {
++					function = "gpio";
++					pins = "gpio24";
++					bias-pull-down;
++				};
++			};
++
++			rp1_morse_irq: rp1_morse_irq {
++				pin_irq {
++					function = "gpio";
++					pins = "gpio5";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_reset: rp1_morse_reset {
++				pin_reset {
++					function = "gpio";
++					pins = "gpio17";
++					bias-pull-up;
++				};
++			};
 +		};
 +	};
 +};

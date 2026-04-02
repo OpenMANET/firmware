@@ -1,0 +1,45 @@
+From d4a7c7f59f8a8e8b8c9d2e5f3a1b4c6d8e9f0123 Mon Sep 17 00:00:00 2001
+From: Developer <dev@example.com>
+Date: Tue, 17 Feb 2026 00:00:00 +0000
+Subject: [PATCH] arm64: dts: Add Morse Micro GPIO line names to RPi5 device trees
+
+Add Morse Micro specific GPIO line names (MM_IRQ, MM_RESET, MM_WAKE, MM_BUSY)
+to bcm2712-rpi-5-b.dts. This allows user-space scripts like morse_cli.sh
+and chipreset.sh to find GPIOs by line names.
+
+The gpio-line-names are defined in the rp1_gpio node (aliased as &gpio).
+
+---
+ arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts b/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
+--- a/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
++++ b/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
+@@ -685,7 +685,7 @@
+ 		"GPIO2", // GPIO2
+ 		"GPIO3", // GPIO3
+ 		"GPIO4", // GPIO4
+-		"GPIO5", // GPIO5
++		"MM_IRQ", // GPIO5 - Morse IRQ
+ 		"GPIO6", // GPIO6
+ 		"GPIO7", // GPIO7
+ 		"GPIO8", // GPIO8
+@@ -697,14 +697,14 @@
+ 		"GPIO14", // GPIO14
+ 		"GPIO15", // GPIO15
+ 		"GPIO16", // GPIO16
+-		"GPIO17", // GPIO17
++		"MM_RESET", // GPIO17 - Morse Reset
+ 		"GPIO18", // GPIO18
+ 		"GPIO19", // GPIO19
+ 		"GPIO20", // GPIO20
+ 		"GPIO21", // GPIO21
+ 		"GPIO22", // GPIO22
+-		"GPIO23", // GPIO23
+-		"GPIO24", // GPIO24
++		"MM_WAKE", // GPIO23 - Morse Wake
++		"MM_BUSY", // GPIO24 - Morse Busy
+ 		"GPIO25", // GPIO25
+ 		"GPIO26", // GPIO26
+ 		"GPIO27", // GPIO27
