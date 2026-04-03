@@ -164,7 +164,9 @@ endef
 
 define Host/Install
 	$(call Host/Install/Default)
-	mv $(1)/bin/xml2-config $(1)/bin/$(GNU_HOST_NAME)-xml2-config
+	if [ ! -L $(1)/bin/xml2-config ]; then \
+		mv $(1)/bin/xml2-config $(1)/bin/$(GNU_HOST_NAME)-xml2-config; \
+	fi
 	$(LN) $(GNU_HOST_NAME)-xml2-config $(1)/bin/xml2-config
 endef
 
