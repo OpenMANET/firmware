@@ -2,9 +2,10 @@
 # Bootloader configuration - distroconfig.txt
 ################################################################################
 
-# Keep the onboard Bluetooth controller on PL011 (ttyAMA0).
-# HaLow on this board uses SPI, so the Bluetooth UART does not need to be
-# moved onto the mini-UART path.
+# Keep the onboard Bluetooth controller on the PL011-backed UART.
+# HaLow on this board uses SPI, so the Bluetooth controller does not need to
+# be moved onto the mini-UART path. The exact Linux tty can vary by carrier
+# and overlay ordering, so runtime detection handles the final mapping.
 [pi0w]
 dtoverlay=disable-bt
 [pi3]

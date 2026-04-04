@@ -24,6 +24,7 @@ CONFIG_PACKAGE_morse-board-config-hotplug-model=y
 CONFIG_PACKAGE_luci-app-ekhwizards=y
 CONFIG_PACKAGE_bluez-alsa=y
 CONFIG_PACKAGE_bluez-utils=y
+CONFIG_PACKAGE_bluez-utils-btmon=y
 CONFIG_PACKAGE_bluez-daemon=y
 CONFIG_PACKAGE_rpi-bluez-firmware=y
 CONFIG_PACKAGE_alsa-lib=y
