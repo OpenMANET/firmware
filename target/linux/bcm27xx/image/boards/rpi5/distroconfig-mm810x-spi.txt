@@ -1,0 +1,2 @@
+dtparam=spi=on
+dtoverlay=mm810x-spi

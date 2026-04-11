@@ -8,6 +8,9 @@ set_preinit_iface() {
 	morse,ekh01 |\
 	morse,mm6108-ekh01-spi |\
 	morse,mm8108-ekh01-spi |\
+	bcm2710,ht-hc01p-spi |\
+	bcm2711,ht-hc01p-spi |\
+	bcm2712,ht-hc01p-spi |\
 	raspberrypi,2-model-b |\
 	raspberrypi,2-model-b-rev2 |\
 	raspberrypi,3-model-b |\
