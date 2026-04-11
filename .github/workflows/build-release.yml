@@ -59,6 +59,17 @@ jobs:
       releasepackages: true
       cpu_arch: ''
 
+  build-ekh-bcm2712:
+    name: Build ekh-bcm2712
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: ekh-bcm2712
+      target: bcm27xx
+      subtarget: bcm2712
+      description: "Raspberry Pi 5"
+      releasepackages: true
+      cpu_arch: aarch64_cortex-a76
+
   build-venice:
     name: Build venice
     uses: ./.github/workflows/build-firmware.yml
@@ -72,7 +83,7 @@ jobs:
 
   publish-packages:
     name: Publish Packages to packages-repo
-    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-halowlink2, build-hd01-v2, build-venice]
+    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-ekh-bcm2712, build-halowlink2, build-hd01-v2, build-venice]
     runs-on: ubuntu-24.04
     steps:
       - name: Download target packages artifacts
@@ -142,7 +153,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-halowlink2, build-hd01-v2, build-venice]
+    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-ekh-bcm2712, build-halowlink2, build-hd01-v2, build-venice]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
