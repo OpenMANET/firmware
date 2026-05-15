@@ -37,27 +37,28 @@ jobs:
       releasepackages: true
       cpu_arch: ''
 
-  build-halowlink2:
-    name: Build HalowLink2
-    uses: ./.github/workflows/build-firmware.yml
-    with:
-      board: halowlink2
-      target: ramips
-      subtarget: mt7621
-      description: "HalowLink 2 (MT7621)"
-      releasepackages: true
-      cpu_arch: mipsel_24kc
+  # NOTE: ADD NEEDS DEPENDENCIES TO RELEASE JOB IF UNCOMMENTING THESE
+  # build-halowlink2:
+  #   name: Build HalowLink2
+  #   uses: ./.github/workflows/build-firmware.yml
+  #   with:
+  #     board: halowlink2
+  #     target: ramips
+  #     subtarget: mt7621
+  #     description: "HalowLink 2 (MT7621)"
+  #     releasepackages: true
+  #     cpu_arch: mipsel_24kc
 
-  build-hd01-v2:
-    name: Build HD01 V2
-    uses: ./.github/workflows/build-firmware.yml
-    with:
-      board: ht-hd01-v2
-      target: ramips
-      subtarget: mt76x8
-      description: "Heltec HT-HD01 V2 (MT76x8)"
-      releasepackages: true
-      cpu_arch: ''
+  # build-hd01-v2:
+  #   name: Build HD01 V2
+  #   uses: ./.github/workflows/build-firmware.yml
+  #   with:
+  #     board: ht-hd01-v2
+  #     target: ramips
+  #     subtarget: mt76x8
+  #     description: "Heltec HT-HD01 V2 (MT76x8)"
+  #     releasepackages: true
+  #     cpu_arch: ''
 
   build-venice:
     name: Build venice
@@ -72,7 +73,7 @@ jobs:
 
   publish-packages:
     name: Publish Packages to packages-repo
-    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-halowlink2, build-hd01-v2, build-venice]
+    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-venice]
     runs-on: ubuntu-24.04
     steps:
       - name: Download target packages artifacts
@@ -142,7 +143,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-halowlink2, build-hd01-v2, build-venice]
+    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-venice]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
