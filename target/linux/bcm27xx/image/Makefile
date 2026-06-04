@@ -321,6 +321,56 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm8108-usb
 endif
 
+define Device/morse_pi5_base
+  $(Device/rpi-5)
+  SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
+  SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
+  DEVICE_VENDOR := RPI
+  IMAGES := sysupgrade.img.gz
+  # Simplify by removing board and OpenWRT version.
+  IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
+  DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
+  DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-6108 morse-fw-8108
+  # RPi 5 has no GPU firmware files (no boot-2711 step needed).
+  IMAGE/sysupgrade.img.gz := boot-common | boot-ekh01 | sdcard-img | gzip | append-metadata
+  IMAGE/factory.img.gz := boot-common | boot-ekh01 | sdcard-img | gzip
+endef
+
+define Device/bcm2712_mm6108-spi
+  $(Device/morse_pi5_base)
+  DEVICE_MODEL := RPI5-MM6108
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2712,mm6108-spi
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_mm6108-spi
+endif
+
+define Device/bcm2712_mm6108-sdio
+  $(Device/morse_pi5_base)
+  DEVICE_MODEL := RPI5-MM6108
+  DEVICE_VARIANT := SDIO
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2712,mm6108-sdio
+  DISTROCONFIG_EXTRA := mm610x-sdio
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_mm6108-sdio
+endif
+
+define Device/bcm2712_mm8108-usb
+  $(Device/morse_pi5_base)
+  DEVICE_MODEL := RPI5-MM8108
+  DEVICE_VARIANT := USB
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2712,mm8108-usb
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_mm8108-usb
+endif
+
 define Device/bcm2710_mm6108-spi
   $(Device/morse_pi3_base)
   DEVICE_MODEL := RPI3-MM6108
