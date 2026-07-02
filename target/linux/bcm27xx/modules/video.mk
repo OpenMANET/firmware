@@ -19,6 +19,28 @@ endef
 
 $(eval $(call KernelPackage,camera-bcm2835))
 
+define KernelPackage/camera-bcm2835-unicam
+  TITLE:=BCM2835 camera with support for unicam
+  DEPENDS:= +kmod-regmap-i2c \
+            +kmod-i2c-mux-pinctrl \
+            +kmod-i2c-bcm2835
+  KCONFIG:= \
+    CONFIG_VIDEO_BCM2835_UNICAM \
+    CONFIG_VIDEO_ISP_BCM2835 \
+    CONFIG_VIDEO_BCM2835_MMAL
+  FILES:= \
+    $(LINUX_DIR)/drivers/staging/vc04_services/bcm2835-isp/bcm2835-isp.ko \
+    $(LINUX_DIR)/drivers/media/platform/bcm2835/bcm2835-unicam.ko
+  AUTOLOAD:=$(call AutoLoad,65,bcm2835-unicam bcm2835-isp)
+  $(call AddDepends/video,@TARGET_bcm27xx +kmod-vchiq-mmal-bcm2835 +kmod-video-videobuf2 +kmod-video-dma-contig +kmod-video-fwnode)
+endef
+
+define KernelPackage/camera-bcm2835-unicam/description
+ Camera host interface devices for Broadcom BCM2835 SoC needed for unicam.
+endef
+
+$(eval $(call KernelPackage,camera-bcm2835-unicam))
+
 
 define KernelPackage/codec-bcm2835
   TITLE:=BCM2835 Video Codec
