@@ -321,6 +321,17 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm8108-usb
 endif
 
+define Device/raven
+  $(Device/morse_ekh01_base)
+  DEVICE_MODEL := RAVEN-MM8108
+  DEVICE_VARIANT := USB
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2711,raven
+endef
+ifeq ($(SUBTARGET),bcm2711)
+  TARGET_DEVICES += bcm2711_raven
+endif
+
 define Device/bcm2710_mm6108-spi
   $(Device/morse_pi3_base)
   DEVICE_MODEL := RPI3-MM6108
