@@ -321,7 +321,7 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm8108-usb
 endif
 
-define Device/raven
+define Device/bcm2711_raven
   $(Device/morse_ekh01_base)
   DEVICE_MODEL := RAVEN-MM8108
   DEVICE_VARIANT := USB
