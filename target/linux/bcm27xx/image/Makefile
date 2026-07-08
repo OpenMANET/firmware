@@ -327,6 +327,7 @@ define Device/raven
   DEVICE_VARIANT := USB
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   SUPPORTED_DEVICES += bcm2711,raven
+  DISTROCONFIG_EXTRA := raven
 endef
 ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_raven

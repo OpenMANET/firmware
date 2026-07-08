@@ -1,0 +1,3 @@
+dtoverlay=raven
+dtoverlay=pps-gpio,gpiopin=18
+dtparam=i2c_vc=on
