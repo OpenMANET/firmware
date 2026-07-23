@@ -1,2 +1,2 @@
 dtparam=spi=on
-dtoverlay=mm610x-spi
+dtoverlay=mm610x-spi-pi5
