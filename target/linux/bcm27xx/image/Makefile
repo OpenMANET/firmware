@@ -66,15 +66,6 @@ define Build/boot-2711
 	mcopy -i $@.boot $(KDIR)/fixup4x.dat ::
 endef
 
-define Build/boot-2712
-	mcopy -i $@.boot $(KDIR)/start4.elf ::
-	mcopy -i $@.boot $(KDIR)/start4cd.elf ::
-	mcopy -i $@.boot $(KDIR)/start4x.elf ::
-	mcopy -i $@.boot $(KDIR)/fixup4.dat ::
-	mcopy -i $@.boot $(KDIR)/fixup4cd.dat ::
-	mcopy -i $@.boot $(KDIR)/fixup4x.dat ::
-endef
-
 define Build/boot-ekh01
 	# Put ekh01 model info into device tree (picked up by 01_sysinfo).
 	# This uses a custom overlay which accepts parameters (via RPI's __overrides__ mechanism),
@@ -319,8 +310,8 @@ define Device/morse_rpi5_base
   IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
   DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
   DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-6108 morse-fw-8108 kmod-spi-dw kmod-spi-dw-mmio kmod-i2c-designware-platform
-  IMAGE/sysupgrade.img.gz := boot-common | boot-2712 | boot-rpi5-morse | sdcard-img | gzip | append-metadata
-  IMAGE/factory.img.gz := boot-common | boot-2712 | boot-rpi5-morse | sdcard-img | gzip
+  IMAGE/sysupgrade.img.gz := boot-common | boot-rpi5-morse | sdcard-img | gzip | append-metadata
+  IMAGE/factory.img.gz := boot-common | boot-rpi5-morse | sdcard-img | gzip
 endef
 
 define Device/bcm2711_mm6108-spi
