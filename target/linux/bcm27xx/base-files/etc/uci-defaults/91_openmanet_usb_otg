@@ -1,0 +1,27 @@
+#!/bin/sh
+
+is_zero2w() {
+	tr '\000' '\n' </proc/device-tree/compatible 2>/dev/null | \
+		grep -qx 'raspberrypi,model-zero-2-w'
+}
+
+is_zero2w || exit 0
+[ -f /usr/share/usbgadget/ecm-rndis ] || exit 0
+
+udc="$(ls /sys/class/udc 2>/dev/null | head -n1)"
+[ -n "$udc" ] || exit 0
+
+uci -q delete usbgadget.@preset[0]
+uci add usbgadget preset >/dev/null
+uci set usbgadget.@preset[-1].name='ecm-rndis'
+uci set usbgadget.@preset[-1].UDC="$udc"
+uci commit usbgadget
+
+/etc/init.d/usbgadget enable >/dev/null 2>&1 || true
+/etc/init.d/usbgadget restart >/dev/null 2>&1 || true
+
+for dev in usb0 usb1; do
+	ip link set "$dev" up 2>/dev/null || true
+done
+
+exit 0

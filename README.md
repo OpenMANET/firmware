@@ -44,10 +44,18 @@ Install build environment packages with
 
 Run the `./scripts/openmanet_setup.sh` script to configure the build for your board of choice.
 
-For example, Using seeedstudio's WiFi Halow Modules on Raspberry Pi4.
+For example, using seeedstudio's WiFi HaLow modules on Raspberry Pi 4.
 ```
 > ./scripts/openmanet_setup.sh -i -b ekh-bcm2711
 ```
+
+The BCM2710 target is also available as split builds:
+```
+> ./scripts/openmanet_setup.sh -i -b ekh-bcm2710-rpi3
+> ./scripts/openmanet_setup.sh -i -b ekh-bcm2710-2w
+```
+
+The `ekh-bcm2710-2w` build is the Zero 2 W-specific image. It narrows the device tree to the Zero 2 W, switches `dwc2` to peripheral mode in `distroconfig.txt`, and includes a configfs-based ECM+RNDIS USB gadget preset.
 
 Run this to download all dependencies before starting a build.  It will make building more reliable.
 ```

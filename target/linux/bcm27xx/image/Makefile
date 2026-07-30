@@ -6,7 +6,7 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
-DEVICE_VARS += SYSINFO_MODEL SYSINFO_BOARD_NAME DISTROCONFIG_EXTRA
+DEVICE_VARS += SYSINFO_MODEL SYSINFO_BOARD_NAME DISTROCONFIG_EXTRA DISTROCONFIG_BASE
 
 FAT32_BLOCK_SIZE=1024
 FAT32_BLOCKS=$(shell echo $$(($(CONFIG_TARGET_KERNEL_PARTSIZE)*1024*1024/$(FAT32_BLOCK_SIZE))))
@@ -77,7 +77,7 @@ define Build/boot-ekh01
 	# As well as this, we have a custom DISTROCONFIG_EXTRA section which is used to define
 	# the necessary SPI/SDIO overlays for the product.
 
-	echo -e '\ndtoverlay=sysinfo,board-name="$(SYSINFO_BOARD_NAME)",model="$(SYSINFO_MODEL)"' | cat boards/ekh01/distroconfig.txt boards/ekh01/distroconfig-$(DISTROCONFIG_EXTRA).txt - | mcopy -o -i $@.boot - ::/distroconfig.txt
+	echo -e '\ndtoverlay=sysinfo,board-name="$(SYSINFO_BOARD_NAME)",model="$(SYSINFO_MODEL)"' | cat boards/ekh01/$(or $(DISTROCONFIG_BASE),distroconfig.txt) boards/ekh01/distroconfig-$(DISTROCONFIG_EXTRA).txt - | mcopy -o -i $@.boot - ::/distroconfig.txt
 
 endef
 
@@ -290,6 +290,21 @@ define Device/morse_pi3_base
   IMAGE/factory.img.gz := boot-common | boot-2710 | boot-ekh01 | sdcard-img | gzip
 endef
 
+define Device/morse_pi3b_base
+  $(Device/morse_pi3_base)
+  DEVICE_DTS := broadcom/bcm2710-rpi-3-b
+endef
+
+define Device/morse_zero2w_base
+  $(Device/morse_pi3_base)
+  DEVICE_DTS := broadcom/bcm2710-rpi-zero-2-w
+  DISTROCONFIG_BASE := distroconfig-zero2w.txt
+  DEVICE_PACKAGES += \
+	kmod-fs-configfs \
+	usbgadget usbgadget-ecm-rndis \
+	kmod-usb-gadget-eth
+endef
+
 define Device/bcm2711_mm6108-spi
   $(Device/morse_ekh01_base)
   DEVICE_MODEL := RPI4-MM6108
@@ -359,6 +374,84 @@ define Device/bcm2710_mm8108-spi
 endef
 ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm8108-spi
+endif
+
+define Device/bcm2710_rpi3_mm6108-spi
+  $(Device/morse_pi3b_base)
+  DEVICE_MODEL := RPI3-MM6108
+  DEVICE_VARIANT := SPI
+  SYSINFO_BOARD_NAME := bcm2710-rpi3,mm6108-spi
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES := bcm2710-rpi3,mm6108-spi
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_rpi3_mm6108-spi
+endif
+
+define Device/bcm2710_rpi3_mm6108-sdio
+  $(Device/morse_pi3b_base)
+  DEVICE_MODEL := RPI3-MM6108
+  DEVICE_VARIANT := SDIO
+  SYSINFO_BOARD_NAME := bcm2710-rpi3,mm6108-sdio
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES := bcm2710-rpi3,mm6108-sdio
+  DISTROCONFIG_EXTRA := mm610x-sdio
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_rpi3_mm6108-sdio
+endif
+
+define Device/bcm2710_rpi3_mm8108-spi
+  $(Device/morse_pi3b_base)
+  DEVICE_MODEL := RPI3-MM8108
+  DEVICE_VARIANT := SPI
+  SYSINFO_BOARD_NAME := bcm2710-rpi3,mm8108-spi
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES := bcm2710-rpi3,mm8108-spi
+  DISTROCONFIG_EXTRA := mm810x-spi
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_rpi3_mm8108-spi
+endif
+
+define Device/bcm2710_zero2w_mm6108-spi
+  $(Device/morse_zero2w_base)
+  DEVICE_MODEL := RPI2W-MM6108
+  DEVICE_VARIANT := SPI
+  SYSINFO_BOARD_NAME := bcm2710-zero2w,mm6108-spi
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES := bcm2710-zero2w,mm6108-spi
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_zero2w_mm6108-spi
+endif
+
+define Device/bcm2710_zero2w_mm6108-sdio
+  $(Device/morse_zero2w_base)
+  DEVICE_MODEL := RPI2W-MM6108
+  DEVICE_VARIANT := SDIO
+  SYSINFO_BOARD_NAME := bcm2710-zero2w,mm6108-sdio
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES := bcm2710-zero2w,mm6108-sdio
+  DISTROCONFIG_EXTRA := mm610x-sdio
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_zero2w_mm6108-sdio
+endif
+
+define Device/bcm2710_zero2w_mm8108-spi
+  $(Device/morse_zero2w_base)
+  DEVICE_MODEL := RPI2W-MM8108
+  DEVICE_VARIANT := SPI
+  SYSINFO_BOARD_NAME := bcm2710-zero2w,mm8108-spi
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES := bcm2710-zero2w,mm8108-spi
+  DISTROCONFIG_EXTRA := mm810x-spi
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_zero2w_mm8108-spi
 endif
 
 $(eval $(call BuildImage))
