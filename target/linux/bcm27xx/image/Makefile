@@ -266,7 +266,9 @@ define Device/morse_ekh01_base
   # Simplify by removing board and OpenWRT version.
   IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
   DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
-  DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-6108 morse-fw-8108
+  DEVICE_PACKAGES += \
+	kmod-morse netifd-morse morse-fw-6108 morse-fw-8108 \
+	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   IMAGE/sysupgrade.img.gz := boot-common | boot-2711 | boot-ekh01 | sdcard-img | gzip | append-metadata
   IMAGE/factory.img.gz := boot-common | boot-2711 | boot-ekh01 | sdcard-img | gzip
 endef
@@ -281,7 +283,9 @@ define Device/morse_pi3_base
   # Simplify by removing board and OpenWRT version.
   IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
   DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
-  DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-6108 morse-fw-8108
+  DEVICE_PACKAGES += \
+	kmod-morse netifd-morse morse-fw-6108 morse-fw-8108 \
+	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   IMAGE/sysupgrade.img.gz := boot-common | boot-2710 | boot-ekh01 | sdcard-img | gzip | append-metadata
   IMAGE/factory.img.gz := boot-common | boot-2710 | boot-ekh01 | sdcard-img | gzip
 endef

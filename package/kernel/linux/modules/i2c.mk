@@ -161,6 +161,21 @@ endef
 
 $(eval $(call KernelPackage,i2c-gpio))
 
+I2C_MUX_PINCTRL_MODULES:= \
+  CONFIG_I2C_MUX_PINCTRL:drivers/i2c/muxes/i2c-mux-pinctrl
+
+define KernelPackage/i2c-mux-pinctrl
+  $(call i2c_defaults,$(I2C_MUX_PINCTRL_MODULES),51)
+  TITLE:=pinctrl-based I2C mux/switches
+  DEPENDS:=+kmod-i2c-mux
+endef
+
+define KernelPackage/i2c-mux-pinctrl/description
+ Kernel modules for pinctrl-based I2C multiplexer
+endef
+
+$(eval $(call KernelPackage,i2c-mux-pinctrl))
+
 
 I2C_I801_MODULES:= \
   CONFIG_I2C_I801:drivers/i2c/busses/i2c-i801
@@ -370,5 +385,4 @@ define KernelPackage/i2c-tiny-usb/description
 endef
 
 $(eval $(call KernelPackage,i2c-tiny-usb))
-
 

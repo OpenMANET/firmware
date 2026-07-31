@@ -25,4 +25,4 @@ CONFIG_PACKAGE_gst1-mod-videoconvert=m
 CONFIG_PACKAGE_gst1-mod-rtspclientsink=m
 
 # v4l
-CONFIG_PACKAGE_v4l-utils=m
+CONFIG_PACKAGE_v4l-utils=y
