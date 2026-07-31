@@ -26,7 +26,7 @@ CONFIG_TARGET_ROOTFS_PARTSIZE=1024
 
 # Video encode/decode
 CONFIG_PACKAGE_kmod-video-core=y
-CONFIG_PACKAGE_kmod-video-codec-bcm2835=y
+CONFIG_PACKAGE_kmod-codec-bcm2835=y
 
 # bug with lan78xx - enabled by default for rpi4 platforms.
 # We enable of-mdio to work around the dependency chain.
