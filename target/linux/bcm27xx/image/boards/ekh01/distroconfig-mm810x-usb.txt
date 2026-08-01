@@ -1,0 +1,2 @@
+# MM8108 uses the USB transport on this target, so no Raspberry Pi
+# device-tree overlay is needed.

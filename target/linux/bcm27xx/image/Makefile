@@ -349,16 +349,18 @@ ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm6108-sdio
 endif
 
-define Device/bcm2710_mm8108-spi
+define Device/bcm2710_mm8108-usb
   $(Device/morse_pi3_base)
   DEVICE_MODEL := RPI3-MM8108
-  DEVICE_VARIANT := SPI
+  DEVICE_VARIANT := USB
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  SUPPORTED_DEVICES += bcm2710,mm8108-spi
-  DISTROCONFIG_EXTRA := mm810x-spi
+  # bcm2710,mm8108-spi is the board name used by prior USB images. Keep it
+  # as a migration alias so deployed USB units can sysupgrade in place.
+  SUPPORTED_DEVICES += bcm2710,mm8108-usb bcm2710,mm8108-spi
+  DISTROCONFIG_EXTRA := mm810x-usb
 endef
 ifeq ($(SUBTARGET),bcm2710)
-  TARGET_DEVICES += bcm2710_mm8108-spi
+  TARGET_DEVICES += bcm2710_mm8108-usb
 endif
 
 $(eval $(call BuildImage))
