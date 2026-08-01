@@ -354,9 +354,7 @@ define Device/bcm2710_mm8108-usb
   DEVICE_MODEL := RPI3-MM8108
   DEVICE_VARIANT := USB
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
-  # bcm2710,mm8108-spi is the board name used by prior USB images. Keep it
-  # as a migration alias so deployed USB units can sysupgrade in place.
-  SUPPORTED_DEVICES += bcm2710,mm8108-usb bcm2710,mm8108-spi
+  SUPPORTED_DEVICES += bcm2710,mm8108-usb
   DISTROCONFIG_EXTRA := mm810x-usb
 endef
 ifeq ($(SUBTARGET),bcm2710)
