@@ -18,15 +18,20 @@ Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
  include/linux/pwm.h | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -412,12 +412,12 @@ static inline int pwm_apply_might_sleep(
+Index: linux-6.6.119/include/linux/pwm.h
+===================================================================
+--- linux-6.6.119.orig/include/linux/pwm.h
++++ linux-6.6.119/include/linux/pwm.h
+@@ -431,7 +431,7 @@ static inline int pwm_apply_might_sleep(
  					const struct pwm_state *state)
  {
  	might_sleep();
 -	return -ENOTSUPP;
 +	return -EOPNOTSUPP;
  }
+ 
+ static inline int pwm_apply_atomic(struct pwm_device *pwm,
+@@ -442,7 +442,7 @@ static inline int pwm_apply_atomic(struc
  
  static inline int pwm_adjust_config(struct pwm_device *pwm)
  {
