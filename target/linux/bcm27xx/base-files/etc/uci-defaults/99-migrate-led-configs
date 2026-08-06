@@ -1,0 +1,35 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+MORSE_EKH01_LED_NAME="green-wifi-activity"
+
+is_morse_led() {
+	[ "$1" = "$MORSE_EKH01_LED_NAME" ]
+}
+
+
+# Previously, we used `wlanX` as our default Morse interface name. This has been changed to `wlhX`.
+# Additionally, `sysfs` has changed from `led0` to `ACT` on the RPI.
+# Upon sysupgrade, update morse LED sections that reference `wlan0` to `wlh0` and if so, also switch
+# sysfs `led0` to `ACT`.
+migrate_led_configs() {
+	local section="$1"
+	local name dev sysfs new_dev
+
+	config_get name "$section" name
+	! is_morse_led "$name" && return 0
+
+	config_get dev "$section" dev
+	[ "$dev" != "wlan0" ] && return 0
+
+	config_get sysfs "$section" sysfs
+	[ "$sysfs" = "led0" ] && uci set "system.$section.sysfs=ACT"
+
+	new_dev="wlh${dev#wlan}"
+	uci set "system.$section.dev=$new_dev"
+}
+
+config_load system
+config_foreach migrate_led_configs led
+uci commit system

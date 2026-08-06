@@ -32,15 +32,14 @@ define KernelPackage/camera-bcm2835-unicam
     $(LINUX_DIR)/drivers/staging/vc04_services/bcm2835-isp/bcm2835-isp.ko \
     $(LINUX_DIR)/drivers/media/platform/bcm2835/bcm2835-unicam.ko
   AUTOLOAD:=$(call AutoLoad,65,bcm2835-unicam bcm2835-isp)
-  $(call AddDepends/video,@TARGET_bcm27xx +kmod-vchiq-mmal-bcm2835 +kmod-video-videobuf2 +kmod-video-dma-contig +kmod-video-fwnode)
+  $(call AddDepends/video,@TARGET_bcm27xx +kmod-vchiq-mmal-bcm2835 +kmod-video-videobuf2 +kmod-video-dma-contig +kmod-video-fwnode +kmod-video-async)
 endef
 
 define KernelPackage/camera-bcm2835-unicam/description
- Camera host interface devices for Broadcom BCM2835 SoC needed for unicam.
+  Camera host interface devices for Broadcom BCM2835 SoC needed for unicam.
 endef
 
 $(eval $(call KernelPackage,camera-bcm2835-unicam))
-
 
 define KernelPackage/codec-bcm2835
   TITLE:=BCM2835 Video Codec
@@ -215,3 +214,72 @@ define KernelPackage/drm-rp1-vec/description
 endef
 
 $(eval $(call KernelPackage,drm-rp1-vec))
+
+# Lens driver modules
+#
+
+define KernelPackage/video-dw9807-vcm
+  SUBMENU:=$(VIDEO_MENU)
+  TITLE:=DW9807 lens voice coil support
+  DEPENDS:=+kmod-i2c-core +kmod-video-fwnode +kmod-video-async
+  KCONFIG:=CONFIG_VIDEO_DW9807_VCM \
+    CONFIG_MEDIA_CONTROLLER \
+    CONFIG_VIDEO_V4L2_SUBDEV_API \
+    CONFIG_V4L2_ASYNC
+  FILES:=$(LINUX_DIR)/drivers/media/i2c/dw9807-vcm.ko
+  AUTOLOAD:=$(call AutoProbe,dw9807-vcm)
+endef
+
+define KernelPackage/video-dw9807-vcm/description
+  DW9807/DW9817 lens voice coil support
+endef
+
+$(eval $(call KernelPackage,video-dw9807-vcm))
+
+define KernelPackage/video-cci-i2c
+  TITLE:=V4L2 CCI I2C support
+  KCONFIG:= \
+    CONFIG_I2C \
+    CONFIG_V4L2_CCI \
+    CONFIG_V4L2_CCI_I2C
+  FILES:=$(LINUX_DIR)/drivers/media/$(V4L2_DIR)/v4l2-cci.ko
+  DEPENDS+=@TARGET_bcm27xx +kmod-regmap-i2c
+  AUTOLOAD:=$(call AutoProbe,v4l2-cci)
+endef
+
+$(eval $(call KernelPackage,video-cci-i2c))
+
+#
+# Camera sensor modules
+# Args:
+#  $1: Name of the camera sensor
+#  $2: Extra dependencies for the camera
+define camera-sensor
+  define KernelPackage/video-$(1)
+    SUBMENU:=$(VIDEO_MENU)
+    TITLE:=$(1) sensor support
+    DEPENDS:=+kmod-i2c-core \
+      +kmod-video-core \
+      +kmod-video-fwnode \
+      +kmod-video-async \
+      $(2)
+    KCONFIG:=CONFIG_VIDEO_$$(subst $(1),$$(shell echo $(1) | tr '[:lower:]' '[:upper:]'),$(1)) \
+      CONFIG_MEDIA_SUPPORT \
+      CONFIG_VIDEO_CAMERA_SENSOR=y \
+      CONFIG_VIDEO_V4L2_SUBDEV_API=y
+    FILES:=$(LINUX_DIR)/drivers/media/i2c/$(1).ko
+    $$(call AddDepends/video,@TARGET_bcm27xx)
+    AUTOLOAD:=$$(call AutoProbe,$(1))
+  endef
+
+  define KernelPackage/video-$(1)/description
+    $(1) sensor support
+  endef
+
+  $$(eval $$(call KernelPackage,video-$(1)))
+endef
+
+$(eval $(call camera-sensor,imx477))
+$(eval $(call camera-sensor,imx219,+kmod-video-cci-i2c))
+$(eval $(call camera-sensor,ov5647))
+$(eval $(call camera-sensor,imx708,+kmod-video-dw9807-vcm))
