@@ -1,17 +1,16 @@
-From 41837aebe62a5887d70cc1e0488ecfd59d1ba70a Mon Sep 17 00:00:00 2001
+From 7deb563a10c90755b4e204e032b23ba30c3f6f77 Mon Sep 17 00:00:00 2001
 From: Evan Benn <evan.benn@morsemicro.com>
 Date: Mon, 19 May 2025 15:58:54 +1000
-Subject: [PATCH] APP-4789: collectd: Increase buffer size for HaLow
- assoclist
+Subject: [PATCH] APP-4789: collectd: Increase buffer size for HaLow assoclist
 
 ---
  ...Use-IWINFO_ASSOCLIST_BUFSIZE-for-buf.patch | 40 +++++++++++++++++++
  1 file changed, 40 insertions(+)
- create mode 100644 feeds/packages/utils/collectd/patches/951-APP-4789-iwinfo-Use-IWINFO_ASSOCLIST_BUFSIZE-for-buf.patch
+ create mode 100644 utils/collectd/patches/951-APP-4789-iwinfo-Use-IWINFO_ASSOCLIST_BUFSIZE-for-buf.patch
 
-qdiff --git a/feeds/packages/utils/collectd/patches/951-APP-4789-iwinfo-Use-IWINFO_ASSOCLIST_BUFSIZE-for-buf.patch b/feeds/packages/utils/collectd/patches/951-APP-4789-iwinfo-Use-IWINFO_ASSOCLIST_BUFSIZE-for-buf.patch
+diff --git a/feeds/packages/utils/collectd/patches/951-APP-4789-iwinfo-Use-IWINFO_ASSOCLIST_BUFSIZE-for-buf.patch b/feeds/packages/utils/collectd/patches/951-APP-4789-iwinfo-Use-IWINFO_ASSOCLIST_BUFSIZE-for-buf.patch
 new file mode 100644
-index 000000000000..0552e33e98b4
+index 000000000..0552e33e9
 --- /dev/null
 +++ b/feeds/packages/utils/collectd/patches/951-APP-4789-iwinfo-Use-IWINFO_ASSOCLIST_BUFSIZE-for-buf.patch
 @@ -0,0 +1,40 @@
@@ -42,18 +41,19 @@ index 000000000000..0552e33e98b4
 ++		return;
 ++	}
 + 	const struct iwinfo_ops *iw = iwinfo_backend(ifname);
-+
++ 
 + 	/* does appear to be a wifi iface */
 +@@ -103,6 +108,7 @@ static void iwinfo_process(const char *ifname)
 + 	}
-+
++ 
 + 	iwinfo_finish();
 ++	free(buf);
 + }
-+
++ 
 + static int iwinfo_read(void)
-+--
++-- 
 +2.48.1
 +
---
-2.48.1
+-- 
+2.43.0
+
