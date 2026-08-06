@@ -1,0 +1,27 @@
+From c2035e57af7c63b1b4b634ee567c55dd103f993f Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Wed, 5 Nov 2025 10:41:04 +1100
+Subject: [PATCH] wifi: mt76: mt7603: disable EDCCA for AU
+
+AU can be certified according to the FCC regs, even though
+the Linux wireless-regdb uses DFS-ETSI, so it's fine to leave
+it disabled here.
+---
+ mt7603/init.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mt7603/init.c b/mt7603/init.c
+index 3f70858a..d13acd38 100644
+--- a/mt7603/init.c
++++ b/mt7603/init.c
+@@ -429,6 +429,7 @@ mt7603_regd_notifier(struct wiphy *wiphy,
+ 
+ 	dev->mt76.region = request->dfs_region;
+ 	dev->ed_monitor = dev->ed_monitor_enabled &&
++			  strcmp("AU", request->alpha2) != 0 &&
+ 			  dev->mt76.region == NL80211_DFS_ETSI;
+ 
+ 	if (dev->ed_monitor) {
+-- 
+2.34.1
+

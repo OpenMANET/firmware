@@ -1,0 +1,37 @@
+From b27598611c41c02a049bbd040f94c90e73e687fb Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Wed, 5 Nov 2025 09:39:59 +1100
+Subject: [PATCH 1/2] wifi: mt76: mt7603: enable clear channel assessment for
+ ETSI
+
+Required for CE certification.
+---
+ mt7603/init.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/mt7603/init.c b/mt7603/init.c
+index f84c9a06..3f70858a 100644
+--- a/mt7603/init.c
++++ b/mt7603/init.c
+@@ -430,6 +430,10 @@ mt7603_regd_notifier(struct wiphy *wiphy,
+ 	dev->mt76.region = request->dfs_region;
+ 	dev->ed_monitor = dev->ed_monitor_enabled &&
+ 			  dev->mt76.region == NL80211_DFS_ETSI;
++
++	if (dev->ed_monitor) {
++		dev_info(dev->mt76.dev, "Enabled CCA-ED for ETSI\n");
++	}
+ }
+ 
+ static int
+@@ -517,6 +521,7 @@ int mt7603_register_device(struct mt7603_dev *dev)
+ 	dev->slottime = 9;
+ 	dev->sensitivity_limit = 28;
+ 	dev->dynamic_sensitivity = true;
++	dev->ed_monitor_enabled = true;
+ 
+ 	ret = mt7603_init_hardware(dev);
+ 	if (ret)
+-- 
+2.34.1
+

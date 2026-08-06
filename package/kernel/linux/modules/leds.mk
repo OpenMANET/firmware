@@ -233,6 +233,24 @@ endef
 $(eval $(call KernelPackage,leds-pwm))
 
 
+define KernelPackage/leds-pwm-multicolor
+  SUBMENU:=$(LEDS_MENU)
+  TITLE:=PWM driven Multicolor LED Support
+  KCONFIG:= \
+	CONFIG_PWM=y \
+	CONFIG_LEDS_CLASS_MULTICOLOR=y \
+	CONFIG_LEDS_PWM_MULTICOLOR
+  FILES:=$(LINUX_DIR)/drivers/leds/rgb/leds-pwm-multicolor.ko
+  AUTOLOAD:=$(call AutoLoad,60,leds-pwm-multicolor)
+endef
+
+define KernelPackage/leds-pwm-multicolor/description
+ This option enables multicolor support for pwm driven LEDs
+endef
+
+$(eval $(call KernelPackage,leds-pwm-multicolor))
+
+
 define KernelPackage/leds-tlc591xx
   SUBMENU:=$(LEDS_MENU)
   TITLE:=LED driver for TLC59108 and TLC59116 controllers

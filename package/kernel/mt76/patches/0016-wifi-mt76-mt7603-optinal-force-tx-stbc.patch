@@ -1,0 +1,93 @@
+From c02a1504aa48de7ec59b0179d31eec149350064a Mon Sep 17 00:00:00 2001
+From: Milad Mohtashamirad <milad.mohtashamirad@morsemicro.com>
+Date: Thu, 27 Nov 2025 12:23:37 +1100
+Subject: [PATCH] Add a debug_fs option to force tx STBC on the devices that 
+ supoort rx stbc. This feature is used in WFA 4.2.39 test.
+
+---
+ mt7603/debugfs.c | 2 ++
+ mt7603/init.c    | 1 +
+ mt7603/mac.c     | 7 +++++++
+ mt7603/mt7603.h  | 4 ++++
+ 4 files changed, 14 insertions(+)
+
+diff --git a/mt7603/debugfs.c b/mt7603/debugfs.c
+index 3967f2f..f690eba 100644
+--- a/mt7603/debugfs.c
++++ b/mt7603/debugfs.c
+@@ -115,4 +115,6 @@ void mt7603_init_debugfs(struct mt7603_dev *dev)
+ 			    &dev->sensitivity_limit);
+ 	debugfs_create_bool("dynamic_sensitivity", 0600, dir,
+ 			    &dev->dynamic_sensitivity);
++	debugfs_create_bool("force_tx_stbc", 0600, dir,
++			    &dev->force_tx_stbc);
+ }
+diff --git a/mt7603/init.c b/mt7603/init.c
+index d13acd3..2699cad 100644
+--- a/mt7603/init.c
++++ b/mt7603/init.c
+@@ -523,6 +523,7 @@ int mt7603_register_device(struct mt7603_dev *dev)
+ 	dev->sensitivity_limit = 28;
+ 	dev->dynamic_sensitivity = true;
+ 	dev->ed_monitor_enabled = true;
++	dev->force_tx_stbc = false;
+ 
+ 	ret = mt7603_init_hardware(dev);
+ 	if (ret)
+diff --git a/mt7603/mac.c b/mt7603/mac.c
+index 9c678b4..0204501 100644
+--- a/mt7603/mac.c
++++ b/mt7603/mac.c
+@@ -364,6 +364,7 @@ void mt7603_wtbl_update_cap(struct mt7603_dev *dev, struct ieee80211_sta *sta)
+ 		val |= MT_WTBL2_W9_SHORT_GI_20;
+ 	if (sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_SGI_40)
+ 		val |= MT_WTBL2_W9_SHORT_GI_40;
++	msta->stbc = !!(sta->deflink.ht_cap.cap & IEEE80211_HT_CAP_RX_STBC);
+ 	mt76_wr(dev, addr + 9 * 4, val);
+ }
+ 
+@@ -743,6 +744,9 @@ void mt7603_wtbl_set_rates(struct mt7603_dev *dev, struct mt7603_sta *sta,
+ 	bool rateset;
+ 	int i, k;
+ 
++	if(sta->stbc && dev->force_tx_stbc)
++		stbc = true;
++
+ 	if (!mt76_poll(dev, MT_WTBL_UPDATE, MT_WTBL_UPDATE_BUSY, 0, 5000))
+ 		return;
+ 
+@@ -1079,6 +1083,9 @@ int mt7603_tx_prepare_skb(struct mt76_dev *mdev, void *txwi_ptr,
+ 		spin_unlock_bh(&dev->mt76.lock);
+ 	}
+ 
++	if (msta->stbc && dev->force_tx_stbc)
++		info->flags |= IEEE80211_TX_CTL_STBC;
++
+ 	mt7603_mac_write_txwi(dev, txwi_ptr, tx_info->skb, qid, wcid,
+ 			      sta, pid, key);
+ 
+diff --git a/mt7603/mt7603.h b/mt7603/mt7603.h
+index 5a19a39..bb85ead 100644
+--- a/mt7603/mt7603.h
++++ b/mt7603/mt7603.h
+@@ -131,6 +131,8 @@ struct mt7603_sta {
+ 	u8 smps;
+ 
+ 	u8 ps;
++
++	u8 stbc;
+ };
+ 
+ struct mt7603_vif {
+@@ -192,6 +194,8 @@ struct mt7603_dev {
+ 	s8 sensitivity;
+ 	u8 sensitivity_limit;
+ 
++	bool force_tx_stbc;
++
+ 	u8 beacon_check;
+ 	u8 tx_hang_check;
+ 	u8 tx_dma_check;
+-- 
+2.25.1
+
