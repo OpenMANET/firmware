@@ -38,6 +38,7 @@ cmcc,a10-ubootmod|\
 cudy,tr3000-v1-ubootmod|\
 h3c,magic-nx30-pro|\
 jcg,q30-pro|\
+konka,komi-a31|\
 mercusys,mr90x-v1-ubi|\
 netcore,n60|\
 netis,nx31|\
@@ -106,7 +107,8 @@ dlink,aquila-pro-ai-m60-a1)
 gatonetworks,gdsp)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x10000" "0x10000"
 	;;
-glinet,gl-mt3000)
+glinet,gl-mt3000|\
+morse,*ekh19*)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x80000" "0x20000"
 	;;
 mercusys,mr80x-v3|\

@@ -22,6 +22,9 @@ engenius,esr600h|\
 hongdian,h8922-v30|\
 linksys,re7000|\
 meig,slt866|\
+morse,ekh03v4|\
+morse,ekh04v6|\
+qding,qc202|\
 sitecom,wlr-4100-v1-002|\
 zyxel,keenetic-lite-iii-a)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x1000" "0x1000"
@@ -32,6 +35,11 @@ allnet,all0256n-8m|\
 allnet,all5002|\
 yuncore,ax820)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x10000" "0x10000"
+	;;
+morse,halowlink1|\
+morse,halowlink2)
+	ubootenv_add_uci_config "/dev/mtd2" "0x0" "0x1000" "0x1000"
+	ubootenv_add_uci_sys_config "/dev/mtd1" "0x0" "0x8000" "0x1000"
 	;;
 arcadyan,we420223-99|\
 dlink,dir-806a-b1)
