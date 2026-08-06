@@ -1,0 +1,12 @@
+diff --git a/root/etc/init.d/firewall b/root/etc/init.d/firewall
+index b555a63..6f8d2c8 100755
+--- a/root/etc/init.d/firewall
++++ b/root/etc/init.d/firewall
+@@ -22,6 +22,7 @@ stop_service() {
+ 
+ reload_service() {
+ 	fw4 reload
++	echo f > /proc/net/nf_conntrack
+ }
+ 
+ boot() {

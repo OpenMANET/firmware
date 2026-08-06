@@ -1,0 +1,37 @@
+--- a/src/ap/hostapd.c
++++ b/src/ap/hostapd.c
+@@ -478,7 +478,6 @@
+ 
+ 	wpa_printf(MSG_DEBUG, "%s(%s)", __func__, hapd->conf->iface);
+ 	hostapd_ucode_free_bss(hapd);
+-	hostapd_ubus_free_bss(hapd);
+ 	accounting_deinit(hapd);
+ 	hostapd_deinit_wpa(hapd);
+ 	vlan_deinit(hapd);
+@@ -519,6 +518,7 @@
+ 	gas_query_ap_deinit(hapd->gas);
+ 	hapd->gas = NULL;
+ #endif /* CONFIG_DPP */
++	hostapd_ubus_free_bss(hapd);
+ #ifdef CONFIG_NAN_USD
+ 	hostapd_nan_usd_deinit(hapd);
+ #endif /* CONFIG_NAN_USD */
+--- a/wpa_supplicant/wpa_supplicant.c
++++ b/wpa_supplicant/wpa_supplicant.c
+@@ -7759,6 +7759,8 @@
+ 		wpa_s->conf = NULL;
+ 	}
+ 
++	wpas_ubus_free_bss(wpa_s);
++
+ 	os_free(wpa_s->ssids_from_scan_req);
+ 	os_free(wpa_s->last_scan_freqs);
+ 
+@@ -7951,7 +7953,6 @@
+ #endif /* CONFIG_MESH */
+ 
+ 	wpas_ucode_free_bss(wpa_s);
+-	wpas_ubus_free_bss(wpa_s);
+ 
+ 	/* Remove interface from the global list of interfaces */
+ 	prev = global->ifaces;

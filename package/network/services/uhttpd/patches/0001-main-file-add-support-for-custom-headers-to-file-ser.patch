@@ -1,0 +1,122 @@
+From 1bdaac05a9c10269e4e4b23c69cf081ca2bee1ca Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Tue, 19 Nov 2024 13:35:59 +1100
+Subject: [PATCH] main/file: add support for custom headers to file serving
+
+This allows us to set 'Cache-Control: no-cache', which makes it
+possible to develop LuCI JS without resorting to disabling the cache
+in the browser dev tools.
+
+Signed-off-by: James Haggerty <james.haggerty@morsemicro.com>
+---
+ file.c   |  4 ++++
+ main.c   | 19 ++++++++++++++++++-
+ uhttpd.h |  6 ++++++
+ 3 files changed, 28 insertions(+), 1 deletion(-)
+
+diff --git a/file.c b/file.c
+index d117387..f0a3c75 100644
+--- a/file.c
++++ b/file.c
+@@ -339,12 +339,16 @@ static char *uh_file_header(struct client *cl, int idx)
+ static void uh_file_response_ok_hdrs(struct client *cl, struct stat *s)
+ {
+ 	char buf[128];
++	struct extra_header *eh;
+ 
+ 	if (s) {
+ 		ustream_printf(cl->us, "ETag: %s\r\n", uh_file_mktag(s, buf, sizeof(buf)));
+ 		ustream_printf(cl->us, "Last-Modified: %s\r\n",
+ 			       uh_file_unix2date(s->st_mtime, buf, sizeof(buf)));
+ 	}
++	list_for_each_entry(eh, &conf.extra_header, list) {
++		ustream_printf(cl->us, "%s\r\n", eh->header);
++	}
+ 	ustream_printf(cl->us, "Date: %s\r\n",
+ 		       uh_file_unix2date(time(NULL), buf, sizeof(buf)));
+ }
+diff --git a/main.c b/main.c
+index de5f2c3..08d2b2e 100644
+--- a/main.c
++++ b/main.c
+@@ -176,6 +176,7 @@ static int usage(const char *name)
+ 		"	-d string       URL decode given string\n"
+ 		"	-r string       Specify basic auth realm\n"
+ 		"	-m string       MD5 crypt given string\n"
++		"	-z string       Add additional response header (can use multiple times)\n"
+ 		"\n", name
+ 	);
+ 	return 1;
+@@ -193,6 +194,7 @@ static void init_defaults_pre(void)
+ 	conf.cgi_path = "/sbin:/usr/sbin:/bin:/usr/bin";
+ 	INIT_LIST_HEAD(&conf.cgi_alias);
+ 	INIT_LIST_HEAD(&conf.lua_prefix);
++	INIT_LIST_HEAD(&conf.extra_header);
+ #if HAVE_UCODE
+ 	INIT_LIST_HEAD(&conf.ucode_prefix);
+ #endif
+@@ -271,6 +273,7 @@ static void add_ucode_prefix(const char *prefix, const char *handler) {
+ int main(int argc, char **argv)
+ {
+ 	struct alias *alias;
++	struct extra_header *extra_header;
+ 	bool nofork = false;
+ 	char *port;
+ 	int opt, ch;
+@@ -293,7 +296,7 @@ int main(int argc, char **argv)
+ 	init_defaults_pre();
+ 	signal(SIGPIPE, SIG_IGN);
+ 
+-	while ((ch = getopt(argc, argv, "A:ab:C:c:Dd:E:e:fh:H:I:i:K:k:L:l:m:N:n:O:o:P:p:qRr:Ss:T:t:U:u:Xx:y:")) != -1) {
++	while ((ch = getopt(argc, argv, "A:ab:C:c:Dd:E:e:fh:H:I:i:K:k:L:l:m:N:n:O:o:P:p:qRr:Ss:T:t:U:u:Xx:y:z:")) != -1) {
+ 		switch(ch) {
+ #ifdef HAVE_TLS
+ 		case 'C':
+@@ -408,6 +411,20 @@ int main(int argc, char **argv)
+ 			list_add(&alias->list, &conf.cgi_alias);
+ 			break;
+ 
++		case 'z':
++			extra_header = calloc(1, sizeof(*extra_header));
++			if (!extra_header) {
++				fprintf(stderr, "Error: failed to allocate extra_header\n");
++				exit(1);
++			}
++			if (strchr(optarg, ':') == NULL) {
++				fprintf(stderr, "Error: invalid extra header (-z) - missing colon\n");
++				exit(1);
++			}
++			extra_header->header = optarg;
++			list_add(&extra_header->list, &conf.extra_header);
++			break;
++
+ 		case 'i':
+ 			optarg = strdup(optarg);
+ 			port = strchr(optarg, '=');
+diff --git a/uhttpd.h b/uhttpd.h
+index c755df6..60a12ff 100644
+--- a/uhttpd.h
++++ b/uhttpd.h
+@@ -62,6 +62,11 @@ struct lua_prefix {
+ 	void *ctx;
+ };
+ 
++struct extra_header {
++	struct list_head list;
++	const char *header;
++};
++
+ #ifdef HAVE_UCODE
+ struct ucode_prefix {
+ 	struct list_head list;
+@@ -98,6 +103,7 @@ struct config {
+ 	int events_retry;
+ 	struct list_head cgi_alias;
+ 	struct list_head lua_prefix;
++	struct list_head extra_header;
+ #ifdef HAVE_UCODE
+ 	struct list_head ucode_prefix;
+ #endif
+-- 
+2.34.1
+

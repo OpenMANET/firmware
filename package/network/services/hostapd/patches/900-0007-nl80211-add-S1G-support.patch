@@ -1,0 +1,163 @@
+From 5e06adaf968bd0dd2a6cb0aa1a91d55f6e2ca5ff Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Mon, 27 Oct 2025 14:44:22 +1100
+Subject: [PATCH 7/8] nl80211: add S1G support
+
+---
+ src/drivers/driver_nl80211.c      | 51 +++++++++++++++++++++++++++++--
+ src/drivers/driver_nl80211_capa.c | 34 +++++++++++++++++++--
+ 2 files changed, 79 insertions(+), 6 deletions(-)
+
+--- a/src/drivers/driver_nl80211.c
++++ b/src/drivers/driver_nl80211.c
+@@ -5016,6 +5016,7 @@ static int nl80211_put_freq_params(struc
+ 	wpa_printf(MSG_DEBUG, "  * he_enabled=%d", freq->he_enabled);
+ 	wpa_printf(MSG_DEBUG, "  * vht_enabled=%d", freq->vht_enabled);
+ 	wpa_printf(MSG_DEBUG, "  * ht_enabled=%d", freq->ht_enabled);
++	wpa_printf(MSG_DEBUG, "  * s1g_enabled=%d", freq->s1g_enabled);
+ 	wpa_printf(MSG_DEBUG, "  * radar_background=%d",
+ 		   freq->radar_background);
+ 
+@@ -5023,7 +5024,43 @@ static int nl80211_put_freq_params(struc
+ 	is_24ghz = hw_mode == HOSTAPD_MODE_IEEE80211G ||
+ 		hw_mode == HOSTAPD_MODE_IEEE80211B;
+ 
+-	if (freq->vht_enabled ||
++	if (freq->s1g_enabled) {
++		enum nl80211_chan_width cw;
++
++		wpa_printf(MSG_DEBUG, "  * channel_width=%d", freq->bandwidth);
++		wpa_printf(MSG_DEBUG, "  * center_freq1=%d", freq->center_freq1);
++		wpa_printf(MSG_DEBUG, "  * center_freq1_offset=%d", freq->center_freq1_offset);
++		wpa_printf(MSG_DEBUG, "  * s1g_primary_2mhz=%d", freq->s1g_primary_2mhz);
++
++		switch (freq->bandwidth) {
++		case 1:
++			cw = NL80211_CHAN_WIDTH_1;
++			break;
++		case 2:
++			cw = NL80211_CHAN_WIDTH_2;
++			break;
++		case 4:
++			cw = NL80211_CHAN_WIDTH_4;
++			break;
++		case 8:
++			cw = NL80211_CHAN_WIDTH_8;
++			break;
++		case 16:
++			cw = NL80211_CHAN_WIDTH_16;
++			break;
++		default:
++			return -EINVAL;
++		}
++
++		if (nla_put_u32(msg, NL80211_ATTR_CHANNEL_WIDTH, cw))
++			return -ENOBUFS;
++		if (nla_put_u32(msg, NL80211_ATTR_CENTER_FREQ1, freq->center_freq1))
++			return -ENOBUFS;
++		if (nla_put_u32(msg, NL80211_ATTR_CENTER_FREQ1_OFFSET, freq->center_freq1_offset))
++			return -ENOBUFS;
++		if (freq->s1g_primary_2mhz && nla_put_flag(msg, NL80211_ATTR_S1G_PRIMARY_2MHZ))
++			return -ENOBUFS;
++	} else if (freq->vht_enabled ||
+ 	    ((freq->he_enabled || freq->eht_enabled) && !is_24ghz)) {
+ 		enum nl80211_chan_width cw;
+ 
+@@ -5553,9 +5590,9 @@ static int nl80211_set_channel(struct i8
+ 	int ret;
+ 
+ 	wpa_printf(MSG_DEBUG,
+-		   "nl80211: Set freq %d offset %d (ht_enabled=%d, vht_enabled=%d, he_enabled=%d, eht_enabled=%d, , bandwidth=%d MHz, cf1=%d MHz, cf1_offset=%d KHz cf2=%d MHz)",
++		   "nl80211: Set freq %d offset %d (ht_enabled=%d, vht_enabled=%d, he_enabled=%d, eht_enabled=%d, s1g_enabled=%d, bandwidth=%d MHz, cf1=%d MHz, cf1_offset=%d KHz cf2=%d MHz)",
+ 		   freq->freq, freq->freq_offset, freq->ht_enabled, freq->vht_enabled,
+-		   freq->he_enabled, freq->eht_enabled, freq->bandwidth,
++		   freq->he_enabled, freq->eht_enabled, freq->s1g_enabled, freq->bandwidth,
+  		   freq->center_freq1, freq->center_freq1_offset, freq->center_freq2);
+ 
+ 	msg = nl80211_bss_msg(bss, 0, set_chan ? NL80211_CMD_SET_CHANNEL :
+@@ -5736,6 +5773,14 @@ static int wpa_driver_nl80211_sta_add(vo
+ 				goto fail;
+ 		}
+ 
++		if (params->s1g_capab) {
++			wpa_hexdump(MSG_DEBUG, "  * s1g_capab",
++				    params->s1g_capab, sizeof(*params->s1g_capab));
++			if (nla_put(msg, NL80211_ATTR_S1G_CAPABILITY,
++				    sizeof(*params->s1g_capab), params->s1g_capab))
++				goto fail;
++		}
++
+ 		if (params->ext_capab) {
+ 			wpa_hexdump(MSG_DEBUG, "  * ext_capab",
+ 				    params->ext_capab, params->ext_capab_len);
+--- a/src/drivers/driver_nl80211_capa.c
++++ b/src/drivers/driver_nl80211_capa.c
+@@ -1658,6 +1658,24 @@ static void phy_info_vht_capa(struct hos
+ }
+ 
+ 
++static void phy_info_s1g_capa(struct hostapd_hw_modes *mode,
++			      struct nlattr *capability,
++			      struct nlattr *mcs_nss_set)
++{
++	if (capability && nla_len(capability) >= 10) {
++		u8 *capa;
++		capa = nla_data(capability);
++		os_memcpy(&mode->s1g_capab.capab_info, capa, 10);
++	}
++
++	if (mcs_nss_set && nla_len(mcs_nss_set) >= 5) {
++		u8 *mcs_nss;
++		mcs_nss = nla_data(mcs_nss_set);
++		os_memcpy(&mode->s1g_capab.supp_mcs_nss, mcs_nss, 5);
++	}
++}
++
++
+ static int phy_info_edmg_capa(struct hostapd_hw_modes *mode,
+ 			      struct nlattr *bw_config,
+ 			      struct nlattr *channels)
+@@ -1732,6 +1750,13 @@ static void phy_info_freq(struct hostapd
+ 	if (tb_freq[NL80211_FREQUENCY_ATTR_NO_160MHZ])
+ 		chan->allowed_bw &= ~HOSTAPD_CHAN_WIDTH_160;
+ 
++	if (tb_freq[NL80211_FREQUENCY_ATTR_NO_4MHZ])
++		chan->allowed_bw &= ~HOSTAPD_CHAN_WIDTH_4;
++	if (tb_freq[NL80211_FREQUENCY_ATTR_8MHZ])
++		chan->allowed_bw &= ~HOSTAPD_CHAN_WIDTH_8;
++	if (tb_freq[NL80211_FREQUENCY_ATTR_16MHZ])
++		chan->allowed_bw &= ~HOSTAPD_CHAN_WIDTH_16;
++
+ 	if (tb_freq[NL80211_FREQUENCY_ATTR_DFS_STATE]) {
+ 		enum nl80211_dfs_state state =
+ 			nla_get_u32(tb_freq[NL80211_FREQUENCY_ATTR_DFS_STATE]);
+@@ -2113,6 +2138,8 @@ static int phy_info_band(struct phy_info
+ 			 tb_band[NL80211_BAND_ATTR_HT_MCS_SET]);
+ 	phy_info_vht_capa(mode, tb_band[NL80211_BAND_ATTR_VHT_CAPA],
+ 			  tb_band[NL80211_BAND_ATTR_VHT_MCS_SET]);
++	phy_info_s1g_capa(mode, tb_band[NL80211_BAND_ATTR_S1G_CAPA],
++			  tb_band[NL80211_BAND_ATTR_S1G_MCS_NSS_SET]);
+ 	ret = phy_info_edmg_capa(mode,
+ 				 tb_band[NL80211_BAND_ATTR_EDMG_BW_CONFIG],
+ 				 tb_band[NL80211_BAND_ATTR_EDMG_CHANNELS]);
+@@ -2182,8 +2209,9 @@ wpa_driver_nl80211_postprocess_modes(str
+ 			continue;
+ 
+ 		modes[m].is_6ghz = false;
+-
+-		if (modes[m].channels[0].freq < 2000) {
++		if (is_s1ghz_freq(modes[m].channels[0].freq)) {
++			modes[m].mode = HOSTAPD_MODE_IEEE80211A;
++		} else if (modes[m].channels[0].freq < 2000) {
+ 			modes[m].num_channels = 0;
+ 			continue;
+ 		} else if (modes[m].channels[0].freq < 4000) {
+@@ -2668,7 +2696,7 @@ static void nl80211_dump_chan_list(struc
+ 
+ 			if (is_6ghz_freq(chan->freq))
+ 				drv->uses_6ghz = true;
+-			if (chan->freq >= 900 && chan->freq < 1000)
++			if (is_s1ghz_freq(chan->freq))
+ 				drv->uses_s1g = true;
+ 
+ 			if (drv->uses_s1g) {

@@ -49,7 +49,14 @@ void hostapd_ubus_remove_vlan(struct hostapd_data *hapd, struct hostapd_vlan *vl
 
 int hostapd_ubus_handle_event(struct hostapd_data *hapd, struct hostapd_ubus_request *req);
 void hostapd_ubus_handle_link_measurement(struct hostapd_data *hapd, const u8 *data, size_t len);
+void hostapd_ubus_notify_type(struct hostapd_data *hapd, const char *type);
 void hostapd_ubus_notify(struct hostapd_data *hapd, const char *type, const u8 *mac);
+#ifdef CONFIG_DPP
+void hostapd_ubus_notify_dpp_conf_failed(struct hostapd_data *hapd);
+#endif
+#ifdef CONFIG_DPP3
+void hostapd_ubus_notify_dpp_pb_result(struct hostapd_data *hapd, const char *status);
+#endif
 void hostapd_ubus_notify_beacon_report(struct hostapd_data *hapd,
 				       const u8 *addr, u8 token, u8 rep_mode,
 				       struct rrm_measurement_beacon_report *rep,
@@ -112,7 +119,15 @@ static inline void hostapd_ubus_handle_link_measurement(struct hostapd_data *hap
 {
 }
 
+static inline void hostapd_ubus_notify_type(struct hostapd_data *hapd, const char *type)
+{
+}
+
 static inline void hostapd_ubus_notify(struct hostapd_data *hapd, const char *type, const u8 *mac)
+{
+}
+
+static inline void hostapd_ubus_notify_dpp_pb_result(struct hostapd_data *hapd, const char *status)
 {
 }
 

@@ -24,8 +24,17 @@ struct wpas_ubus_bss {
 void wpas_ubus_add_bss(struct wpa_supplicant *wpa_s);
 void wpas_ubus_free_bss(struct wpa_supplicant *wpa_s);
 
+void wpas_ubus_notify_type(struct wpa_supplicant *wpa_s, const char *type);
 #ifdef CONFIG_WPS
 void wpas_ubus_notify(struct wpa_supplicant *wpa_s, const struct wps_credential *cred);
+#endif
+
+#ifdef CONFIG_DPP3
+void wpas_ubus_notify_dpp_pb_result(struct wpa_supplicant *wpa_s, const char *status);
+#endif
+#ifdef CONFIG_DPP
+void wpas_ubus_notify_dpp_conf_failed(struct wpa_supplicant *wpa_s);
+void wpas_ubus_notify_dpp_conf_received(struct wpa_supplicant *wpa_s, const struct dpp_config_obj *conf);
 #endif
 
 #else
@@ -39,7 +48,19 @@ static inline void wpas_ubus_free_bss(struct wpa_supplicant *wpa_s)
 {
 }
 
+static inline void wpas_ubus_notify_type(struct wpa_supplicant *wpa_s, const char *type)
+{
+}
+
 static inline void wpas_ubus_notify(struct wpa_supplicant *wpa_s, struct wps_credential *cred)
+{
+}
+
+static inline void wpas_ubus_notify_dpp_pb_result(struct wpa_supplicant *wpa_s, const char *status)
+{
+}
+
+static inline void wpas_ubus_notify_dpp_conf_received(struct wpa_supplicant *wpa_s, const struct dpp_config_obj *conf)
 {
 }
 

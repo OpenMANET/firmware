@@ -1,0 +1,71 @@
+From cd94560132fbae314b0abd96e3fd3078b6f420af Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Fri, 13 Jun 2025 09:53:32 +1000
+Subject: [PATCH] bridge: set primary on adding wifi client to bridge if no
+ primary
+
+This means that the bridge takes on the address of the wifi client,
+which is useful for linking the mac address with the IP
+in the assoclist.
+---
+ bridge.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/bridge.c b/bridge.c
+index cc25c51..6f8b307 100644
+--- a/bridge.c
++++ b/bridge.c
+@@ -151,19 +151,23 @@ bridge_reset_primary(struct bridge_state *bst)
+ 	bst->primary_port = NULL;
+ 	bst->dev.settings.flags &= ~DEV_OPT_MACADDR;
+ 	vlist_for_each_element(&bst->members, bm, node) {
+-		uint8_t *macaddr;
+-
+ 		if (!bm->present)
+ 			continue;
+ 
+-		bst->primary_port = bm;
++		if (!bst->primary_port || (bm->dev.dev->wireless && !bm->dev.dev->wireless_ap))
++			bst->primary_port = bm;
++	}
++
++	if (bst->primary_port) {
++		uint8_t *macaddr;
++
++		bm = bst->primary_port;
+ 		if (bm->dev.dev->settings.flags & DEV_OPT_MACADDR)
+ 			macaddr = bm->dev.dev->settings.macaddr;
+ 		else
+ 			macaddr = bm->dev.dev->orig_settings.macaddr;
+ 		memcpy(bst->dev.settings.macaddr, macaddr, 6);
+ 		bst->dev.settings.flags |= DEV_OPT_MACADDR;
+-		return;
+ 	}
+ }
+ 
+@@ -773,13 +777,21 @@ bridge_member_cb(struct device_user *dep, enum device_event ev)
+ 		if (bridge_enable_member(bm))
+ 			break;
+ 
++		/* Prefer setting a MAC address from a WiFi Client/Mesh if there's no
++		 * one currently set. This happens if you bridge only wifi devices,
++		 * and means the MAC address in the assoclist can be linked with the IP.
++		 * Otherwise Linux will choose the lowest MAC address.
++		 */
++		if (!bst->primary_port && dev->wireless && !dev->wireless_ap)
++			bridge_reset_primary(bst);
++
+ 		/*
+ 		 * Adding a bridge member can overwrite the bridge mtu
+ 		 * in the kernel, apply the bridge settings in case the
+ 		 * bridge mtu is set
+ 		 */
+ 		system_if_apply_settings(&bst->dev, &bst->dev.settings,
+-					 DEV_OPT_MTU | DEV_OPT_MTU6);
++					 DEV_OPT_MTU | DEV_OPT_MTU6 | DEV_OPT_MACADDR);
+ 		break;
+ 	case DEV_EVENT_LINK_UP:
+ 		if (!bst->has_vlans)
+-- 
+2.34.1
+

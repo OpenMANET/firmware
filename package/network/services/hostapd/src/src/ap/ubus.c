@@ -15,6 +15,7 @@
 #include "hostapd.h"
 #include "neighbor_db.h"
 #include "wps_hostapd.h"
+#include "dpp_hostapd.h"
 #include "sta_info.h"
 #include "ubus.h"
 #include "ap_drv_ops.h"
@@ -621,6 +622,36 @@ hostapd_bss_wps_cancel(struct ubus_context *ctx, struct ubus_object *obj,
 	return 0;
 }
 #endif /* CONFIG_WPS */
+
+#ifdef CONFIG_DPP3
+enum {
+	DPP_PUSH_BUTTON_COMMAND,
+	__DPP_PUSH_BUTTON_MAX
+};
+
+static const struct blobmsg_policy dpp_push_button_policy[__DPP_PUSH_BUTTON_MAX] = {
+	[DPP_PUSH_BUTTON_COMMAND] = { "command", BLOBMSG_TYPE_STRING },
+};
+
+static int
+hostapd_bss_dpp_push_button(struct ubus_context *ctx, struct ubus_object *obj,
+			    struct ubus_request_data *req, const char *method,
+			    struct blob_attr *msg)
+{
+	int rc;
+	struct blob_attr *tb[__DPP_PUSH_BUTTON_MAX];
+	struct hostapd_data *hapd = container_of(obj, struct hostapd_data, ubus.obj);
+
+	blobmsg_parse(dpp_push_button_policy, __DPP_PUSH_BUTTON_MAX, tb, blob_data(msg), blob_len(msg));
+
+	rc = hostapd_dpp_push_button(hapd, tb[DPP_PUSH_BUTTON_COMMAND] ? blobmsg_data(tb[DPP_PUSH_BUTTON_COMMAND]) : NULL);
+
+	if (rc != 0)
+		return UBUS_STATUS_NOT_SUPPORTED;
+
+	return 0;
+}
+#endif /* CONFIG_DPP3 */
 
 static int
 hostapd_bss_update_beacon(struct ubus_context *ctx, struct ubus_object *obj,
@@ -1631,6 +1662,9 @@ static const struct ubus_method bss_methods[] = {
 	UBUS_METHOD_NOARG("wps_status", hostapd_bss_wps_status),
 	UBUS_METHOD_NOARG("wps_cancel", hostapd_bss_wps_cancel),
 #endif
+#ifdef CONFIG_DPP3
+	UBUS_METHOD("dpp_push_button", hostapd_bss_dpp_push_button, dpp_push_button_policy),
+#endif
 	UBUS_METHOD_NOARG("update_beacon", hostapd_bss_update_beacon),
 	UBUS_METHOD_NOARG("get_features", hostapd_bss_get_features),
 #ifdef NEED_AP_MLME
@@ -1847,6 +1881,37 @@ int hostapd_ubus_handle_event(struct hostapd_data *hapd, struct hostapd_ubus_req
 
 	return WLAN_STATUS_SUCCESS;
 }
+
+void hostapd_ubus_notify_type(struct hostapd_data *hapd, const char *type)
+{
+	if (!hapd->ubus.obj.has_subscribers)
+		return;
+
+	ubus_notify(ctx, &hapd->ubus.obj, type, NULL, -1);
+}
+
+#ifdef CONFIG_DPP
+void hostapd_ubus_notify_dpp_conf_failed(struct hostapd_data *hapd)
+{
+	blob_buf_init(&b, 0);
+
+	blobmsg_add_string(&b, "ifname", hapd->conf->iface);
+
+	ubus_send_event(ctx, "dpp.conf_failed", b.head);
+}
+#endif
+
+#ifdef CONFIG_DPP3
+void hostapd_ubus_notify_dpp_pb_result(struct hostapd_data *hapd, const char *status)
+{
+	blob_buf_init(&b, 0);
+
+	blobmsg_add_string(&b, "ifname", hapd->conf->iface);
+	blobmsg_add_string(&b, "status", status);
+
+	ubus_send_event(ctx, "dpp.result", b.head);
+}
+#endif
 
 void hostapd_ubus_notify(struct hostapd_data *hapd, const char *type, const u8 *addr)
 {

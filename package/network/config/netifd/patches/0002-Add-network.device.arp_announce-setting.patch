@@ -1,0 +1,142 @@
+From ebb2cf7a323a99e59edc8552cd57e1a7f1e12832 Mon Sep 17 00:00:00 2001
+From: Evan Benn <evan.benn@morsemicro.com>
+Date: Wed, 8 Oct 2025 17:20:04 +1100
+Subject: [PATCH 2/2] Add network.device.arp_announce setting
+
+---
+ device.c       | 16 ++++++++++++++++
+ device.h       |  3 +++
+ system-linux.c | 20 ++++++++++++++++++++
+ 3 files changed, 39 insertions(+)
+
+diff --git a/device.c b/device.c
+index b1213a0f30c9..425e075a4cab 100644
+--- a/device.c
++++ b/device.c
+@@ -62,6 +62,7 @@ static const struct blobmsg_policy dev_attrs[__DEV_ATTR_MAX] = {
+ 	[DEV_ATTR_DROP_GRATUITOUS_ARP] = { .name = "drop_gratuitous_arp", .type = BLOBMSG_TYPE_BOOL },
+ 	[DEV_ATTR_DROP_UNSOLICITED_NA] = { .name = "drop_unsolicited_na", .type = BLOBMSG_TYPE_BOOL },
+ 	[DEV_ATTR_ARP_ACCEPT] = { .name = "arp_accept", .type = BLOBMSG_TYPE_BOOL },
++	[DEV_ATTR_ARP_ANNOUNCE] = { .name = "arp_announce", .type = BLOBMSG_TYPE_INT32 },
+ 	[DEV_ATTR_AUTH] = { .name = "auth", .type = BLOBMSG_TYPE_BOOL },
+ 	[DEV_ATTR_AUTH_VLAN] = { .name = "auth_vlan", BLOBMSG_TYPE_ARRAY },
+ 	[DEV_ATTR_SPEED] = { .name = "speed", .type = BLOBMSG_TYPE_INT32 },
+@@ -296,6 +297,8 @@ device_merge_settings(struct device *dev, struct device_settings *n)
+ 		s->drop_unsolicited_na : os->drop_unsolicited_na;
+ 	n->arp_accept = s->flags & DEV_OPT_ARP_ACCEPT ?
+ 		s->arp_accept : os->arp_accept;
++	n->arp_announce = s->flags & DEV_OPT_ARP_ANNOUNCE ?
++		s->arp_announce : os->arp_announce;
+ 	n->auth = s->flags & DEV_OPT_AUTH ? s->auth : os->auth;
+ 	n->speed = s->flags & DEV_OPT_SPEED ? s->speed : os->speed;
+ 	n->duplex = s->flags & DEV_OPT_DUPLEX ? s->duplex : os->duplex;
+@@ -520,6 +523,17 @@ device_init_settings(struct device *dev, struct blob_attr **tb)
+ 		s->flags |= DEV_OPT_ARP_ACCEPT;
+ 	}
+ 
++	if ((cur = tb[DEV_ATTR_ARP_ANNOUNCE])) {
++		unsigned int announce = blobmsg_get_u32(cur);
++
++		if (announce <= 2) {
++			s->arp_announce = announce;
++			s->flags |= DEV_OPT_ARP_ANNOUNCE;
++		} else {
++			DPRINTF("Invalid value: %u - (Use 0, 1 or 2)\n", announce);
++		}
++	}
++
+ 	if ((cur = tb[DEV_ATTR_AUTH])) {
+ 		s->auth = blobmsg_get_bool(cur);
+ 		s->flags |= DEV_OPT_AUTH;
+@@ -1410,6 +1424,8 @@ device_dump_status(struct blob_buf *b, struct device *dev)
+ 			blobmsg_add_u8(b, "drop_unsolicited_na", st.drop_unsolicited_na);
+ 		if (st.flags & DEV_OPT_ARP_ACCEPT)
+ 			blobmsg_add_u8(b, "arp_accept", st.arp_accept);
++		if (st.flags & DEV_OPT_ARP_ANNOUNCE)
++			blobmsg_add_u32(b, "arp_announce", st.arp_announce);
+ 		if (st.flags & DEV_OPT_AUTH)
+ 			blobmsg_add_u8(b, "auth", st.auth);
+ 		if (st.flags & DEV_OPT_GRO)
+diff --git a/device.h b/device.h
+index b2ea0fa67afe..b452fd49f70e 100644
+--- a/device.h
++++ b/device.h
+@@ -59,6 +59,7 @@ enum {
+ 	DEV_ATTR_DROP_GRATUITOUS_ARP,
+ 	DEV_ATTR_DROP_UNSOLICITED_NA,
+ 	DEV_ATTR_ARP_ACCEPT,
++	DEV_ATTR_ARP_ANNOUNCE,
+ 	DEV_ATTR_AUTH,
+ 	DEV_ATTR_AUTH_VLAN,
+ 	DEV_ATTR_SPEED,
+@@ -144,6 +145,7 @@ enum {
+ 	DEV_OPT_GRO			= (1ULL << 37),
+ 	DEV_OPT_MASTER			= (1ULL << 38),
+ 	DEV_OPT_EEE			= (1ULL << 39),
++	DEV_OPT_ARP_ANNOUNCE		= (1ULL << 40),
+ };
+ 
+ /* events broadcasted to all users of a device */
+@@ -218,6 +220,7 @@ struct device_settings {
+ 	bool drop_gratuitous_arp;
+ 	bool drop_unsolicited_na;
+ 	bool arp_accept;
++	unsigned int arp_announce;
+ 	bool auth;
+ 	unsigned int speed;
+ 	bool duplex;
+diff --git a/system-linux.c b/system-linux.c
+index 7bcc5d0d75da..c3f7f249ff65 100644
+--- a/system-linux.c
++++ b/system-linux.c
+@@ -558,6 +558,11 @@ static void system_set_arp_accept(struct device *dev, const char *val)
+ 	system_set_dev_sysctl("ipv4/conf", "arp_accept", dev->ifname, val);
+ }
+ 
++static void system_set_arp_announce(struct device *dev, const char *val)
++{
++	system_set_dev_sysctl("ipv4/conf", "arp_announce", dev->ifname, val);
++}
++
+ static void system_bridge_set_multicast_to_unicast(struct device *dev, const char *val)
+ {
+ 	system_set_dev_sysfs("brport/multicast_to_unicast", dev->ifname, val);
+@@ -719,6 +724,12 @@ static int system_get_arp_accept(struct device *dev, char *buf, const size_t buf
+ 			dev->ifname, buf, buf_sz);
+ }
+ 
++static int system_get_arp_announce(struct device *dev, char *buf, const size_t buf_sz)
++{
++	return system_get_dev_sysctl("ipv4/conf", "arp_announce",
++			dev->ifname, buf, buf_sz);
++}
++
+ #ifndef IFF_LOWER_UP
+ #define IFF_LOWER_UP	0x10000
+ #endif
+@@ -2246,6 +2257,11 @@ system_if_get_settings(struct device *dev, struct device_settings *s)
+ 		s->flags |= DEV_OPT_ARP_ACCEPT;
+ 	}
+ 
++	if (!system_get_arp_announce(dev, buf, sizeof(buf))) {
++		s->arp_announce = strtoul(buf, NULL, 0);
++		s->flags |= DEV_OPT_ARP_ANNOUNCE;
++	}
++
+ 	ret = system_get_ethtool_gro(dev);
+ 	if (ret >= 0) {
+ 		s->gro = ret;
+@@ -2367,6 +2383,10 @@ system_if_apply_settings(struct device *dev, struct device_settings *s, uint64_t
+ 		system_set_drop_unsolicited_na(dev, s->drop_unsolicited_na ? "1" : "0");
+ 	if (apply_mask & DEV_OPT_ARP_ACCEPT)
+ 		system_set_arp_accept(dev, s->arp_accept ? "1" : "0");
++	if (apply_mask & DEV_OPT_ARP_ANNOUNCE) {
++		snprintf(buf, sizeof(buf), "%u", s->arp_announce);
++		system_set_arp_announce(dev, buf);
++	}
+ 	system_set_ethtool_settings(dev, s);
+ }
+ 
+-- 
+2.51.1
+

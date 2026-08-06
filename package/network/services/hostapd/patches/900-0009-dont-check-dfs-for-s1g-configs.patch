@@ -1,0 +1,28 @@
+From 8445a24e7372237b9b23a04c9edbeaf56808bb66 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Wed, 14 Jan 2026 21:38:41 +1100
+Subject: [PATCH] TEMP: dont check dfs for s1g configs
+
+---
+ src/ap/dfs.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/ap/dfs.c b/src/ap/dfs.c
+index 8797f040cf58..bae0275ec7f3 100644
+--- a/src/ap/dfs.c
++++ b/src/ap/dfs.c
+@@ -1603,6 +1603,11 @@ int hostapd_is_dfs_required(struct hostapd_iface *iface)
+ 	    iface->current_mode->mode != HOSTAPD_MODE_IEEE80211A)
+ 		return 0;
+ 
++#ifdef CONFIG_IEEE80211AH
++	if (iface->conf->ieee80211ah)
++		return 0;
++#endif
++
+ 	/* Get start (first) channel for current configuration */
+ 	start_chan_idx = dfs_get_start_chan_idx(iface, &start_chan_idx1);
+ 	if (start_chan_idx == -1)
+-- 
+2.43.0
+

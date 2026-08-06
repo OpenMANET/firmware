@@ -1,0 +1,19 @@
+--- a/event.c
++++ b/event.c
+@@ -315,7 +315,7 @@ static void parse_vendor_event(struct nl
+ 	vendor_id = nla_get_u32(attrs[NL80211_ATTR_VENDOR_ID]);
+ 	subcmd = nla_get_u32(attrs[NL80211_ATTR_VENDOR_SUBCMD]);
+ 
+-	printf("vendor event %.6x:%d", vendor_id, subcmd);
++	printf("vendor event %.6x:%d\n", vendor_id, subcmd);
+ 
+ 	for (i = 0; i < &__stop_vendor_event - __start_vendor_event; i++) {
+ 		struct vendor_event *ev = __start_vendor_event[i];
+@@ -338,6 +338,7 @@ static void parse_vendor_event(struct nl
+ 		iw_hexdump("vendor event",
+ 			   nla_data(attrs[NL80211_ATTR_VENDOR_DATA]),
+ 			   nla_len(attrs[NL80211_ATTR_VENDOR_DATA]));
++	return;
+ out:
+ 	printf("\n");
+ }

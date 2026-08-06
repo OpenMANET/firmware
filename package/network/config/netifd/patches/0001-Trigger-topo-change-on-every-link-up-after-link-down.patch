@@ -1,0 +1,53 @@
+From 28a9a17708b5060c70219ff9c83d22e2fe5eb43a Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Wed, 25 Sep 2024 21:08:31 +1000
+Subject: [PATCH] Trigger topo change on every link up after link down
+
+This causes DHCP renewals to happen when you disconnect/reconnect
+cables or re-establish wifi connections on a bridge.
+---
+ bridge.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/bridge.c b/bridge.c
+index cc25c51..4e9d272 100644
+--- a/bridge.c
++++ b/bridge.c
+@@ -136,6 +136,7 @@ struct bridge_member {
+ 	uint16_t pvid;
+ 	bool present;
+ 	bool active;
++	bool has_link_down;
+ 	char name[];
+ };
+ 
+@@ -782,6 +783,11 @@ bridge_member_cb(struct device_user *dep, enum device_event ev)
+ 					 DEV_OPT_MTU | DEV_OPT_MTU6);
+ 		break;
+ 	case DEV_EVENT_LINK_UP:
++		if (!bst->has_vlans && !dev->settings.auth && bm->has_link_down) {
++			device_broadcast_event(&bst->dev, DEV_EVENT_TOPO_CHANGE);
++		}
++		bm->has_link_down = false;
++
+ 		if (!bst->has_vlans)
+ 			break;
+ 
+@@ -791,10 +797,11 @@ bridge_member_cb(struct device_user *dep, enum device_event ev)
+ 		uloop_timeout_set(&bm->check_timer, 1000);
+ 		break;
+ 	case DEV_EVENT_LINK_DOWN:
+-		if (!dev->settings.auth)
+-			break;
++		bm->has_link_down = true;
++
++		if (dev->settings.auth)
++			bridge_disable_member(bm, true);
+ 
+-		bridge_disable_member(bm, true);
+ 		break;
+ 	case DEV_EVENT_REMOVE:
+ 		if (dep->hotplug && !dev->sys_present) {
+-- 
+2.25.1
+
