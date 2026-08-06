@@ -142,7 +142,7 @@ define KernelPackage/mt7603
   DEPENDS+=@PCI_SUPPORT +kmod-mt76-core
   FILES:=\
 	$(PKG_BUILD_DIR)/mt7603/mt7603e.ko
-  AUTOLOAD:=$(call AutoLoad,30,mt7603e)
+  AUTOLOAD:=$(call AutoProbe,mt7603e)
 endef
 
 define KernelPackage/mt76-connac

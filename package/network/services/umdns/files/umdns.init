@@ -53,7 +53,7 @@ start_service() {
 	procd_close_data
 
 	procd_open_trigger
-	procd_add_config_trigger "config.change" "umdns" /etc/init.d/umdns restart
+	procd_add_config_trigger "config.change" "umdns" /etc/init.d/umdns reload
 	for n in $network; do
 		procd_add_interface_trigger "interface.*" $n /etc/init.d/umdns reload
 	done
@@ -66,7 +66,7 @@ start_service() {
 	procd_close_instance
 }
 
-service_running() {
+service_started() {
 	ubus -t 10 wait_for umdns
 	[ $? = 0 ] && reload_service
 }
