@@ -215,27 +215,6 @@ endef
 
 $(eval $(call KernelPackage,drm-rp1-vec))
 
-# Lens driver modules
-#
-
-define KernelPackage/video-dw9807-vcm
-  SUBMENU:=$(VIDEO_MENU)
-  TITLE:=DW9807 lens voice coil support
-  DEPENDS:=+kmod-i2c-core +kmod-video-fwnode +kmod-video-async
-  KCONFIG:=CONFIG_VIDEO_DW9807_VCM \
-    CONFIG_MEDIA_CONTROLLER \
-    CONFIG_VIDEO_V4L2_SUBDEV_API \
-    CONFIG_V4L2_ASYNC
-  FILES:=$(LINUX_DIR)/drivers/media/i2c/dw9807-vcm.ko
-  AUTOLOAD:=$(call AutoProbe,dw9807-vcm)
-endef
-
-define KernelPackage/video-dw9807-vcm/description
-  DW9807/DW9817 lens voice coil support
-endef
-
-$(eval $(call KernelPackage,video-dw9807-vcm))
-
 define KernelPackage/video-cci-i2c
   TITLE:=V4L2 CCI I2C support
   KCONFIG:= \
