@@ -165,7 +165,7 @@ ifdef USE_GIT_SRC_CHECKOUT
 	ln -s $(TOPDIR)/git-src/$(PKG_NAME)/.git $(PKG_BUILD_DIR)/.git
 	( cd $(PKG_BUILD_DIR); \
 		git checkout .; \
-		git submodule update --recursive; \
+		git submodule update --init --recursive; \
 		git submodule foreach git config --unset core.worktree; \
 		git submodule foreach git checkout .; \
 	)
@@ -177,7 +177,7 @@ ifdef USE_GIT_TREE
 	ln -s $(CURDIR)/git-src $(PKG_BUILD_DIR)/.git
 	( cd $(PKG_BUILD_DIR); \
 		git checkout .; \
-		git submodule update --recursive; \
+		git submodule update --init --recursive; \
 		git submodule foreach git config --unset core.worktree; \
 		git submodule foreach git checkout .; \
 	)

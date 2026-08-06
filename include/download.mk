@@ -22,6 +22,17 @@ DOWNLOAD_RDEP=$(STAMP_PREPARED) $(HOST_STAMP_PREPARED)
 export DOWNLOAD_CHECK_CERTIFICATE:=$(CONFIG_DOWNLOAD_CHECK_CERTIFICATE)
 export DOWNLOAD_TOOL_CUSTOM:=$(CONFIG_DOWNLOAD_TOOL_CUSTOM)
 
+ifneq ($(wildcard $(STAGING_DIR_HOST)/bin/flock),)
+  define dl_locked
+	SHELL= \
+	flock \
+		$(DL_DIR)/.$(if $(2),$(strip $(2)),global).flock \
+		-c '$(subst ','\'',$(1))'
+  endef
+else
+  dl_locked=$(1)
+endif
+
 define dl_method_git
 $(if $(filter https://github.com/% git://github.com/%,$(1)),github_archive,git)
 endef
@@ -232,18 +243,12 @@ define DownloadMethod/rawgit
 	echo "Generating formal git archive (apply .gitattributes rules)" && \
 	(cd $(SUBDIR) && git config core.abbrev 8 && \
 	git archive --format=tar HEAD --output=../$(SUBDIR).tar.git) && \
-	$(if $(filter skip,$(SUBMODULES)),true,$(TAR) --ignore-failed-read -C $(SUBDIR) -f $(SUBDIR).tar.git -r .git .gitmodules 2>/dev/null) && \
+	$(if $(filter skip,$(SUBMODULES)),true, \
+		$(TAR) --numeric-owner --owner=0 --group=0 --ignore-failed-read -C $(SUBDIR) -f $(SUBDIR).tar.git -r .git .gitmodules 2>/dev/null \
+	) && \
 	rm -rf $(SUBDIR) && mkdir $(SUBDIR) && \
 	$(TAR) -C $(SUBDIR) -xf $(SUBDIR).tar.git && \
-	(cd $(SUBDIR) && \
-	if [ -f .gitmodules ] && [ -n "$$FORCE_GIT_HTTPS_SUBMODULES" ]; then \
-		sed -i -e 's#git@github.com:#https://github.com/#g' \
-		       -e 's#ssh://git@github.com/#https://github.com/#g' .gitmodules; \
-		git submodule sync --recursive; \
-		git config url."https://github.com/".insteadOf git@github.com:; \
-		git config url."https://github.com/".insteadOf ssh://git@github.com/; \
-	fi && \
-	$(if $(filter skip,$(SUBMODULES)),true,git submodule update --init --recursive -- $(SUBMODULES) && \
+	(cd $(SUBDIR) && $(if $(filter skip,$(SUBMODULES)),true,git submodule update --init --recursive -- $(SUBMODULES) && \
 	rm -rf .git .gitmodules)) && \
 	echo "Packing checkout..." && \
 	$(call dl_tar_pack,$(TMP_DIR)/dl/$(FILE),$(SUBDIR)) && \
@@ -355,7 +360,7 @@ define Download
 
   $(DL_DIR)/$(FILE):
 	mkdir -p $(DL_DIR)
-	$(call locked, \
+	$(call dl_locked, \
 		$(if $(DownloadMethod/$(call dl_method,$(URL),$(PROTO))), \
 			$(call DownloadMethod/$(call dl_method,$(URL),$(PROTO)),check,$(if $(filter default,$(1)),PKG_,Download/$(1):)), \
 			$(DownloadMethod/unknown) \
