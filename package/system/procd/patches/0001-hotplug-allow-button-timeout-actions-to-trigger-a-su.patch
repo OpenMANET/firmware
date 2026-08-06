@@ -1,0 +1,77 @@
+From 7e338e24a552fe14bd218371cf84c227be3a7f89 Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Wed, 24 Jul 2024 11:37:46 +1000
+Subject: [PATCH] hotplug: allow button timeout actions to trigger a subsequent
+ timeout
+
+This allows visual feedback when timeouts are reached.
+
+In our case, there is a single button which on a normal press/release
+will initiate DPP, but longer presses will first reboot then
+factory reset. So users know they've held it down long enough,
+it's nice to change the state of an LED.
+
+This also fixes what seems to me a bug, in that you can attach
+a timeout to a 'release' action but the timing was reset
+(so you can't distinguish between a released timeout vs
+a pressed timeout).
+---
+ plug/hotplug.c | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/plug/hotplug.c b/plug/hotplug.c
+index 53f3383..7bdb0b7 100644
+--- a/plug/hotplug.c
++++ b/plug/hotplug.c
+@@ -361,6 +361,17 @@ static struct cmd_handler {
+ 	},
+ };
+ 
++/* This is a non-public handler used when a button event
++ * return a non-zero value, which is used as a timeout
++ * to subsequently call the same script.
++ */
++static struct cmd_handler BUTTON_TIMEOUT_HANDLER = {
++	.name = "button_timeout",
++	.handler = handle_exec,
++	.complete = handle_button_complete,
++};
++
++
+ static void queue_next(void)
+ {
+ 	struct cmd_queue *c;
+@@ -441,13 +452,15 @@ static void handle_button_timeout(struct uloop_timeout *t)
+ 	blobmsg_add_string(&button_buf, "ACTION", "timeout");
+ 	snprintf(seen, sizeof(seen), "%d", b->seen);
+ 	blobmsg_add_string(&button_buf, "SEEN", seen);
+-	queue_add(&handlers[HANDLER_EXEC], button_buf.head, b->data);
++	queue_add(&BUTTON_TIMEOUT_HANDLER, button_buf.head, b->data);
+ 	button_free(b);
+ }
+ 
+ static void handle_button_complete(struct blob_attr *msg, struct blob_attr *data, int ret)
+ {
+ 	char *name = hotplug_msg_find_var(msg, "BUTTON");
++	char *action = hotplug_msg_find_var(msg, "ACTION");
++	char *seen = hotplug_msg_find_var(msg, "SEEN");
+ 	struct button_timeout *b;
+ 	int timeout = ret >> 8;
+ 
+@@ -465,6 +478,13 @@ static void handle_button_complete(struct blob_attr *msg, struct blob_attr *data
+ 	b->name = strdup(name);
+ 	b->seen = timeout;
+ 
++	if (action && seen && (!strcmp(action, "timeout") || !strcmp(action, "released"))) {
++		/* If this happening due to a previous timeout or a released action,
++		 * then we should add on the previous SEEN time.
++		 */
++		b->seen += atoi(seen);
++	}
++
+ 	memcpy(b->data, data, blob_pad_len(data));
+ 	b->timeout.cb = handle_button_timeout;
+ 
+-- 
+2.25.1
+

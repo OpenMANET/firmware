@@ -1,0 +1,75 @@
+From 80187cf5badb43ec42f6025acaeb70688c494101 Mon Sep 17 00:00:00 2001
+From: Felix Fietkau <nbd@nbd.name>
+Date: Thu, 13 Mar 2025 11:02:22 +0100
+Subject: [PATCH 1/2] service: re-run init script "running" command after
+ instance restart
+
+This ensures that init scripts that use this command for applying the
+config via ubus work properly.
+
+Signed-off-by: Felix Fietkau <nbd@nbd.name>
+---
+ service/instance.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/service/instance.c b/service/instance.c
+index 1c363fc..1d04041 100644
+--- a/service/instance.c
++++ b/service/instance.c
+@@ -32,6 +32,7 @@
+ #include <libubox/md5.h>
+ 
+ #include "../procd.h"
++#include "../rcS.h"
+ 
+ #include "service.h"
+ #include "instance.h"
+@@ -786,8 +787,10 @@ instance_timeout(struct uloop_timeout *t)
+ 		LOG("Instance %s::%s pid %d not stopped on SIGTERM, sending SIGKILL instead\n",
+ 				in->srv->name, in->name, in->proc.pid);
+ 		kill(in->proc.pid, SIGKILL);
+-	} else if (in->restart || in->respawn)
++	} else if (in->restart || in->respawn) {
+ 		instance_start(in);
++		rc(in->srv->name, "running");
++	}
+ }
+ 
+ static void
+@@ -822,6 +825,7 @@ static void
+ instance_exit(struct uloop_process *p, int ret)
+ {
+ 	struct service_instance *in;
++	bool restart = false;
+ 	struct timespec tp;
+ 	long runtime;
+ 
+@@ -840,11 +844,11 @@ instance_exit(struct uloop_process *p, int ret)
+ 	if (in->halt) {
+ 		instance_removepid(in);
+ 		if (in->restart)
+-			instance_start(in);
++			restart = true;
+ 		else
+ 			instance_delete(in);
+ 	} else if (in->restart) {
+-		instance_start(in);
++		restart = true;
+ 	} else if (in->respawn) {
+ 		if (runtime < in->respawn_threshold)
+ 			in->respawn_count++;
+@@ -861,6 +865,11 @@ instance_exit(struct uloop_process *p, int ret)
+ 			uloop_timeout_set(&in->timeout, in->respawn_timeout * 1000);
+ 		}
+ 	}
++
++	if (restart) {
++		instance_start(in);
++		rc(in->srv->name, "running");
++	}
+ }
+ 
+ void
+-- 
+2.34.1
+

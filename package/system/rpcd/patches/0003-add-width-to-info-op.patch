@@ -1,0 +1,12 @@
+Index: rpcd-2025.09.01~bba95191/iwinfo.c
+===================================================================
+--- rpcd-2025.09.01~bba95191.orig/iwinfo.c
++++ rpcd-2025.09.01~bba95191/iwinfo.c
+@@ -339,6 +339,7 @@ rpc_iwinfo_info(struct ubus_context *ctx
+ 	rpc_iwinfo_call_int("channel", iw->channel, NULL);
+ 	rpc_iwinfo_call_int("center_chan1", iw->center_chan1, NULL);
+ 	rpc_iwinfo_call_int("center_chan2", iw->center_chan2, NULL);
++	rpc_iwinfo_call_int("center_width", iw->center_width, NULL);
+ 
+ 	rpc_iwinfo_call_int("frequency", iw->frequency, NULL);
+ 	rpc_iwinfo_call_int("frequency_offset", iw->frequency_offset, NULL);

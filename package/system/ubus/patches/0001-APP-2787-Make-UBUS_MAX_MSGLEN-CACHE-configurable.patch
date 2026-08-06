@@ -1,0 +1,25 @@
+From f1adaccc5f94d74bb073cfe184937eca7baece24 Mon Sep 17 00:00:00 2001
+From: Evan Benn <evan.benn@morsemicro.com>
+Date: Wed, 2 Apr 2025 10:16:31 +1100
+Subject: [PATCH] APP-2787: Make UBUS_MAX_MSGLEN CACHE configurable
+
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a65ccbb80de1..1c7114045082 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -14,7 +14,7 @@ OPTION(BUILD_EXAMPLES "build examples" ON)
+ 
+ SET(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
+ SET(UBUS_UNIX_SOCKET "/var/run/ubus/ubus.sock")
+-SET(UBUS_MAX_MSGLEN 1048576)
++SET(UBUS_MAX_MSGLEN 1048576 CACHE STRING "UBUS_MAX_MSGLEN")
+ 
+ ADD_DEFINITIONS( -DUBUS_UNIX_SOCKET="${UBUS_UNIX_SOCKET}")
+ ADD_DEFINITIONS( -DUBUS_MAX_MSGLEN=${UBUS_MAX_MSGLEN})
+-- 
+2.48.1
+

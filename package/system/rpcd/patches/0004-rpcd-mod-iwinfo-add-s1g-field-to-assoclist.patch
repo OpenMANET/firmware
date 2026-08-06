@@ -1,0 +1,33 @@
+From 15781ad33be3de02e3f27e5c022ccb1f57111dd6 Mon Sep 17 00:00:00 2001
+From: syang <samuele.yang@morsemicro.com>
+Date: Mon, 16 Feb 2026 11:38:12 +1100
+Subject: [PATCH] rpcd-mod-iwinfo: add s1g field to assoclist
+
+---
+ iwinfo.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/iwinfo.c b/iwinfo.c
+index ff0f38b..2e16d31 100644
+--- a/iwinfo.c
++++ b/iwinfo.c
+@@ -459,6 +459,7 @@ rpc_iwinfo_add_rateinfo(struct iwinfo_rate_entry *r)
+ 	blobmsg_add_u8(&buf, "vht", r->is_vht);
+ 	blobmsg_add_u8(&buf, "he", r->is_he);
+ 	blobmsg_add_u8(&buf, "eht", r->is_eht);
++	blobmsg_add_u8(&buf, "s1g", r->is_s1g);
+ 	blobmsg_add_u32(&buf, "mhz", r->mhz_hi * 256 + r->mhz);
+ 	blobmsg_add_u32(&buf, "rate", r->rate);
+ 
+@@ -467,7 +468,7 @@ rpc_iwinfo_add_rateinfo(struct iwinfo_rate_entry *r)
+ 		blobmsg_add_u8(&buf, "40mhz", r->is_40mhz);
+ 		blobmsg_add_u8(&buf, "short_gi", r->is_short_gi);
+ 	}
+-	else if (r->is_vht) {
++	else if (r->is_vht || r->is_s1g) {
+ 		blobmsg_add_u32(&buf, "mcs", r->mcs);
+ 		blobmsg_add_u32(&buf, "nss", r->nss);
+ 		blobmsg_add_u8(&buf, "short_gi", r->is_short_gi);
+-- 
+2.34.1
+

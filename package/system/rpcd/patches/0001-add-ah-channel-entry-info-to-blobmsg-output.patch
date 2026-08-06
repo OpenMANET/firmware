@@ -49,10 +49,10 @@ index c93982f..4c09d33 100644
  				blobmsg_close_table(&buf, t);
  			}
  
-+			if (e->ah_chan_info.primary_chan) {
-+				t = blobmsg_open_table(&buf, "ah_operation");
-+				blobmsg_add_u32(&buf, "primary_channel", e->ah_chan_info.primary_chan);
-+				blobmsg_add_u32(&buf, "channel_width", ah_chan_width[e->ah_chan_info.chan_width]);
++			if (e->s1g_chan_info.primary_chan) {
++				t = blobmsg_open_table(&buf, "s1g_operation");
++				blobmsg_add_u32(&buf, "primary_channel", e->s1g_chan_info.primary_chan);
++				blobmsg_add_u32(&buf, "channel_width", e->s1g_chan_info.chan_width);
 +				blobmsg_close_table(&buf, t);
 +			}
 +

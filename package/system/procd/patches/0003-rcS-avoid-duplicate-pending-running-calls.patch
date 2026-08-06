@@ -1,0 +1,50 @@
+From 891094aefcb28a376a43b7c539f599a8e0987e4d Mon Sep 17 00:00:00 2001
+From: Felix Fietkau <nbd@nbd.name>
+Date: Thu, 13 Mar 2025 11:21:13 +0100
+Subject: [PATCH 2/2] rcS: avoid duplicate pending "running" calls
+
+Since those can be triggered by instance restarts now, and since the calls
+can wait for their service to be active, suppress duplicate concurrent script
+calls in case of rapid consecutive crashes.
+
+Signed-off-by: Felix Fietkau <nbd@nbd.name>
+---
+ rcS.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/rcS.c b/rcS.c
+index 2851fae..bfaf50b 100644
+--- a/rcS.c
++++ b/rcS.c
+@@ -125,6 +125,16 @@ static void q_initd_complete(struct runqueue *q, struct runqueue_task *p)
+ 	free(s);
+ }
+ 
++static bool find_runqueue_list_entry(struct list_head *list, char *file, char *param)
++{
++	struct initd *s;
++
++	list_for_each_entry(s, list, proc.task.list.list)
++		if (!strcmp(s->file, file) && !strcmp(s->param, param))
++			return true;
++	return false;
++}
++
+ static void add_initd(struct runqueue *q, char *file, char *param)
+ {
+ 	static const struct runqueue_task_type initd_type = {
+@@ -135,6 +145,11 @@ static void add_initd(struct runqueue *q, char *file, char *param)
+ 	struct initd *s;
+ 	char *p, *f;
+ 
++	if (!strcmp(param, "running") &&
++	    (find_runqueue_list_entry(&q->tasks_active.list, file, param) ||
++	     find_runqueue_list_entry(&q->tasks_inactive.list, file, param)))
++		return;
++
+ 	s = calloc_a(sizeof(*s), &f, strlen(file) + 1, &p, strlen(param) + 1);
+ 	if (!s) {
+ 		ERROR("Out of memory in %s.\n", file);
+-- 
+2.34.1
+
