@@ -3,7 +3,7 @@ A MANET (Mobile Ad-Hoc Network) is a self-forming wireless mesh where each node 
 
 **Software Specifications**
 - OpenWRT 24.10 Base
-- Linux Kernel 6.6.138
+- Linux Kernel 6.6.119
 - Wifi Drivers back-ported from 6.12.61
 - Morse Micro Drivers 2.0
 
