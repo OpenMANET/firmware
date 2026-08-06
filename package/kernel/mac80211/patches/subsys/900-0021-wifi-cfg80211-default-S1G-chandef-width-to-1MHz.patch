@@ -1,0 +1,30 @@
+From bca76b875d0530658f3ba1bc946dbae1974f14c3 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Tue, 21 Oct 2025 17:12:01 +1100
+Subject: [PATCH 21/21] wifi: cfg80211: default S1G chandef width to 1MHz
+
+When management frames are passed down to be transmitted by usermode, often
+times the NL80211_ATTR_CHANNEL_WIDTH is not used as its implied to be
+transmitted on the control width. This can lead to errors during chandef
+validation as the offsets from the channel center are wrong. Ensure we
+initialise S1G chandefs to a width of 1MHz rather then 20MHz.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20251021061201.235754-1-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ net/wireless/nl80211.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -3391,6 +3391,9 @@ static int _nl80211_parse_chandef(struct
+ 		return -EINVAL;
+ 	}
+ 
++	if (cfg80211_chandef_is_s1g(chandef))
++		chandef->width = NL80211_CHAN_WIDTH_1;
++
+ 	if (attrs[NL80211_ATTR_WIPHY_CHANNEL_TYPE]) {
+ 		enum nl80211_channel_type chantype;
+ 

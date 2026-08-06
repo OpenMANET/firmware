@@ -1,0 +1,78 @@
+From 2d49b6b42145c6098edba4d43833bf60f58812e8 Mon Sep 17 00:00:00 2001
+From: Prabha Murugesan <prabha.murugesan@morsemicro.com>
+Date: Thu, 27 Nov 2025 12:18:17 +1100
+Subject: [PATCH] mac80211: Stop forwarding mesh traffic when tx queues are full
+
+This change restores the original behaviour where mesh-forwarded frames are
+dropped when the underlying TX queues are full.
+
+The patch is derived from the following upstream commits:
+
+--------------------------------------------------------------------
+commit 859ae7018316daa4adbc496012dcbbb458d7e510
+Author: Nicolas Escande <nico.escande@gmail.com>
+Date:   Mon Feb 14 18:32:14 2022 +0100
+
+    mac80211: fix forwarded mesh frames AC & queue selection
+--------------------------------------------------------------------
+
+commit cfee66b0f9891fc2b79a238e737308a2732365d2
+Author: Javier Cardona <javier@cozybit.com>
+Date:   Tue Sep 6 13:05:21 2011 -0700
+
+    mac80211: Stop forwarding mesh traffic when tx queues are full
+--------------------------------------------------------------------
+
+Between the 6.1 and 6.6 kernel versions, mesh forwarding changed significantly
+due to the enforcement of iTXQ. mac80211 6.1.145 (as shipped in OpenWrt
+6.1.145-1) does not support iTXQ in mesh forwarding. However, the following
+commit removed the driver-queue congestion check under the assumption that all
+drivers were already using iTXQ:
+
+--------------------------------------------------------------------
+commit 5c1e269aa5ebafeec69b68ff560522faa5bcb6c1
+Author: Felix Fietkau <nbd@nbd.name>
+Date:   Mon Feb 13 11:08:53 2023 +0100
+
+    wifi: mac80211: remove mesh forwarding congestion check
+
+    Now that all drivers use iTXQ, it does not make sense to check to drop
+    tx forwarding packets when the driver has stopped the queues.
+    fq_codel will take care of dropping packets when the queues fill up
+--------------------------------------------------------------------
+
+OpenWrt’s 6.1.145-1 mac80211 snapshot appears to fall in a transition point
+where iTXQ was becoming mandatory, but mesh forwarding had not yet fully
+migrated to it. As a result, the congestion check removal caused forwarded mesh
+frames to be transmitted even when the driver queues were stopped.
+
+This patch reinstates the expected behaviour by preventing mesh forwarding when
+TX queues are full.
+
+Index: backports-6.1.145-1/net/mac80211/rx.c
+===================================================================
+--- backports-6.1.145-1.orig/net/mac80211/rx.c
++++ backports-6.1.145-1/net/mac80211/rx.c
+@@ -2749,6 +2749,7 @@ ieee80211_rx_mesh_data(struct ieee80211_
+ 	int tailroom = 0;
+ 	int hdrlen, mesh_hdrlen;
+ 	u8 *qos;
++	u16 ac, q;
+ 
+ 	if (!ieee80211_vif_is_mesh(&sdata->vif))
+ 		return RX_CONTINUE;
+@@ -2823,7 +2824,13 @@ ieee80211_rx_mesh_data(struct ieee80211_
+ 		return RX_DROP_MONITOR;
+ 	}
+ 
+-	skb_set_queue_mapping(skb, ieee802_1d_to_ac[skb->priority]);
++	ac = ieee802_1d_to_ac[skb->priority];
++	q = sdata->vif.hw_queue[ac];
++	if (ieee80211_queue_stopped(&local->hw, q)) {
++		return RX_DROP_MONITOR;
++	}
++
++	skb_set_queue_mapping(skb, ac);
+ 
+ 	ieee80211_fill_mesh_addresses(&hdr, &hdr.frame_control,
+ 				      eth->h_dest, eth->h_source);

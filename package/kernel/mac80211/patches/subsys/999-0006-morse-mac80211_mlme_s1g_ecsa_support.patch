@@ -1,0 +1,13 @@
+Index: backports-6.12.61/net/mac80211/mlme.c
+===================================================================
+--- backports-6.12.61.orig/net/mac80211/mlme.c
++++ backports-6.12.61/net/mac80211/mlme.c
+@@ -2631,7 +2631,7 @@ ieee80211_sta_process_chanswitch(struct
+ 
+ 	/* we may have to handle timeout for deactivated link in software */
+ 	now = ktime_get_boottime();
+-	csa_time_tu = (max_t(int, csa_ie.count, 1) - 1) * link->conf->beacon_int;
++	csa_time_tu = (max_t(int, csa_ie.count, 1) - 1) * sdata->vif.bss_conf.dtim_period * link->conf->beacon_int;
+ 	link->u.mgd.csa.time = now + ns_to_ktime(ieee80211_tu_to_usec(csa_time_tu) * NSEC_PER_USEC);
+ 
+ 	if (ieee80211_vif_link_active(&sdata->vif, link->link_id) &&

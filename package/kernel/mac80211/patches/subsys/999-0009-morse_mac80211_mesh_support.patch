@@ -1,0 +1,134 @@
+diff --git a/net/mac80211/cfg.c b/net/mac80211/cfg.c
+index f11fd360b422..22fd7188ddf8 100644
+--- a/net/mac80211/cfg.c
++++ b/net/mac80211/cfg.c
+@@ -2127,6 +2127,10 @@ static int ieee80211_add_station(struct wiphy *wiphy, struct net_device *dev,
+ 		return err;
+ 	}
+ 
++	if (ieee80211_vif_is_mesh(&sdata->vif)) {
++		mesh_update_mfp_flag(sdata,sta);
++	}
++
+ 	/*
+ 	 * for TDLS and for unassociated station, rate control should be
+ 	 * initialized only when rates are known and station is marked
+diff --git a/net/mac80211/ieee80211_i.h b/net/mac80211/ieee80211_i.h
+index bfe0514efca3..4c5a13b8f77d 100644
+--- a/net/mac80211/ieee80211_i.h
++++ b/net/mac80211/ieee80211_i.h
+@@ -798,6 +798,10 @@ struct ieee80211_if_mesh {
+ 	int mesh_paths_generation;
+ 	int mpp_paths_generation;
+ 	struct mesh_tx_cache tx_cache;
++	 enum {
++		IEEE80211_MESH_MFP_DISABLED,
++		IEEE80211_MESH_MFP_ENABLED,
++	} mfp; /* management frame protection */
+ };
+ 
+ #ifdef CONFIG_MAC80211_MESH
+diff --git a/net/mac80211/mesh.c b/net/mac80211/mesh.c
+index 50eb1d8cd43d..73a1650417f2 100644
+--- a/net/mac80211/mesh.c
++++ b/net/mac80211/mesh.c
+@@ -1710,6 +1710,19 @@ void ieee80211_mesh_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
+ 	}
+ }
+ 
++void mesh_update_mfp_flag(struct ieee80211_sub_if_data *sdata, struct sta_info *sta)
++{
++	struct ieee80211_if_mesh *ifmsh = &sdata->u.mesh;
++	if (test_sta_flag(sta, WLAN_STA_MFP))
++	{
++		mpl_dbg(sdata,"%s: Mesh MFP Enabled\n",__func__);
++		ifmsh->mfp = IEEE80211_MESH_MFP_ENABLED;
++	} else {
++		mpl_dbg(sdata,"%s: Mesh MFP Disabled\n",__func__);
++		ifmsh->mfp = IEEE80211_MESH_MFP_DISABLED;
++	}
++}
++
+ static void mesh_bss_info_changed(struct ieee80211_sub_if_data *sdata)
+ {
+ 	struct ieee80211_if_mesh *ifmsh = &sdata->u.mesh;
+diff --git a/net/mac80211/mesh.h b/net/mac80211/mesh.h
+index 3f9664e4e00c..2350bf695dbb 100644
+--- a/net/mac80211/mesh.h
++++ b/net/mac80211/mesh.h
+@@ -418,12 +418,15 @@ static inline bool mesh_path_sel_is_hwmp(struct ieee80211_sub_if_data *sdata)
+ void mesh_path_flush_by_iface(struct ieee80211_sub_if_data *sdata);
+ void mesh_sync_adjust_tsf(struct ieee80211_sub_if_data *sdata);
+ void ieee80211s_stop(void);
++void mesh_update_mfp_flag(struct ieee80211_sub_if_data *sdata, struct sta_info *sta);
+ #else
+ static inline bool mesh_path_sel_is_hwmp(struct ieee80211_sub_if_data *sdata)
+ { return false; }
+ static inline void mesh_path_flush_by_iface(struct ieee80211_sub_if_data *sdata)
+ {}
+ static inline void ieee80211s_stop(void) {}
++static inline void mesh_update_mfp_flag(struct ieee80211_sub_if_data *sdata, struct sta_info *sta)
++{}
+ #endif
+ 
+ #endif /* IEEE80211S_H */
+diff --git a/net/mac80211/mesh_hwmp.c b/net/mac80211/mesh_hwmp.c
+index 579d0f24ac9d..da8c163fbfaf 100644
+--- a/net/mac80211/mesh_hwmp.c
++++ b/net/mac80211/mesh_hwmp.c
+@@ -190,6 +190,8 @@ static int mesh_path_sel_frame_tx(enum mpath_frame_type action, u8 flags,
+ 		pos += 4;
+ 	}
+ 
++	if (sdata->u.mesh.mfp == IEEE80211_MESH_MFP_DISABLED)
++		IEEE80211_SKB_CB(skb)->flags |= IEEE80211_TX_INTFL_DONT_ENCRYPT;
+ 	ieee80211_tx_skb(sdata, skb);
+ 	return 0;
+ }
+@@ -303,6 +305,15 @@ void ieee80211s_update_metric(struct ieee80211_local *local,
+ 	struct rate_info rinfo;
+ 
+ 	failed = !(txinfo->flags & IEEE80211_TX_STAT_ACK);
++	if (!ewma_mesh_fail_avg_read(&sta->mesh->fail_avg)) {
++		/* If the average value in mesh metrics calculation
++		 * has been rounded to 0 (success), this resets it to
++		 * the smallest nonzero value to avoid a case where a
++		 * single failure would result in an avg value that goes
++		 * beyond the value of 95 (Link Failure Threshold)
++		 */
++		ewma_mesh_fail_avg_add(&sta->mesh->fail_avg, 1);
++	}
+ 
+ 	/* moving average, scaled to 100.
+ 	 * feed failure as 100 and success as 0
+diff --git a/net/mac80211/tx.c b/net/mac80211/tx.c
+index 0ff8b56f5807..08a150460a46 100644
+--- a/net/mac80211/tx.c
++++ b/net/mac80211/tx.c
+@@ -4307,6 +4307,12 @@ void __ieee80211_subif_start_xmit(struct sk_buff *skb,
+ 		if (fast_tx &&
+ 		    ieee80211_xmit_fast(sdata, sta, fast_tx, skb))
+ 			goto out;
++	} else if (ieee80211_vif_is_mesh(&sdata->vif)) {
++		/* For mesh interface, sta is determined in ieee80211_tx_prepare after building
++		 * mesh header. Update tx pacing shift here, otherwise it affects TCP throughput as
++		 * there won't be enough packets to aggregate.
++		 */
++		sk_pacing_shift_update(skb->sk, sdata->local->hw.tx_sk_pacing_shift);
+ 	}
+ 
+ 	/* the frame could be fragmented, software-encrypted, and other
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index ecfceddce00f..94ab07182c56 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -14302,7 +14302,8 @@ static int nl80211_probe_client(struct sk_buff *skb,
+ 	int err;
+ 
+ 	if (wdev->iftype != NL80211_IFTYPE_AP &&
+-	    wdev->iftype != NL80211_IFTYPE_P2P_GO)
++	    wdev->iftype != NL80211_IFTYPE_P2P_GO &&
++	    wdev->iftype != NL80211_IFTYPE_MESH_POINT)
+ 		return -EOPNOTSUPP;
+ 
+ 	if (!info->attrs[NL80211_ATTR_MAC])

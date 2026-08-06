@@ -1,0 +1,30 @@
+From ad55aa3ad8f843b2600db322d312f9f28d79568e Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Tue, 21 Oct 2025 17:10:51 +1100
+Subject: [PATCH 20/21] wifi: mac80211: get probe response chan via
+ ieee80211_get_channel_khz
+
+Make use of ieee80211_get_channel_khz() rather then the MHz counterpart
+to ensure probe responses received on an S1G channel pass the check.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20251021061051.235258-1-lachlan.hodges@morsemicro.com
+[modify indentation]
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ net/mac80211/mlme.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+--- a/net/mac80211/mlme.c
++++ b/net/mac80211/mlme.c
+@@ -5999,8 +5999,8 @@ static void ieee80211_rx_mgmt_probe_resp
+ 	 * Response frame shall be set to the broadcast address [..]"
+ 	 * So, on 6GHz band we should also accept broadcast responses.
+ 	 */
+-	channel = ieee80211_get_channel(sdata->local->hw.wiphy,
+-					rx_status->freq);
++	channel = ieee80211_get_channel_khz(sdata->local->hw.wiphy,
++					    ieee80211_rx_status_to_khz(rx_status));
+ 	if (!channel)
+ 		return;
+ 

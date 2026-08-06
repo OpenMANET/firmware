@@ -1,0 +1,75 @@
+From 5ea255673cdb4a9bf99dd3e4fc9ca1089f5692a3 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Tue, 17 Jun 2025 18:06:07 +1000
+Subject: [PATCH 03/21] wifi: cfg80211: support configuration of S1G station
+ capabilities
+
+Currently there is no support for initialising a peers S1G capabilities,
+this patch adds support for configuring an S1G station.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250617080610.756048-2-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/net/cfg80211.h | 4 +++-
+ net/wireless/nl80211.c | 8 ++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index 0003733b1e77..4a092da3a9de 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -560,7 +560,7 @@ struct ieee80211_sta_s1g_cap {
+  * @vht_cap: VHT capabilities in this band
+  * @s1g_cap: S1G capabilities in this band
+  * @edmg_cap: EDMG capabilities in this band
+- * @s1g_cap: S1G capabilities in this band (S1B band only, of course)
++ * @s1g_cap: S1G capabilities in this band (S1G band only, of course)
+  * @n_iftype_data: number of iftype data entries
+  * @iftype_data: interface type data entries.  Note that the bits in
+  *	@types_mask inside this structure cannot overlap (i.e. only
+@@ -1653,6 +1653,7 @@ struct sta_txpwr {
+  * @he_6ghz_capa: HE 6 GHz Band capabilities of station
+  * @eht_capa: EHT capabilities of station
+  * @eht_capa_len: the length of the EHT capabilities
++ * @s1g_capa: S1G capabilities of station
+  */
+ struct link_station_parameters {
+ 	const u8 *mld_mac;
+@@ -1671,6 +1672,7 @@ struct link_station_parameters {
+ 	const struct ieee80211_he_6ghz_capa *he_6ghz_capa;
+ 	const struct ieee80211_eht_cap_elem *eht_capa;
+ 	u8 eht_capa_len;
++	const struct ieee80211_s1g_cap *s1g_capa;
+ };
+ 
+ /**
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index 70bfe2bfdcc7..70ca74a75f22 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -7856,6 +7856,10 @@ static int nl80211_set_station_tdls(struct genl_info *info,
+ 		}
+ 	}
+ 
++	if (info->attrs[NL80211_ATTR_S1G_CAPABILITY])
++		params->link_sta_params.s1g_capa =
++			nla_data(info->attrs[NL80211_ATTR_S1G_CAPABILITY]);
++
+ 	err = nl80211_parse_sta_channel_info(info, params);
+ 	if (err)
+ 		return err;
+@@ -8182,6 +8186,10 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
+ 		params.link_sta_params.he_6ghz_capa =
+ 			nla_data(info->attrs[NL80211_ATTR_HE_6GHZ_CAPABILITY]);
+ 
++	if (info->attrs[NL80211_ATTR_S1G_CAPABILITY])
++		params.link_sta_params.s1g_capa =
++			nla_data(info->attrs[NL80211_ATTR_S1G_CAPABILITY]);
++
+ 	if (info->attrs[NL80211_ATTR_OPMODE_NOTIF]) {
+ 		params.link_sta_params.opmode_notif_used = true;
+ 		params.link_sta_params.opmode_notif =
+-- 
+2.50.1
+

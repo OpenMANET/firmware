@@ -1,0 +1,42 @@
+From 037dc18ac3fb8f46c72057411d7011a5baaab559 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Tue, 17 Jun 2025 18:06:09 +1000
+Subject: [PATCH 05/21] wifi: mac80211: add support for storing station S1G
+ capabilities
+
+When a station configuration is updated, update the stations
+S1G capabilities.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250617080610.756048-4-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ net/mac80211/cfg.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/net/mac80211/cfg.c b/net/mac80211/cfg.c
+index cc366d79d49a..56540c3701ed 100644
+--- a/net/mac80211/cfg.c
++++ b/net/mac80211/cfg.c
+@@ -1895,6 +1895,7 @@ static int sta_link_apply_parameters(struct ieee80211_local *local,
+ 		       params->vht_capa ||
+ 		       params->he_capa ||
+ 		       params->eht_capa ||
++		       params->s1g_capa ||
+ 		       params->opmode_notif_used;
+ 
+ 	switch (mode) {
+@@ -1973,6 +1974,10 @@ static int sta_link_apply_parameters(struct ieee80211_local *local,
+ 						    params->eht_capa_len,
+ 						    link_sta);
+ 
++	if (params->s1g_capa)
++		ieee80211_s1g_cap_to_sta_s1g_cap(sdata, params->s1g_capa,
++						 link_sta);
++
+ 	ieee80211_sta_init_nss(link_sta);
+ 
+ 	if (params->opmode_notif_used) {
+-- 
+2.50.1
+

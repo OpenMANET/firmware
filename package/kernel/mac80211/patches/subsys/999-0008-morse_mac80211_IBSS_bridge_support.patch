@@ -1,0 +1,33 @@
+--- a/net/wireless/core.c
++++ b/net/wireless/core.c
+@@ -1327,8 +1327,8 @@ void cfg80211_init_wdev(struct wireless_
+ 	wdev->ps_timeout = -1;
+ 
+ 	if ((wdev->iftype == NL80211_IFTYPE_STATION ||
+-	     wdev->iftype == NL80211_IFTYPE_P2P_CLIENT ||
+-	     wdev->iftype == NL80211_IFTYPE_ADHOC) && !wdev->use_4addr)
++	     wdev->iftype == NL80211_IFTYPE_P2P_CLIENT) &&
++        !wdev->use_4addr)
+ 		wdev->netdev->priv_flags |= IFF_DONT_BRIDGE;
+ 
+ 	INIT_WORK(&wdev->disconnect_wk, cfg80211_autodisconnect_wk);
+--- a/net/wireless/util.c
++++ b/net/wireless/util.c
+@@ -1164,7 +1164,6 @@ int cfg80211_change_iface(struct cfg8021
+ 			fallthrough;
+ 		case NL80211_IFTYPE_OCB:
+ 		case NL80211_IFTYPE_P2P_CLIENT:
+-		case NL80211_IFTYPE_ADHOC:
+ 			dev->priv_flags |= IFF_DONT_BRIDGE;
+ 			break;
+ 		case NL80211_IFTYPE_P2P_GO:
+@@ -1185,6 +1184,9 @@ int cfg80211_change_iface(struct cfg8021
+ 		case NL80211_IFTYPE_NAN:
+ 			WARN_ON(1);
+ 			break;
++		case NL80211_IFTYPE_ADHOC:
++			/*None to do*/
++			break;
+ 		}
+ 	}
+ 

@@ -1,0 +1,51 @@
+From f16c2766a4054a508c7e1ca9b6ecad1381b28133 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Fri, 9 Jan 2026 14:30:07 +1100
+Subject: [PATCH wireless-next] wifi: cfg80211: include S1G_NO_PRIMARY flag
+ when sending channel
+
+When sending a channel ensure we include the IEEE80211_CHAN_S1G_NO_PRIMARY
+flag.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+---
+ include/uapi/linux/nl80211.h | 4 ++++
+ net/wireless/nl80211.c       | 3 +++
+ 2 files changed, 7 insertions(+)
+
+Index: backports-6.12.61/include/uapi/linux/nl80211.h
+===================================================================
+--- backports-6.12.61.orig/include/uapi/linux/nl80211.h
++++ backports-6.12.61/include/uapi/linux/nl80211.h
+@@ -4344,6 +4344,9 @@ enum nl80211_wmm_rule {
+  *	channel in current regulatory domain.
+  * @NL80211_FREQUENCY_ATTR_NO_16MHZ: 16 MHz operation is not allowed on this
+  *	channel in current regulatory domain.
++ * @NL80211_FREQUENCY_ATTR_S1G_NO_PRIMARY: Channel is not permitted for use
++ *	as a primary channel. Does not prevent the channel from existing
++ *	as a non-primary subchannel. Only applicable to S1G channels.
+  * @NL80211_FREQUENCY_ATTR_MAX: highest frequency attribute number
+  *	currently defined
+  * @__NL80211_FREQUENCY_ATTR_AFTER_LAST: internal use
+@@ -4392,6 +4395,7 @@ enum nl80211_frequency_attr {
+ 	NL80211_FREQUENCY_ATTR_NO_4MHZ,
+ 	NL80211_FREQUENCY_ATTR_NO_8MHZ,
+ 	NL80211_FREQUENCY_ATTR_NO_16MHZ,
++	NL80211_FREQUENCY_ATTR_S1G_NO_PRIMARY,
+ 
+ 	/* keep last */
+ 	__NL80211_FREQUENCY_ATTR_AFTER_LAST,
+Index: backports-6.12.61/net/wireless/nl80211.c
+===================================================================
+--- backports-6.12.61.orig/net/wireless/nl80211.c
++++ backports-6.12.61/net/wireless/nl80211.c
+@@ -1245,6 +1245,9 @@ static int nl80211_msg_put_channel(struc
+ 		if ((chan->flags & IEEE80211_CHAN_NO_16MHZ) &&
+ 		    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_NO_16MHZ))
+ 			goto nla_put_failure;
++		if ((chan->flags & IEEE80211_CHAN_S1G_NO_PRIMARY) &&
++		    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_S1G_NO_PRIMARY))
++			goto nla_put_failure;
+ 	}
+ 
+ 	if (nla_put_u32(msg, NL80211_FREQUENCY_ATTR_MAX_TX_POWER,

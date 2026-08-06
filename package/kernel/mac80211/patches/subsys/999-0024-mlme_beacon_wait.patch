@@ -1,0 +1,45 @@
+*** a/net/mac80211/mlme.c
+--- b/net/mac80211/mlme.c
+***************
+*** 67,72 ****
+--- 67,80 ----
+  		 "Number of beacon intervals before we decide beacon was lost.");
+  
+  /*
++  * Number of beacon intervals to wait for a beacon at association.
++  */
++ static int beacon_wait_count = 1;
++ module_param(beacon_wait_count, int, 0644);
++ MODULE_PARM_DESC(beacon_wait_count,
++ 		 "Number of beacon intervals to wait for a beacon at association.");
++ 
++ /*
+   * Time the connection can be idle before we probe
+   * it to see if we can still talk to the AP.
+   */
+***************
+*** 7734,7744 ****
+  		if (!beacon_ies) {
+  			/*
+  			 * Wait up to one beacon interval ...
+! 			 * should this be more if we miss one?
+  			 */
+  			sdata_info(sdata, "waiting for beacon from %pM\n",
+  				   link->u.mgd.bssid);
+! 			assoc_data->timeout = TU_TO_EXP_TIME(req->bss->beacon_interval);
+  			assoc_data->timeout_started = true;
+  			assoc_data->need_beacon = true;
+  		}
+--- 7742,7753 ----
+  		if (!beacon_ies) {
+  			/*
+  			 * Wait up to one beacon interval ...
+! 			 * Beacon periods to wait can be set via modparam
+  			 */
+  			sdata_info(sdata, "waiting for beacon from %pM\n",
+  				   link->u.mgd.bssid);
+! 			assoc_data->timeout = TU_TO_EXP_TIME(beacon_wait_count *
+! 				req->bss->beacon_interval);
+  			assoc_data->timeout_started = true;
+  			assoc_data->need_beacon = true;
+  		}

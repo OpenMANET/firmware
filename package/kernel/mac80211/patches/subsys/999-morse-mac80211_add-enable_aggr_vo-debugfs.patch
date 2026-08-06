@@ -1,0 +1,90 @@
+#Subject: [PATCH] debugfs: Add read/write support for enabling aggregation on VO TID
+
+#This patch introduces a debugfs interface to enable or disable 
+#aggregation on the Voice (VO) Traffic Identifier (TID) for a 
+#specific station (STA). The interface allows users to inspect 
+#and modify the `enable_aggr_vo` flag through debugfs.
+
+# New debugfs entries:
+#- `enable_aggr_vo`: 
+#  - **Read**: Returns `1` if aggregation for voice is enabled, `0`  therwise.
+#  - **Write**: Accepts `0` to disable and `1` to enable aggregation of voice traffic.
+
+--- a/net/mac80211/debugfs_sta.c
++++ b/net/mac80211/debugfs_sta.c
+@@ -1231,6 +1231,43 @@ out:
+ }
+ LINK_STA_OPS(eht_capa);
+ 
++static ssize_t sta_enable_aggr_vo_read(struct file *file, char __user *userbuf,
++				size_t count, loff_t *ppos)
++{
++	struct sta_info *sta = file->private_data;
++	char buf[5];
++
++	snprintf(buf, sizeof(buf), "%d\n", sta->enable_aggr_vo ? 1 : 0);
++	return simple_read_from_buffer(userbuf, count, ppos, buf, strlen(buf));
++}
++
++static ssize_t sta_enable_aggr_vo_write(struct file *file, const char __user *userbuf,
++				size_t count, loff_t *ppos)
++{
++	struct sta_info *sta = file->private_data;
++	char buf[5];
++	int val;
++
++	if (count >= sizeof(buf))
++		return -EINVAL;
++
++	if (copy_from_user(buf, userbuf, count))
++		return -EFAULT;
++
++	buf[count] = '\0';
++
++	if (kstrtoint(buf, 10, &val))
++		return -EINVAL;
++
++	if (val != 0 && val != 1) // Ensure it's strictly 0 or 1
++		return -EINVAL;
++
++	sta->enable_aggr_vo = val;
++	return count;
++}
++STA_OPS_RW(enable_aggr_vo);
++
++
+ #define DEBUGFS_ADD(name) \
+ 	debugfs_create_file(#name, 0400, \
+ 		sta->debugfs_dir, sta, &sta_ ##name## _ops)
+@@ -1260,6 +1297,7 @@ void ieee80211_sta_debugfs_add(struct st
+ 	DEBUGFS_ADD(num_ps_buf_frames);
+ 	DEBUGFS_ADD(last_seq_ctrl);
+ 	DEBUGFS_ADD(agg_status);
++	DEBUGFS_ADD(enable_aggr_vo);
+ 	/* FIXME: Kept here as the statistics are only done on the deflink */
+ 	DEBUGFS_ADD_COUNTER(tx_filtered, deflink.status_stats.filtered);
+ 
+ 	if (wiphy_ext_feature_isset(local->hw.wiphy,
+ 				    NL80211_EXT_FEATURE_AQL))
+--- a/net/mac80211/sta_info.h
++++ b/net/mac80211/sta_info.h
+@@ -728,6 +728,8 @@ struct sta_info {
+ 	struct link_sta_info deflink;
+ 	struct link_sta_info __rcu *link[IEEE80211_MLD_MAX_NUM_LINKS];
+ 
++	bool enable_aggr_vo;
++
+ 	/* keep last! */
+ 	struct ieee80211_sta sta;
+ };
+--- a/net/mac80211/tx.c
++++ b/net/mac80211/tx.c
+@@ -1185,7 +1185,7 @@ void ieee80211_aggr_check(struct ieee802
+ 	if (!sta || 
+ 	    (!sta->sta.valid_links && !sta->sta.deflink.ht_cap.ht_supported &&
+ 	     !sta->sta.deflink.s1g_cap.s1g) ||
+-	    !sta->sta.wme || skb_get_queue_mapping(skb) == IEEE80211_AC_VO ||
++	    !sta->sta.wme || (skb_get_queue_mapping(skb) == IEEE80211_AC_VO && (!sta->enable_aggr_vo) )||
+ 	    skb->protocol == sdata->control_port_protocol)
+ 		return;
+ 

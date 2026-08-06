@@ -1,0 +1,380 @@
+From e0c47c6229c25b54440fe1f84a0ff533942290b1 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Fri, 25 Jul 2025 23:22:20 +1000
+Subject: [PATCH 15/21] wifi: mac80211: support parsing S1G TIM PVB
+
+An S1G TIM PVB has 3 mandatory encoding modes, that being
+block bitmap, single AID and OBL alongside the ability for
+each encoding mode to be inverted. Introduce the ability to
+parse the 3 encoding formats. The implementation specification
+for the encoding formats can be found in IEEE80211-2024 9.4.2.5.
+
+Signed-off-by: Arien Judge <arien.judge@morsemicro.com>
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250725132221.258217-3-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ drivers/net/wireless/ath/carl9170/rx.c        |   2 +-
+ drivers/net/wireless/intersil/p54/txrx.c      |   2 +-
+ .../net/wireless/ralink/rt2x00/rt2x00dev.c    |   2 +-
+ drivers/net/wireless/realtek/rtlwifi/ps.c     |   2 +-
+ include/linux/ieee80211.h                     | 265 +++++++++++++++++-
+ net/mac80211/mesh_ps.c                        |   2 +-
+ net/mac80211/mlme.c                           |   3 +-
+ 7 files changed, 263 insertions(+), 15 deletions(-)
+
+--- a/drivers/net/wireless/ath/carl9170/rx.c
++++ b/drivers/net/wireless/ath/carl9170/rx.c
+@@ -555,7 +555,7 @@ static void carl9170_ps_beacon(struct ar
+ 	/* Check whenever the PHY can be turned off again. */
+ 
+ 	/* 1. What about buffered unicast traffic for our AID? */
+-	cam = ieee80211_check_tim(tim_ie, tim_len, ar->common.curaid);
++	cam = ieee80211_check_tim(tim_ie, tim_len, ar->common.curaid, false);
+ 
+ 	/* 2. Maybe the AP wants to send multicast/broadcast data? */
+ 	cam |= !!(tim_ie->bitmap_ctrl & 0x01);
+--- a/drivers/net/wireless/intersil/p54/txrx.c
++++ b/drivers/net/wireless/intersil/p54/txrx.c
+@@ -317,7 +317,7 @@ static void p54_pspoll_workaround(struct
+ 	tim_len = tim[1];
+ 	tim_ie = (struct ieee80211_tim_ie *) &tim[2];
+ 
+-	new_psm = ieee80211_check_tim(tim_ie, tim_len, priv->aid);
++	new_psm = ieee80211_check_tim(tim_ie, tim_len, priv->aid, false);
+ 	if (new_psm != priv->powersave_override) {
+ 		priv->powersave_override = new_psm;
+ 		p54_set_ps(priv);
+--- a/drivers/net/wireless/ralink/rt2x00/rt2x00dev.c
++++ b/drivers/net/wireless/ralink/rt2x00/rt2x00dev.c
+@@ -679,7 +679,7 @@ static void rt2x00lib_rxdone_check_ps(st
+ 	/* Check whenever the PHY can be turned off again. */
+ 
+ 	/* 1. What about buffered unicast traffic for our AID? */
+-	cam = ieee80211_check_tim(tim_ie, tim_len, rt2x00dev->aid);
++	cam = ieee80211_check_tim(tim_ie, tim_len, rt2x00dev->aid, false);
+ 
+ 	/* 2. Maybe the AP wants to send multicast/broadcast data? */
+ 	cam |= (tim_ie->bitmap_ctrl & 0x01);
+--- a/drivers/net/wireless/realtek/rtlwifi/ps.c
++++ b/drivers/net/wireless/realtek/rtlwifi/ps.c
+@@ -519,7 +519,7 @@ void rtl_swlps_beacon(struct ieee80211_h
+ 
+ 	/* 1. What about buffered unicast traffic for our AID? */
+ 	u_buffed = ieee80211_check_tim(tim_ie, tim_len,
+-				       rtlpriv->mac80211.assoc_id);
++				       rtlpriv->mac80211.assoc_id, false);
+ 
+ 	/* 2. Maybe the AP wants to send multicast/broadcast data? */
+ 	m_buffed = tim_ie->bitmap_ctrl & 0x01;
+--- a/include/linux/ieee80211.h
++++ b/include/linux/ieee80211.h
+@@ -220,6 +220,12 @@ static inline u16 ieee80211_sn_sub(u16 s
+ #define IEEE80211_MAX_AID_S1G		8191
+ #define IEEE80211_MAX_TIM_LEN		251
+ #define IEEE80211_MAX_MESH_PEERINGS	63
++
++/* S1G encoding types */
++#define IEEE80211_S1G_TIM_ENC_MODE_BLOCK	0
++#define IEEE80211_S1G_TIM_ENC_MODE_SINGLE	1
++#define IEEE80211_S1G_TIM_ENC_MODE_OLB		2
++
+ /* Maximum size for the MA-UNITDATA primitive, 802.11 standard section
+    6.2.1.1.2.
+ 
+@@ -4687,15 +4693,8 @@ static inline unsigned long ieee80211_tu
+ 	return 1024 * tu;
+ }
+ 
+-/**
+- * ieee80211_check_tim - check if AID bit is set in TIM
+- * @tim: the TIM IE
+- * @tim_len: length of the TIM IE
+- * @aid: the AID to look for
+- * Return: whether or not traffic is indicated in the TIM for the given AID
+- */
+-static inline bool ieee80211_check_tim(const struct ieee80211_tim_ie *tim,
+-				       u8 tim_len, u16 aid)
++static inline bool __ieee80211_check_tim(const struct ieee80211_tim_ie *tim,
++					 u8 tim_len, u16 aid)
+ {
+ 	u8 mask;
+ 	u8 index, indexn1, indexn2;
+@@ -4718,6 +4717,254 @@ static inline bool ieee80211_check_tim(c
+ 	return !!(tim->virtual_map[index] & mask);
+ }
+ 
++struct s1g_tim_aid {
++	u16 aid;
++	u8 target_blk; /* Target block index */
++	u8 target_subblk; /* Target subblock index */
++	u8 target_subblk_bit; /* Target subblock bit */
++};
++
++struct s1g_tim_enc_block {
++	u8 enc_mode;
++	bool inverse;
++	const u8 *ptr;
++	u8 len;
++
++	/*
++	 * For an OLB encoded block that spans multiple blocks, this
++	 * is the offset into the span described by that encoded block.
++	 */
++	u8 olb_blk_offset;
++};
++
++/*
++ * Helper routines to quickly extract the length of an encoded block. Validation
++ * is also performed to ensure the length extracted lies within the TIM.
++ */
++
++static inline int ieee80211_s1g_len_bitmap(const u8 *ptr, const u8 *end)
++{
++	u8 blkmap;
++	u8 n_subblks;
++
++	if (ptr >= end)
++		return -EINVAL;
++
++	blkmap = *ptr;
++	n_subblks = hweight8(blkmap);
++
++	if (ptr + 1 + n_subblks > end)
++		return -EINVAL;
++
++	return 1 + n_subblks;
++}
++
++static inline int ieee80211_s1g_len_single(const u8 *ptr, const u8 *end)
++{
++	return (ptr + 1 > end) ? -EINVAL : 1;
++}
++
++static inline int ieee80211_s1g_len_olb(const u8 *ptr, const u8 *end)
++{
++	if (ptr >= end)
++		return -EINVAL;
++
++	return (ptr + 1 + *ptr > end) ? -EINVAL : 1 + *ptr;
++}
++
++/*
++ * Enumerate all encoded blocks until we find the encoded block that describes
++ * our target AID. OLB is a special case as a single encoded block can describe
++ * multiple blocks as a single encoded block.
++ */
++static inline int ieee80211_s1g_find_target_block(struct s1g_tim_enc_block *enc,
++						  const struct s1g_tim_aid *aid,
++						  const u8 *ptr, const u8 *end)
++{
++	/* need at least block-control octet */
++	while (ptr + 1 <= end) {
++		u8 ctrl = *ptr++;
++		u8 mode = ctrl & 0x03;
++		bool contains, inverse = ctrl & BIT(2);
++		u8 span, blk_off = ctrl >> 3;
++		int len;
++
++		switch (mode) {
++		case IEEE80211_S1G_TIM_ENC_MODE_BLOCK:
++			len = ieee80211_s1g_len_bitmap(ptr, end);
++			contains = blk_off == aid->target_blk;
++			break;
++		case IEEE80211_S1G_TIM_ENC_MODE_SINGLE:
++			len = ieee80211_s1g_len_single(ptr, end);
++			contains = blk_off == aid->target_blk;
++			break;
++		case IEEE80211_S1G_TIM_ENC_MODE_OLB:
++			len = ieee80211_s1g_len_olb(ptr, end);
++			/*
++			 * An OLB encoded block can describe more then one
++			 * block, meaning an encoded OLB block can span more
++			 * then a single block.
++			 */
++			if (len > 0) {
++				/* Minus one for the length octet */
++				span = DIV_ROUND_UP(len - 1, 8);
++				/*
++				 * Check if our target block lies within the
++				 * block span described by this encoded block.
++				 */
++				contains = (aid->target_blk >= blk_off) &&
++					   (aid->target_blk < blk_off + span);
++			}
++			break;
++		default:
++			return -EOPNOTSUPP;
++		}
++
++		if (len < 0)
++			return len;
++
++		if (contains) {
++			enc->enc_mode = mode;
++			enc->inverse = inverse;
++			enc->ptr = ptr;
++			enc->len = (u8)len;
++			enc->olb_blk_offset = blk_off;
++			return 0;
++		}
++
++		ptr += len;
++	}
++
++	return -ENOENT;
++}
++
++static inline bool ieee80211_s1g_parse_bitmap(struct s1g_tim_enc_block *enc,
++					      struct s1g_tim_aid *aid)
++{
++	const u8 *ptr = enc->ptr;
++	u8 blkmap = *ptr++;
++
++	/*
++	 * If our block bitmap does not contain a set bit that corresponds
++	 * to our AID, it could mean a variety of things depending on if
++	 * the encoding mode is inverted or not.
++	 *
++	 * 1. If inverted, it means the entire subblock is present and hence
++	 *    our AID has been set.
++	 * 2. If not inverted, it means our subblock is not present and hence
++	 *    it is all zero meaning our AID is not set.
++	 */
++	if (!(blkmap & BIT(aid->target_subblk)))
++		return enc->inverse;
++
++	/*
++	 * Increment ptr by the number of set subblocks that appear before our
++	 * target subblock. If our target subblock is 0, do nothing as ptr
++	 * already points to our target subblock.
++	 */
++	if (aid->target_subblk)
++		ptr += hweight8(blkmap & GENMASK(aid->target_subblk - 1, 0));
++
++	return !!(*ptr & BIT(aid->target_subblk_bit)) ^ enc->inverse;
++}
++
++static inline bool ieee80211_s1g_parse_single(struct s1g_tim_enc_block *enc,
++					      struct s1g_tim_aid *aid)
++{
++	/*
++	 * Single AID mode describes, as the name suggests, a single AID
++	 * within the block described by the encoded block. The octet
++	 * contains the 6 LSBs of the AID described in the block. The other
++	 * 2 bits are reserved. When inversed, every single AID described
++	 * by the current block have buffered traffic except for the AID
++	 * described in the single AID octet.
++	 */
++	return ((*enc->ptr & 0x3f) == (aid->aid & 0x3f)) ^ enc->inverse;
++}
++
++static inline bool ieee80211_s1g_parse_olb(struct s1g_tim_enc_block *enc,
++					   struct s1g_tim_aid *aid)
++{
++	const u8 *ptr = enc->ptr;
++	u8 blk_len = *ptr++;
++	/*
++	 * Given an OLB encoded block that describes multiple blocks,
++	 * calculate the offset into the span. Then calculate the
++	 * subblock location normally.
++	 */
++	u16 span_offset = aid->target_blk - enc->olb_blk_offset;
++	u16 subblk_idx = span_offset * 8 + aid->target_subblk;
++
++	if (subblk_idx >= blk_len)
++		return enc->inverse;
++
++	return !!(ptr[subblk_idx] & BIT(aid->target_subblk_bit)) ^ enc->inverse;
++}
++
++/*
++ * An S1G PVB has 3 non optional encoding types, each that can be inverted.
++ * An S1G PVB is constructed with zero or more encoded block subfields. Each
++ * encoded block represents a single "block" of AIDs (64), and each encoded
++ * block can contain one of the 3 encoding types alongside a single bit for
++ * whether the bits should be inverted.
++ *
++ * As the standard makes no guarantee about the ordering of encoded blocks,
++ * we must parse every encoded block in the worst case scenario given an
++ * AID that lies within the last block.
++ */
++static inline bool ieee80211_s1g_check_tim(const struct ieee80211_tim_ie *tim,
++					   u8 tim_len, u16 aid)
++{
++	int err;
++	struct s1g_tim_aid target_aid;
++	struct s1g_tim_enc_block enc_blk;
++
++	if (tim_len < 3)
++		return false;
++
++	target_aid.aid = aid;
++	target_aid.target_blk = (aid >> 6) & 0x1f;
++	target_aid.target_subblk = (aid >> 3) & 0x7;
++	target_aid.target_subblk_bit = aid & 0x7;
++
++	/*
++	 * Find our AIDs target encoded block and fill &enc_blk with the
++	 * encoded blocks information. If no entry is found or an error
++	 * occurs return false.
++	 */
++	err = ieee80211_s1g_find_target_block(&enc_blk, &target_aid,
++					      tim->virtual_map,
++					      (const u8 *)tim + tim_len + 2);
++	if (err)
++		return false;
++
++	switch (enc_blk.enc_mode) {
++	case IEEE80211_S1G_TIM_ENC_MODE_BLOCK:
++		return ieee80211_s1g_parse_bitmap(&enc_blk, &target_aid);
++	case IEEE80211_S1G_TIM_ENC_MODE_SINGLE:
++		return ieee80211_s1g_parse_single(&enc_blk, &target_aid);
++	case IEEE80211_S1G_TIM_ENC_MODE_OLB:
++		return ieee80211_s1g_parse_olb(&enc_blk, &target_aid);
++	default:
++		return false;
++	}
++}
++
++/**
++ * ieee80211_check_tim - check if AID bit is set in TIM
++ * @tim: the TIM IE
++ * @tim_len: length of the TIM IE
++ * @aid: the AID to look for
++ * @s1g: whether the TIM is from an S1G PPDU
++ * Return: whether or not traffic is indicated in the TIM for the given AID
++ */
++static inline bool ieee80211_check_tim(const struct ieee80211_tim_ie *tim,
++				       u8 tim_len, u16 aid, bool s1g)
++{
++	return s1g ? ieee80211_s1g_check_tim(tim, tim_len, aid) :
++		     __ieee80211_check_tim(tim, tim_len, aid);
++}
++
+ /**
+  * ieee80211_get_tdls_action - get TDLS action code
+  * @skb: the skb containing the frame, length will not be checked
+--- a/net/mac80211/mesh_ps.c
++++ b/net/mac80211/mesh_ps.c
+@@ -586,7 +586,7 @@ void ieee80211_mps_frame_release(struct
+ 
+ 	if (sta->mesh->plink_state == NL80211_PLINK_ESTAB)
+ 		has_buffered = ieee80211_check_tim(elems->tim, elems->tim_len,
+-						   sta->mesh->aid);
++						   sta->mesh->aid, false);
+ 
+ 	if (has_buffered)
+ 		mps_dbg(sta->sdata, "%pM indicates buffered frames\n",
+--- a/net/mac80211/mlme.c
++++ b/net/mac80211/mlme.c
+@@ -6832,7 +6832,8 @@ static void ieee80211_rx_mgmt_beacon(str
+ 	ncrc = elems->crc;
+ 
+ 	if (ieee80211_hw_check(&local->hw, PS_NULLFUNC_STACK) &&
+-	    ieee80211_check_tim(elems->tim, elems->tim_len, vif_cfg->aid)) {
++	    ieee80211_check_tim(elems->tim, elems->tim_len, vif_cfg->aid,
++				vif_cfg->s1g)) {
+ 		if (local->hw.conf.dynamic_ps_timeout > 0) {
+ 			if (local->hw.conf.flags & IEEE80211_CONF_PS) {
+ 				local->hw.conf.flags &= ~IEEE80211_CONF_PS;

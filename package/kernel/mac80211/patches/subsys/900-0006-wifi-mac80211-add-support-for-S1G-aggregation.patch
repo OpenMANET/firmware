@@ -1,0 +1,64 @@
+From a50522962453b75eb34de581c604850fab7bedac Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Tue, 17 Jun 2025 18:06:10 +1000
+Subject: [PATCH 06/21] wifi: mac80211: add support for S1G aggregation
+
+Allow an S1G station to use aggregation.
+
+Signed-off-by: Sophronia Koilpillai <sophronia.koilpillai@morsemicro.com>
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250617080610.756048-5-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ net/mac80211/agg-rx.c | 6 ++++--
+ net/mac80211/agg-tx.c | 3 ++-
+ net/mac80211/tx.c     | 3 ++-
+ 3 files changed, 8 insertions(+), 4 deletions(-)
+
+--- a/net/mac80211/agg-rx.c
++++ b/net/mac80211/agg-rx.c
+@@ -259,7 +259,8 @@ void __ieee80211_start_rx_ba_session(str
+ 	}
+ 
+ 	if (!sta->sta.deflink.ht_cap.ht_supported &&
+-	    !sta->sta.deflink.he_cap.has_he) {
++	    !sta->sta.deflink.he_cap.has_he &&
++	    !sta->sta.deflink.s1g_cap.s1g) {
+ 		ht_dbg(sta->sdata,
+ 		       "STA %pM erroneously requests BA session on tid %d w/o HT\n",
+ 		       sta->sta.addr, tid);
+@@ -286,7 +287,8 @@ void __ieee80211_start_rx_ba_session(str
+ 	 * and if buffer size does not exceeds max value */
+ 	/* XXX: check own ht delayed BA capability?? */
+ 	if (((ba_policy != 1) &&
+-	     (!(sta->sta.deflink.ht_cap.cap & IEEE80211_HT_CAP_DELAY_BA))) ||
++	     (!(sta->sta.deflink.ht_cap.cap & IEEE80211_HT_CAP_DELAY_BA) ||
++	     !(sta->sta.deflink.s1g_cap.cap[3] & S1G_CAP3_HT_DELAYED_BA))) ||
+ 	    (buf_size > max_buf_size)) {
+ 		status = WLAN_STATUS_INVALID_QOS_PARAM;
+ 		ht_dbg_ratelimited(sta->sdata,
+--- a/net/mac80211/agg-tx.c
++++ b/net/mac80211/agg-tx.c
+@@ -605,7 +605,8 @@ int ieee80211_start_tx_ba_session(struct
+ 	if (!pubsta->deflink.ht_cap.ht_supported &&
+ 	    !pubsta->deflink.vht_cap.vht_supported &&
+ 	    !pubsta->deflink.he_cap.has_he &&
+-	    !pubsta->deflink.eht_cap.has_eht)
++	    !pubsta->deflink.eht_cap.has_eht &&
++	    !pubsta->deflink.s1g_cap.s1g)
+ 		return -EINVAL;
+ 
+ 	if (WARN_ON_ONCE(!local->ops->ampdu_action))
+--- a/net/mac80211/tx.c
++++ b/net/mac80211/tx.c
+@@ -1182,7 +1182,9 @@ void ieee80211_aggr_check(struct ieee802
+ 	if (!ref || !(ref->ops->capa & RATE_CTRL_CAPA_AMPDU_TRIGGER))
+ 		return;
+ 
+-	if (!sta || !sta->sta.deflink.ht_cap.ht_supported ||
++	if (!sta || 
++	    (!sta->sta.valid_links && !sta->sta.deflink.ht_cap.ht_supported &&
++	     !sta->sta.deflink.s1g_cap.s1g) ||
+ 	    !sta->sta.wme || skb_get_queue_mapping(skb) == IEEE80211_AC_VO ||
+ 	    skb->protocol == sdata->control_port_protocol)
+ 		return;

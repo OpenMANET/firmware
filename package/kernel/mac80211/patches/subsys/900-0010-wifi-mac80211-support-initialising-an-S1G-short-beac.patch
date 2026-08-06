@@ -1,0 +1,199 @@
+From bbf93a06d73505591db3a93797f44b9c44555d9b Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Thu, 17 Jul 2025 17:42:03 +1000
+Subject: [PATCH 10/21] wifi: mac80211: support initialising an S1G short
+ beaconing BSS
+
+Introduce the ability to parse the short beacon data and long
+beacon period. The long beacon period represents the number of beacon
+intervals between each long beacon transmission. Additionally,
+as a BSS cannot change its configuration such that short beaconing
+is dynamically disabled/enabled without tearing down the interface
+- we ensure we have an existing short beacon before performing
+the update.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250717074205.312577-3-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/net/mac80211.h     |  4 +++
+ net/mac80211/cfg.c         | 66 ++++++++++++++++++++++++++++++++++++--
+ net/mac80211/ieee80211_i.h |  9 ++++++
+ 3 files changed, 77 insertions(+), 2 deletions(-)
+
+--- a/include/net/mac80211.h
++++ b/include/net/mac80211.h
+@@ -740,6 +740,8 @@ struct ieee80211_parsed_tpe {
+  * @eht_80mhz_full_bw_ul_mumimo: in AP-mode, does this BSS support the
+  *	reception of an EHT TB PPDU on an RU that spans the entire PPDU
+  *	bandwidth
++ * @s1g_long_beacon_period: number of beacon intervals between each long
++ *	beacon transmission.
+  */
+ struct ieee80211_bss_conf {
+ 	struct ieee80211_vif *vif;
+@@ -834,6 +836,8 @@ struct ieee80211_bss_conf {
+ 	bool eht_su_beamformee;
+ 	bool eht_mu_beamformer;
+ 	bool eht_80mhz_full_bw_ul_mumimo;
++
++	u8 s1g_long_beacon_period;
+ };
+ 
+ /**
+--- a/net/mac80211/cfg.c
++++ b/net/mac80211/cfg.c
+@@ -1023,6 +1023,47 @@ ieee80211_set_unsol_bcast_probe_resp(str
+ 	return 0;
+ }
+ 
++static int
++ieee80211_set_s1g_short_beacon(struct ieee80211_sub_if_data *sdata,
++			       struct ieee80211_link_data *link,
++			       struct cfg80211_s1g_short_beacon *params)
++{
++	struct s1g_short_beacon_data *new;
++	struct s1g_short_beacon_data *old =
++		sdata_dereference(link->u.ap.s1g_short_beacon, sdata);
++	size_t new_len =
++		sizeof(*new) + params->short_head_len + params->short_tail_len;
++
++	if (!params->update)
++		return 0;
++
++	if (!params->short_head)
++		return -EINVAL;
++
++	new = kzalloc(new_len, GFP_KERNEL);
++	if (!new)
++		return -ENOMEM;
++
++	/* Memory layout: | struct | head | tail | */
++	new->short_head = (u8 *)new + sizeof(*new);
++	new->short_head_len = params->short_head_len;
++	memcpy(new->short_head, params->short_head, params->short_head_len);
++
++	if (params->short_tail) {
++		new->short_tail = new->short_head + params->short_head_len;
++		new->short_tail_len = params->short_tail_len;
++		memcpy(new->short_tail, params->short_tail,
++		       params->short_tail_len);
++	}
++
++	rcu_assign_pointer(link->u.ap.s1g_short_beacon, new);
++
++	if (old)
++		kfree_rcu(old, rcu_head);
++
++	return 0;
++}
++
+ static int ieee80211_set_ftm_responder_params(
+ 				struct ieee80211_sub_if_data *sdata,
+ 				const u8 *lci, size_t lci_len,
+@@ -1442,8 +1483,8 @@ static int ieee80211_start_ap(struct wip
+ 	link_conf->twt_responder = params->twt_responder;
+ 	link_conf->he_obss_pd = params->he_obss_pd;
+ 	link_conf->he_bss_color = params->beacon.he_bss_color;
+-	sdata->vif.cfg.s1g = params->chandef.chan->band ==
+-				  NL80211_BAND_S1GHZ;
++	link_conf->s1g_long_beacon_period = params->s1g_long_beacon_period;
++	sdata->vif.cfg.s1g = params->chandef.chan->band == NL80211_BAND_S1GHZ;
+ 
+ 	sdata->vif.cfg.ssid_len = params->ssid_len;
+ 	if (params->ssid_len)
+@@ -1490,6 +1531,13 @@ static int ieee80211_start_ap(struct wip
+ 	if (err < 0)
+ 		goto error;
+ 
++	if (sdata->vif.cfg.s1g) {
++		err = ieee80211_set_s1g_short_beacon(sdata, link,
++						     &params->s1g_short_beacon);
++		if (err < 0)
++			goto error;
++	}
++
+ 	err = drv_start_ap(sdata->local, sdata, link_conf);
+ 	if (err) {
+ 		old = sdata_dereference(link->u.ap.beacon, sdata);
+@@ -1568,6 +1616,13 @@ static int ieee80211_change_beacon(struc
+ 	if (err < 0)
+ 		return err;
+ 
++	if (link->u.ap.s1g_short_beacon) {
++		err = ieee80211_set_s1g_short_beacon(sdata, link,
++						     &params->s1g_short_beacon);
++		if (err < 0)
++			return err;
++	}
++
+ 	if (beacon->he_bss_color_valid &&
+ 	    beacon->he_bss_color.enabled != link_conf->he_bss_color.enabled) {
+ 		link_conf->he_bss_color.enabled = beacon->he_bss_color.enabled;
+@@ -1599,6 +1654,7 @@ static int ieee80211_stop_ap(struct wiph
+ 	struct probe_resp *old_probe_resp;
+ 	struct fils_discovery_data *old_fils_discovery;
+ 	struct unsol_bcast_probe_resp_data *old_unsol_bcast_probe_resp;
++	struct s1g_short_beacon_data *old_s1g_short_beacon;
+ 	struct cfg80211_chan_def chandef;
+ 	struct ieee80211_link_data *link =
+ 		sdata_dereference(sdata->link[link_id], sdata);
+@@ -1617,6 +1673,8 @@ static int ieee80211_stop_ap(struct wiph
+ 	old_unsol_bcast_probe_resp =
+ 		sdata_dereference(link->u.ap.unsol_bcast_probe_resp,
+ 				  sdata);
++	old_s1g_short_beacon =
++		sdata_dereference(link->u.ap.s1g_short_beacon, sdata);
+ 
+ 	/* abort any running channel switch or color change */
+ 	link_conf->csa_active = false;
+@@ -1639,6 +1697,7 @@ static int ieee80211_stop_ap(struct wiph
+ 	RCU_INIT_POINTER(link->u.ap.probe_resp, NULL);
+ 	RCU_INIT_POINTER(link->u.ap.fils_discovery, NULL);
+ 	RCU_INIT_POINTER(link->u.ap.unsol_bcast_probe_resp, NULL);
++	RCU_INIT_POINTER(link->u.ap.s1g_short_beacon, NULL);
+ 	kfree_rcu(old_beacon, rcu_head);
+ 	if (old_probe_resp)
+ 		kfree_rcu(old_probe_resp, rcu_head);
+@@ -1646,6 +1705,8 @@ static int ieee80211_stop_ap(struct wiph
+ 		kfree_rcu(old_fils_discovery, rcu_head);
+ 	if (old_unsol_bcast_probe_resp)
+ 		kfree_rcu(old_unsol_bcast_probe_resp, rcu_head);
++	if (old_s1g_short_beacon)
++		kfree_rcu(old_s1g_short_beacon, rcu_head);
+ 
+ 	kfree(link_conf->ftmr_params);
+ 	link_conf->ftmr_params = NULL;
+@@ -1661,6 +1722,7 @@ static int ieee80211_stop_ap(struct wiph
+ 	link_conf->enable_beacon = false;
+ 	sdata->beacon_rate_set = false;
+ 	sdata->vif.cfg.ssid_len = 0;
++	sdata->vif.cfg.s1g = false;
+ 	clear_bit(SDATA_STATE_OFFCHANNEL_BEACON_STOPPED, &sdata->state);
+ 	ieee80211_link_info_change_notify(sdata, link,
+ 					  BSS_CHANGED_BEACON_ENABLED);
+--- a/net/mac80211/ieee80211_i.h
++++ b/net/mac80211/ieee80211_i.h
+@@ -300,6 +300,14 @@ struct unsol_bcast_probe_resp_data {
+ 	u8 data[];
+ };
+ 
++struct s1g_short_beacon_data {
++	struct rcu_head rcu_head;
++	u8 *short_head;
++	u8 *short_tail;
++	int short_head_len;
++	int short_tail_len;
++};
++
+ struct ps_data {
+ 	/* yes, this looks ugly, but guarantees that we can later use
+ 	 * bitmap_empty :)
+@@ -1027,6 +1035,7 @@ struct ieee80211_link_data_ap {
+ 	struct probe_resp __rcu *probe_resp;
+ 	struct fils_discovery_data __rcu *fils_discovery;
+ 	struct unsol_bcast_probe_resp_data __rcu *unsol_bcast_probe_resp;
++	struct s1g_short_beacon_data __rcu *s1g_short_beacon;
+ 
+ 	/* to be used after channel switch. */
+ 	struct cfg80211_beacon_data *next_beacon;
