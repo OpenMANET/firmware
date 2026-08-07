@@ -20,10 +20,8 @@ Signed-off-by: Jonathan Bell <jonathan@raspberrypi.com>
  include/linux/mmc/card.h | 1 +
  3 files changed, 10 insertions(+)
 
-Index: linux-6.6.110/drivers/mmc/core/card.h
-===================================================================
---- linux-6.6.110.orig/drivers/mmc/core/card.h
-+++ linux-6.6.110/drivers/mmc/core/card.h
+--- a/drivers/mmc/core/card.h
++++ b/drivers/mmc/core/card.h
 @@ -298,4 +298,9 @@ static inline int mmc_card_no_uhs_ddr50_
  	return c->quirks & MMC_QUIRK_NO_UHS_DDR50_TUNING;
  }
@@ -34,10 +32,8 @@ Index: linux-6.6.110/drivers/mmc/core/card.h
 +}
 +
  #endif
-Index: linux-6.6.110/drivers/mmc/core/sd.c
-===================================================================
---- linux-6.6.110.orig/drivers/mmc/core/sd.c
-+++ linux-6.6.110/drivers/mmc/core/sd.c
+--- a/drivers/mmc/core/sd.c
++++ b/drivers/mmc/core/sd.c
 @@ -1522,6 +1522,10 @@ cont:
  			goto free_card;
  	}
@@ -49,15 +45,13 @@ Index: linux-6.6.110/drivers/mmc/core/sd.c
  	/* Enable command queueing if supported */
  	if (card->ext_csd.cmdq_support && host->caps2 & MMC_CAP2_CQE) {
  		/*
-Index: linux-6.6.110/include/linux/mmc/card.h
-===================================================================
---- linux-6.6.110.orig/include/linux/mmc/card.h
-+++ linux-6.6.110/include/linux/mmc/card.h
-@@ -299,6 +299,7 @@ struct mmc_card {
+--- a/include/linux/mmc/card.h
++++ b/include/linux/mmc/card.h
+@@ -298,6 +298,7 @@ struct mmc_card {
+ #define MMC_QUIRK_BROKEN_CACHE_FLUSH	(1<<16)	/* Don't flush cache until the write has occurred */
  #define MMC_QUIRK_BROKEN_SD_POWEROFF_NOTIFY	(1<<17) /* Disable broken SD poweroff notify support */
  #define MMC_QUIRK_NO_UHS_DDR50_TUNING	(1<<18) /* Disable DDR50 tuning */
- #define MMC_QUIRK_NO_18V   (1<<19)     /* Ignore voltage negotiation and don't use 1.8v */
-+#define MMC_QUIRK_WORKING_SD_CQ        (1<<30)         /* SD card has known-good CQ implementation */
- #define MMC_QUIRK_ERASE_BROKEN (1<<31)         /* Skip erase */
++#define MMC_QUIRK_WORKING_SD_CQ	(1<<30)		/* SD card has known-good CQ implementation */
+ #define MMC_QUIRK_ERASE_BROKEN	(1<<31)		/* Skip erase */
  
  	bool			written_flag;	/* Indicates eMMC has been written since power on */

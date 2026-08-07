@@ -269,10 +269,8 @@ Signed-off-by: Phil Elwell <phil@raspberrypi.com>
  9 files changed, 1637 insertions(+), 5 deletions(-)
  create mode 100644 drivers/mmc/host/bcm2835-mmc.c
 
-Index: linux-6.6.110/drivers/mmc/core/block.c
-===================================================================
---- linux-6.6.110.orig/drivers/mmc/core/block.c
-+++ linux-6.6.110/drivers/mmc/core/block.c
+--- a/drivers/mmc/core/block.c
++++ b/drivers/mmc/core/block.c
 @@ -171,6 +171,13 @@ static DEFINE_MUTEX(open_lock);
  module_param(perdev_minors, int, 0444);
  MODULE_PARM_DESC(perdev_minors, "Minors numbers to allocate per device");
@@ -332,10 +330,8 @@ Index: linux-6.6.110/drivers/mmc/core/block.c
  	ret = mmc_blk_alloc_parts(card, md);
  	if (ret)
  		goto out;
-Index: linux-6.6.110/drivers/mmc/core/core.c
-===================================================================
---- linux-6.6.110.orig/drivers/mmc/core/core.c
-+++ linux-6.6.110/drivers/mmc/core/core.c
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
 @@ -1818,7 +1818,8 @@ EXPORT_SYMBOL(mmc_erase);
  
  int mmc_can_erase(struct mmc_card *card)
@@ -346,10 +342,8 @@ Index: linux-6.6.110/drivers/mmc/core/core.c
  		return 1;
  	return 0;
  }
-Index: linux-6.6.110/drivers/mmc/core/quirks.h
-===================================================================
---- linux-6.6.110.orig/drivers/mmc/core/quirks.h
-+++ linux-6.6.110/drivers/mmc/core/quirks.h
+--- a/drivers/mmc/core/quirks.h
++++ b/drivers/mmc/core/quirks.h
 @@ -50,6 +50,14 @@ static const struct mmc_fixup __maybe_un
  	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_SANDISK_SD, 0x5344, add_quirk_sd,
  		  MMC_QUIRK_BROKEN_SD_DISCARD),
@@ -365,10 +359,8 @@ Index: linux-6.6.110/drivers/mmc/core/quirks.h
  	END_FIXUP
  };
  
-Index: linux-6.6.110/drivers/mmc/host/Kconfig
-===================================================================
---- linux-6.6.110.orig/drivers/mmc/host/Kconfig
-+++ linux-6.6.110/drivers/mmc/host/Kconfig
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
 @@ -5,6 +5,35 @@
  
  comment "MMC/SD/SDIO Host Controller Drivers"
@@ -405,10 +397,8 @@ Index: linux-6.6.110/drivers/mmc/host/Kconfig
  config MMC_DEBUG
  	bool "MMC host drivers debugging"
  	depends on MMC != n
-Index: linux-6.6.110/drivers/mmc/host/Makefile
-===================================================================
---- linux-6.6.110.orig/drivers/mmc/host/Makefile
-+++ linux-6.6.110/drivers/mmc/host/Makefile
+--- a/drivers/mmc/host/Makefile
++++ b/drivers/mmc/host/Makefile
 @@ -22,6 +22,7 @@ obj-$(CONFIG_MMC_SDHCI_F_SDH30)	+= sdhci
  obj-$(CONFIG_MMC_SDHCI_MILBEAUT)	+= sdhci-milbeaut.o
  obj-$(CONFIG_MMC_SDHCI_SPEAR)	+= sdhci-spear.o
@@ -417,10 +407,8 @@ Index: linux-6.6.110/drivers/mmc/host/Makefile
  obj-$(CONFIG_MMC_WBSD)		+= wbsd.o
  obj-$(CONFIG_MMC_AU1X)		+= au1xmmc.o
  obj-$(CONFIG_MMC_ALCOR)	+= alcor.o
-Index: linux-6.6.110/drivers/mmc/host/bcm2835-mmc.c
-===================================================================
 --- /dev/null
-+++ linux-6.6.110/drivers/mmc/host/bcm2835-mmc.c
++++ b/drivers/mmc/host/bcm2835-mmc.c
 @@ -0,0 +1,1562 @@
 +/*
 + * BCM2835 MMC host driver.
@@ -1984,10 +1972,8 @@ Index: linux-6.6.110/drivers/mmc/host/bcm2835-mmc.c
 +MODULE_DESCRIPTION("BCM2835 SDHCI driver");
 +MODULE_LICENSE("GPL v2");
 +MODULE_AUTHOR("Gellert Weisz");
-Index: linux-6.6.110/drivers/mmc/host/sdhci-iproc.c
-===================================================================
---- linux-6.6.110.orig/drivers/mmc/host/sdhci-iproc.c
-+++ linux-6.6.110/drivers/mmc/host/sdhci-iproc.c
+--- a/drivers/mmc/host/sdhci-iproc.c
++++ b/drivers/mmc/host/sdhci-iproc.c
 @@ -198,6 +198,7 @@ static const struct sdhci_ops sdhci_ipro
  	.write_b = sdhci_iproc_writeb,
  	.set_clock = sdhci_set_clock,
@@ -1996,10 +1982,8 @@ Index: linux-6.6.110/drivers/mmc/host/sdhci-iproc.c
  	.set_bus_width = sdhci_set_bus_width,
  	.reset = sdhci_reset,
  	.set_uhs_signaling = sdhci_set_uhs_signaling,
-Index: linux-6.6.110/drivers/mmc/host/sdhci.c
-===================================================================
---- linux-6.6.110.orig/drivers/mmc/host/sdhci.c
-+++ linux-6.6.110/drivers/mmc/host/sdhci.c
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
 @@ -40,7 +40,7 @@
  	pr_debug("%s: " DRIVER_NAME ": " f, mmc_hostname(host->mmc), ## x)
  
@@ -2027,15 +2011,13 @@ Index: linux-6.6.110/drivers/mmc/host/sdhci.c
  		       mmc_hostname(host->mmc));
  		sdhci_err_stats_inc(host, REQ_TIMEOUT);
  		sdhci_dumpregs(host);
-Index: linux-6.6.110/include/linux/mmc/card.h
-===================================================================
---- linux-6.6.110.orig/include/linux/mmc/card.h
-+++ linux-6.6.110/include/linux/mmc/card.h
-@@ -299,6 +299,7 @@ struct mmc_card {
+--- a/include/linux/mmc/card.h
++++ b/include/linux/mmc/card.h
+@@ -298,6 +298,7 @@ struct mmc_card {
+ #define MMC_QUIRK_BROKEN_CACHE_FLUSH	(1<<16)	/* Don't flush cache until the write has occurred */
  #define MMC_QUIRK_BROKEN_SD_POWEROFF_NOTIFY	(1<<17) /* Disable broken SD poweroff notify support */
  #define MMC_QUIRK_NO_UHS_DDR50_TUNING	(1<<18) /* Disable DDR50 tuning */
- #define MMC_QUIRK_NO_18V   (1<<19)     /* Ignore voltage negotiation and don't use 1.8v */
-+#define MMC_QUIRK_ERASE_BROKEN (1<<31)         /* Skip erase */
++#define MMC_QUIRK_ERASE_BROKEN	(1<<31)		/* Skip erase */
  
  	bool			written_flag;	/* Indicates eMMC has been written since power on */
  	bool			reenable_cmdq;	/* Re-enable Command Queue */

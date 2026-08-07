@@ -107,8 +107,7 @@ dlink,aquila-pro-ai-m60-a1)
 gatonetworks,gdsp)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x10000" "0x10000"
 	;;
-glinet,gl-mt3000|\
-morse,*ekh19*)
+glinet,gl-mt3000)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x80000" "0x20000"
 	;;
 mercusys,mr80x-v3|\
