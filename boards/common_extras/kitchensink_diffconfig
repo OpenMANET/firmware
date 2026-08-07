@@ -1263,7 +1263,6 @@ CONFIG_PACKAGE_wireless-tools=m
 CONFIG_PACKAGE_wl12xx-firmware=m
 CONFIG_PACKAGE_wl18xx-firmware=m
 CONFIG_PACKAGE_wpa-supplicant=m
-CONFIG_PACKAGE_wpa_supplicant_s1g=m
 CONFIG_PACKAGE_wpad-mesh-openssl=m
 CONFIG_PACKAGE_wpad-openssl=m
 CONFIG_PACKAGE_wwan=m

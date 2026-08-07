@@ -15,11 +15,8 @@ CONFIG_ZSTD_OPTIMIZE_O3=y
 
 ## Morse Micro Specific ##
 CONFIG_PACKAGE_morsectrl=y
-CONFIG_PACKAGE_morse-board-config=y
+CONFIG_PACKAGE_morse-board-config=n
 CONFIG_PACKAGE_morse-board-config-hotplug-model=y
-CONFIG_PACKAGE_morse-fw-8108=y
-CONFIG_PACKAGE_morse-fw-8108-tlm=y
-CONFIG_PACKAGE_morse-fw-8108-flm=m
 CONFIG_MORSE_USB=y
 CONFIG_MORSE_USER_ACCESS=y
 CONFIG_MORSE_VENDOR_COMMAND=y
