@@ -10,7 +10,6 @@ CONFIG_PACKAGE_bsp-halowlink2=y
 CONFIG_PACKAGE_kmod-mmc=y
 CONFIG_PACKAGE_kmod-sdhci-mt7620=y
 CONFIG_PACKAGE_kmod-mt7603=y
-CONFIG_PACKAGE_netifd-morse=y
 CONFIG_PACKAGE_morse-board-config=y
 CONFIG_PACKAGE_libcap=y
 
@@ -70,7 +69,6 @@ CONFIG_PACKAGE_kmod-pps=y
 CONFIG_PACKAGE_kmod-ptp=y
 CONFIG_PACKAGE_kmod-qrtr=y
 CONFIG_PACKAGE_kmod-qrtr-mhi=y
-CONFIG_PACKAGE_morse-board-config-hotplug-model=y
 
 # Initramfs must use XZ compression (board u-boot requires it)
 CONFIG_TARGET_INITRAMFS_COMPRESSION_XZ=y

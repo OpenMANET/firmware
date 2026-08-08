@@ -9,17 +9,12 @@ CONFIG_VERSION_PRODUCT="HT-HD01-V2"
 CONFIG_PACKAGE_bsp-ht-hd01-v2=y
 CONFIG_PACKAGE_kmod-mmc=y
 CONFIG_PACKAGE_kmod-sdhci-mt7620=y
-CONFIG_PACKAGE_netifd-morse=y
 CONFIG_PACKAGE_libcap=y
 CONFIG_PACKAGE_morse-board-config=y
-CONFIG_PACKAGE_morse-board-config-hotplug-model=y
 
 # Heltec HT-HD01 RGB LED + button service (from stock firmware)
 CONFIG_PACKAGE_ht-service=y
 
-# Morse status/boot info
-CONFIG_PACKAGE_morse-mode=y
-CONFIG_PACKAGE_morse-boot-prints=y
 
 # Ethernet-to-HaLow transparent bridge
 CONFIG_PACKAGE_virtual-wire=y
