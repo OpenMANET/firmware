@@ -1,0 +1,38 @@
+From a595e4304e7bd7b5eac97a2a2d42e75a4ab61fcf Mon Sep 17 00:00:00 2001
+From: Corey Wagehoft <corey.wagehoft@gmail.com>
+Date: Fri, 8 Aug 2026 00:00:00 +0000
+Subject: [PATCH] ARM: dts: bcm2711: Add morse HAT gpios to gpio-line-names
+
+Adapted from Morse Micro upstream 3.1-dev 991-0005 for the Seeed WM1302
+Pi Hat wiring used by OpenMANET rpi4 mm6108 images: reset is GPIO17,
+wake is GPIO23, busy is GPIO24 (the upstream eval-kit HAT uses
+GPIO5/GPIO3/GPIO7). The Morse 2.x userspace tooling (chipreset.sh,
+morse_cli.sh, switch_wifi_driver) locates the chip reset line by the
+MM_RESET gpio-line-name, so the names must exist in the base DT.
+
+The renames target the second (downstream, 58-entry) &gpio
+gpio-line-names block added by 950-0870, which is the one that takes
+effect in the compiled dtb; the plain "GPIO15"/"GPIO20"/"GPIO25"
+context lines (no inline comments) make the hunk unambiguous.
+
+---
+ arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+--- a/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
++++ b/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
+@@ -329,11 +329,11 @@
+ 			  "GPIO15",
+ 			  "GPIO16",
+-			  "GPIO17",
++			  "MM_RESET",
+ 			  "GPIO18",
+ 			  "GPIO19",
+ 			  "GPIO20",
+ 			  "GPIO21",
+ 			  "GPIO22",
+-			  "GPIO23",
+-			  "GPIO24",
++			  "MM_WAKE",
++			  "MM_BUSY",
+ 			  "GPIO25",
