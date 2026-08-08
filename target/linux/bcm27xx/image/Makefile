@@ -259,6 +259,7 @@ endif
 
 define Device/morse_ekh01_base
   $(Device/rpi-4)
+  DEVICE_PACKAGES += -wpad-basic-mbedtls
   SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
   SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
   DEVICE_VENDOR := RPI
@@ -272,6 +273,7 @@ endef
 
 define Device/morse_pi3_base
   $(Device/rpi-3)
+  DEVICE_PACKAGES += -wpad-basic-mbedtls
   SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
   SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
   DEVICE_VENDOR := RPI
