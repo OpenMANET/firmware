@@ -215,6 +215,9 @@ if [ -z "$MODE" ] && [ -z "$INITIALIZE" ]; then
 fi
 
 if [ "${INITIALIZE}" ]; then
+    # feeds install never removes existing symlinks, so start from a clean
+    # slate to keep -i idempotent from any prior tree state.
+    ./scripts/feeds uninstall -a
     ./scripts/feeds update -a
     #patch packages if necessary and re-create index files
     patch_feeds_packages "${BOARD:-}"
