@@ -2128,7 +2128,7 @@ define Device/morse_halowlink2
   DEVICE_VENDOR := MorseMicro
   DEVICE_MODEL := HaLowLink2-MM8108
   DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 kmod-mt7603 \
-	kmod-morse netifd-morse morse-fw-8108 \
+	kmod-mm8108 netifd-morse mm8108-firmware \
 	bsp-halowlink2 -alsa-ucm-conf -alsa-utils
 
   SUPPORTED_DEVICES += morse,halowlink2
