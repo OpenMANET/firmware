@@ -17,7 +17,7 @@ CONFIG_PACKAGE_libcap=y
 CONFIG_PACKAGE_morse-fw-6108=n
 CONFIG_PACKAGE_morse-fw-6108-tlm=n
 CONFIG_PACKAGE_kmod-mm6108=n
-CONFIG_PACKAGE_mm8108-firmware=n
+CONFIG_PACKAGE_mm6108-firmware=n
 
 # Not needed for this board
 CONFIG_PACKAGE_ftdi-usb-spi=n
