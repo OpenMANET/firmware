@@ -1,4 +1,9 @@
 #!/bin/sh
+# Modified for OpenMANET / Morse Micro HaLow support: get_freq() knows the
+# s1g band and returns fractional MHz with a first-enabled-frequency
+# fallback for it. Non-s1g bands keep upstream behaviour (integer MHz,
+# single value) — stock wpa_supplicant rejects fractional frequencies in
+# mesh/adhoc network blocks.
 . /lib/netifd/netifd-wireless.sh
 . /lib/netifd/hostapd.sh
 . /lib/functions/system.sh
@@ -1137,7 +1142,10 @@ band_match && $3 == "MHz" {
 }
 
 END {
-	print freq, first_enabled_freq
+	if (band == "5:")
+		print freq, first_enabled_freq
+	else
+		print int(freq)
 }
 '
 }
