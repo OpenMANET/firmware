@@ -1,10 +1,41 @@
 CONFIG_TARGET_MULTI_PROFILE=y
+
+# Per-device rootfs: every image starts from the shared rootfs (all =y
+# packages), then that device's TARGET_DEVICE_PACKAGES list (below) is
+# applied on top during image assembly.
 CONFIG_TARGET_PER_DEVICE_ROOTFS=y
 CONFIG_TARGET_bcm27xx=y
 CONFIG_TARGET_bcm27xx_bcm2711=y
 CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_bcm2711_mm6108-spi=y
 CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_bcm2711_mm6108-sdio=y
 CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_bcm2711_mm8108-usb=y
+
+# Build BOTH Morse drivers =y so they sit in the shared rootfs and every
+# kmod-morse dependency in the morse userspace (netifd-morse, hostapd_s1g,
+# smart_manager, LuCI theme/home/apps, ...) resolves at =y. If the drivers
+# were left =m (the per-device default), kconfig would silently demote all
+# of those dependents to =m and they would vanish from the images
+# (e.g. LuCI shipping with no theme).
+CONFIG_PACKAGE_kmod-mm6108=y
+CONFIG_PACKAGE_kmod-mm8108=y
+CONFIG_PACKAGE_mm6108-firmware=y
+CONFIG_PACKAGE_mm8108-firmware=y
+
+# Per-device package lists (only active with TARGET_PER_DEVICE_ROOTFS).
+# '-pkg' entries are removed from that image via opkg during assembly:
+#  * the wrong-radio driver+firmware is stripped from each image, because
+#    Morse Micro state the mm6108 and mm8108 drivers conflict when loaded
+#    together (removal also deletes the modules.d autoload entry). Safe as
+#    userspace depends on the virtual kmod-morse, which the remaining
+#    driver still PROVIDES.
+#  * wpad-basic-mbedtls is dropped: it is inherited from the upstream
+#    rpi-4 profile DEVICE_PACKAGES and would clash with wpad-openssl
+#    (both ship /usr/sbin/hostapd et al).
+# Adding a new radio variant later? Extend these exclusion lists; plain
+# morse userspace packages need nothing here.
+CONFIG_TARGET_DEVICE_PACKAGES_bcm27xx_bcm2711_DEVICE_bcm2711_mm6108-spi="-kmod-mm8108 -mm8108-firmware -wpad-basic-mbedtls"
+CONFIG_TARGET_DEVICE_PACKAGES_bcm27xx_bcm2711_DEVICE_bcm2711_mm6108-sdio="-kmod-mm8108 -mm8108-firmware -wpad-basic-mbedtls"
+CONFIG_TARGET_DEVICE_PACKAGES_bcm27xx_bcm2711_DEVICE_bcm2711_mm8108-usb="-kmod-mm6108 -mm6108-firmware -wpad-basic-mbedtls"
 
 CONFIG_VERSION_MANUFACTURER="Raspberry Pi"
 CONFIG_VERSION_PRODUCT="BCM2711"
