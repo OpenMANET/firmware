@@ -215,50 +215,8 @@ endef
 
 $(eval $(call KernelPackage,drm-rp1-vec))
 
-define KernelPackage/video-cci-i2c
-  TITLE:=V4L2 CCI I2C support
-  KCONFIG:= \
-    CONFIG_I2C \
-    CONFIG_V4L2_CCI \
-    CONFIG_V4L2_CCI_I2C
-  FILES:=$(LINUX_DIR)/drivers/media/$(V4L2_DIR)/v4l2-cci.ko
-  DEPENDS+=@TARGET_bcm27xx +kmod-regmap-i2c
-  AUTOLOAD:=$(call AutoProbe,v4l2-cci)
-endef
-
-$(eval $(call KernelPackage,video-cci-i2c))
-
-#
-# Camera sensor modules
-# Args:
-#  $1: Name of the camera sensor
-#  $2: Extra dependencies for the camera
-define camera-sensor
-  define KernelPackage/video-$(1)
-    SUBMENU:=$(VIDEO_MENU)
-    TITLE:=$(1) sensor support
-    DEPENDS:=+kmod-i2c-core \
-      +kmod-video-core \
-      +kmod-video-fwnode \
-      +kmod-video-async \
-      $(2)
-    KCONFIG:=CONFIG_VIDEO_$$(subst $(1),$$(shell echo $(1) | tr '[:lower:]' '[:upper:]'),$(1)) \
-      CONFIG_MEDIA_SUPPORT \
-      CONFIG_VIDEO_CAMERA_SENSOR=y \
-      CONFIG_VIDEO_V4L2_SUBDEV_API=y
-    FILES:=$(LINUX_DIR)/drivers/media/i2c/$(1).ko
-    $$(call AddDepends/video,@TARGET_bcm27xx)
-    AUTOLOAD:=$$(call AutoProbe,$(1))
-  endef
-
-  define KernelPackage/video-$(1)/description
-    $(1) sensor support
-  endef
-
-  $$(eval $$(call KernelPackage,video-$(1)))
-endef
-
-$(eval $(call camera-sensor,imx477))
-$(eval $(call camera-sensor,imx219,+kmod-video-cci-i2c))
-$(eval $(call camera-sensor,ov5647))
-$(eval $(call camera-sensor,imx708,+kmod-video-dw9807-vcm))
+# The V4L2 CCI package (kmod-video-cci) and the camera sensor packages
+# (video-imx477/imx219/ov5647/imx708) are now provided by the generic
+# package/kernel/linux/modules/video.mk; the local duplicates that shipped
+# the same v4l2-cci.ko (as kmod-video-cci-i2c) were removed to avoid rootfs
+# file clashes.
