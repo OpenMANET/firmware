@@ -290,7 +290,7 @@ define Device/bcm2711_mm6108-spi
   DEVICE_VARIANT := SPI
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   DEVICE_PACKAGES += \
-	kmod-mm6108 netifd-morse mm6108-firmware \
+	kmod-mm6108 netifd-morse mm6108-firmware smart_manager morse-copy-coredump \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-spi
   DISTROCONFIG_EXTRA := mm610x-spi
@@ -305,7 +305,7 @@ define Device/bcm2711_mm6108-sdio
   DEVICE_VARIANT := SDIO
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   DEVICE_PACKAGES += \
-	kmod-mm6108 netifd-morse mm6108-firmware \
+	kmod-mm6108 netifd-morse mm6108-firmware smart_manager morse-copy-coredump \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-sdio
   DISTROCONFIG_EXTRA := mm610x-sdio
@@ -320,7 +320,7 @@ define Device/bcm2711_mm8108-usb
   DEVICE_VARIANT := USB
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   DEVICE_PACKAGES += \
-	kmod-mm8108 netifd-morse mm8108-firmware \
+	kmod-mm8108 netifd-morse mm8108-firmware smart_manager morse-copy-coredump \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm8108-usb
 endef
@@ -334,7 +334,7 @@ define Device/bcm2711_raven
   DEVICE_VARIANT := USB
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   DEVICE_PACKAGES += \
-	kmod-mm8108 netifd-morse mm8108-firmware \
+	kmod-mm8108 netifd-morse mm8108-firmware smart_manager morse-copy-coredump \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += bcm2711,raven
   DISTROCONFIG_EXTRA := raven
@@ -349,7 +349,7 @@ define Device/bcm2710_mm6108-spi
   DEVICE_VARIANT := SPI
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   DEVICE_PACKAGES += \
-	kmod-mm6108 netifd-morse mm6108-firmware \
+	kmod-mm6108 netifd-morse mm6108-firmware smart_manager morse-copy-coredump \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += bcm2710,mm6108-spi
   DISTROCONFIG_EXTRA := mm610x-spi
@@ -364,7 +364,7 @@ define Device/bcm2710_mm6108-sdio
   DEVICE_VARIANT := SDIO
   SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
   DEVICE_PACKAGES += \
-	kmod-mm6108 netifd-morse mm6108-firmware \
+	kmod-mm6108 netifd-morse mm6108-firmware smart_manager morse-copy-coredump \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += bcm2710,mm6108-sdio
   DISTROCONFIG_EXTRA := mm610x-sdio

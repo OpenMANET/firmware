@@ -1,5 +1,4 @@
 # Morse specific
-CONFIG_PACKAGE_kmod-morse=y
 CONFIG_PACKAGE_morsectrl=y
 CONFIG_PACKAGE_morse-bundle=y
 CONFIG_PACKAGE_morse-copy-coredump=y
