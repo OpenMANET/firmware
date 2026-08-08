@@ -296,7 +296,7 @@ define Device/heltec_ht-hd01-v2
   DEVICE_MODEL := HT-HD01-V2
   DEVICE_VARIANT := mm6108
   DEVICE_PACKAGES := kmod-mmc kmod-sdhci-mt7620 \
-	kmod-morse netifd-morse morse-fw-6108 \
+	kmod-mm6108 netifd-morse mm6108-firmware \
 	kmod-trelay ht-service morse-mode \
 	morse-boot-prints virtual-wire
   SUPPORTED_DEVICES += heltec,ht-hd01-v2
