@@ -91,7 +91,7 @@ define Device/gw_venice
   # Simplify by removing board and OpenWRT version.
   IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
   DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
-  DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-8108
+  DEVICE_PACKAGES += kmod-mm8108 netifd-morse mm8108-firmware
   IMAGES := sysupgrade.img.gz
   IMAGE/sysupgrade.img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip | append-metadata
   IMAGE/factory.img.gz := boot-scr | boot-img-ext4 | sdcard-img-ext4 | gzip
