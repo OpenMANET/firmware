@@ -9,7 +9,10 @@ board_config_update
 case "$board" in
 morse,ekh01 |\
 morse,mm6108-ekh01-spi |\
-morse,mm8108-ekh01-spi)
+morse,mm8108-ekh01-spi |\
+bcm2710,ht-hc01p-spi |\
+bcm2711,ht-hc01p-spi |\
+bcm2712,ht-hc01p-spi)
 	# RPI's have a green LED that is by default connected to SD card activity.
 	# For our purposes, connecting it to HaLow activity is more useful.
 	# Note that wlan0 is usually the morse chip.

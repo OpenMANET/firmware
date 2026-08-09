@@ -1,0 +1,212 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Andrew Suggs <andrewsuggs465@users.noreply.github.com>
+Date: Thu, 23 Jul 2026 00:00:00 +0000
+Subject: [PATCH] dt-overlays: morse: add Raspberry Pi 5 (RP1) overlay variants
+
+The RPi5 routes the 40-pin header through the RP1 southbridge, so the
+SDIO/SPI controllers and pinctrl live under different nodes (&rp1_mmc0,
+&rp1_spi0, &rp1_gpio) than on BCM2835-283x boards.
+
+These are provided as separate -pi5 overlays rather than extra fragments
+in the existing mm_wlan/mm610x-spi/mm810x-spi overlays: the firmware
+overlay loader rejects an overlay outright if any fragment target label
+cannot be resolved, so mixing RP1 fragments into the shared overlays
+would break overlay application on Pi 3/4 and Seeed boards.
+
+---
+diff --git a/arch/arm/boot/dts/overlays/mm610x-spi-pi5-overlay.dts b/arch/arm/boot/dts/overlays/mm610x-spi-pi5-overlay.dts
+new file mode 100644
+index 0000000..4588925
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/mm610x-spi-pi5-overlay.dts
+@@ -0,0 +1,66 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	compatible = "brcm,bcm2712";
++
++	fragment@0 {
++		target = <&rp1_spi0>;
++		frag0: __overlay__ {
++			pinctrl-0 = <&rp1_spi0_gpio9 &rp1_spi0_cs_gpio7 &rp1_morse_wake &rp1_morse_busy &rp1_morse_irq &rp1_morse_reset>;
++			pinctrl-names = "default";
++			cs-gpios = <&rp1_gpio 8 1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++
++			mm6108: mm6108@0 {
++				compatible = "morse,mm610x-spi";
++				reg = <0>; /* CE0 */
++				reset-gpios = <&rp1_gpio 17 0>;
++				power-gpios = <&rp1_gpio 23 0>,
++				              <&rp1_gpio 24 0>;
++				spi-irq-gpios = <&rp1_gpio 5 0>;
++				spi-max-frequency = <50000000>;
++				status = "okay";
++			};
++		};
++	};
++
++	fragment@1 {
++		target = <&rp1_gpio>;
++		__overlay__ {
++			rp1_morse_wake: rp1_morse_wake {
++				pin_wake {
++					function = "gpio";
++					pins = "gpio23";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_busy: rp1_morse_busy {
++				pin_busy {
++					function = "gpio";
++					pins = "gpio24";
++					bias-pull-down;
++				};
++			};
++
++			rp1_morse_irq: rp1_morse_irq {
++				pin_irq {
++					function = "gpio";
++					pins = "gpio5";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_reset: rp1_morse_reset {
++				pin_reset {
++					function = "gpio";
++					pins = "gpio17";
++					bias-pull-up;
++				};
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/overlays/mm810x-spi-pi5-overlay.dts b/arch/arm/boot/dts/overlays/mm810x-spi-pi5-overlay.dts
+new file mode 100644
+index 0000000..6d62efe
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/mm810x-spi-pi5-overlay.dts
+@@ -0,0 +1,66 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	compatible = "brcm,bcm2712";
++
++	fragment@0 {
++		target = <&rp1_spi0>;
++		frag0: __overlay__ {
++			pinctrl-0 = <&rp1_spi0_gpio9 &rp1_spi0_cs_gpio7 &rp1_morse_wake &rp1_morse_busy &rp1_morse_irq &rp1_morse_reset>;
++			pinctrl-names = "default";
++			cs-gpios = <&rp1_gpio 8 1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++
++			mm8108: mm8108@0 {
++				compatible = "morse,mm810x-spi";
++				reg = <0>; /* CE0 */
++				reset-gpios = <&rp1_gpio 17 0>;
++				power-gpios = <&rp1_gpio 23 0>,
++				              <&rp1_gpio 24 0>;
++				spi-irq-gpios = <&rp1_gpio 5 0>;
++				spi-max-frequency = <50000000>;
++				status = "okay";
++			};
++		};
++	};
++
++	fragment@1 {
++		target = <&rp1_gpio>;
++		__overlay__ {
++			rp1_morse_wake: rp1_morse_wake {
++				pin_wake {
++					function = "gpio";
++					pins = "gpio23";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_busy: rp1_morse_busy {
++				pin_busy {
++					function = "gpio";
++					pins = "gpio24";
++					bias-pull-down;
++				};
++			};
++
++			rp1_morse_irq: rp1_morse_irq {
++				pin_irq {
++					function = "gpio";
++					pins = "gpio5";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_reset: rp1_morse_reset {
++				pin_reset {
++					function = "gpio";
++					pins = "gpio17";
++					bias-pull-up;
++				};
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/overlays/mm_wlan-pi5-overlay.dts b/arch/arm/boot/dts/overlays/mm_wlan-pi5-overlay.dts
+new file mode 100644
+index 0000000..c60135a
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/mm_wlan-pi5-overlay.dts
+@@ -0,0 +1,46 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	compatible = "brcm,bcm2712";
++
++	fragment@0 {
++		target = <&rp1_mmc0>;
++		wifi_ovl: __overlay__ {
++			pinctrl-0 = <&rp1_sdio0_22_27 &mm_sdio_pins_rp1>;
++			pinctrl-names = "default";
++			non-removable;
++			bus-width = <4>;
++			status = "okay";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			mm6108_sdio: mm6108_sdio@0 {
++				compatible = "morse,mm610x";
++				reset-gpios = <&gpio 17 0>;
++				power-gpios = <&gpio 3 0>,
++				              <&gpio 7 0>;
++				status = "okay";
++				reg = <2>;
++				bus-width = <4>;
++			};
++		};
++	};
++
++	fragment@1 {
++		target = <&rp1_sdio_clk0>;
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@2 {
++		target = <&rp1_gpio>;
++		__overlay__ {
++			mm_sdio_pins_rp1: mm_sdio_pins {
++				pins = "gpio1";
++				function = "gpio";
++				bias-pull-up;
++			};
++		};
++	};
++};

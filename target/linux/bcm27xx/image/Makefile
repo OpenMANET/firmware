@@ -81,6 +81,19 @@ define Build/boot-ekh01
 
 endef
 
+define Build/boot-rpi5-morse
+	# Put RPI5 model info into device tree (picked up by 01_sysinfo).
+	# This uses a custom overlay which accepts parameters (via RPI's __overrides__ mechanism),
+	# and writes those parameters into the root of the device tree (as sysinfo-model
+	# and sysinfo-board-name).
+	# As well as this, we have a custom DISTROCONFIG_EXTRA section which is used to define
+	# the necessary SPI/SDIO overlays for the product.
+
+	echo -e '\ndtoverlay=sysinfo,board-name="$(SYSINFO_BOARD_NAME)",model="$(SYSINFO_MODEL)"' | cat boards/rpi5/distroconfig.txt boards/rpi5/distroconfig-$(DISTROCONFIG_EXTRA).txt - | mcopy -o -i $@.boot - ::/distroconfig.txt
+
+endef
+
+
 define Build/sdcard-img
 	SIGNATURE="$(IMG_PART_SIGNATURE)" \
 	./gen_rpi_sdcard_img.sh $@ $@.boot $(IMAGE_ROOTFS) \
@@ -290,6 +303,21 @@ define Device/morse_pi3_base
   IMAGE/factory.img.gz := boot-common | boot-2710 | boot-ekh01 | sdcard-img | gzip
 endef
 
+define Device/morse_rpi5_base
+  $(Device/rpi-5)
+  SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
+  SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
+  DEVICE_VENDOR := RPI
+  # remove the factory image (causes confusion)
+  IMAGES := sysupgrade.img.gz
+  # Simplify by removing board and OpenWRT version.
+  IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
+  DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
+  DEVICE_PACKAGES += kmod-morse netifd-morse morse-fw-6108 morse-fw-8108 kmod-spi-dw kmod-spi-dw-mmio kmod-i2c-designware-platform
+  IMAGE/sysupgrade.img.gz := boot-common | boot-rpi5-morse | sdcard-img | gzip | append-metadata
+  IMAGE/factory.img.gz := boot-common | boot-rpi5-morse | sdcard-img | gzip
+endef
+
 define Device/bcm2711_mm6108-spi
   $(Device/morse_ekh01_base)
   DEVICE_MODEL := RPI4-MM6108
@@ -300,6 +328,19 @@ define Device/bcm2711_mm6108-spi
 endef
 ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm6108-spi
+endif
+
+define Device/bcm2711_ht-hc01p-spi
+  $(Device/morse_ekh01_base)
+  DEVICE_MODEL := RPI4-HT-HC01P
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += heltec,ht-hc01p bcm2711,ht-hc01p-spi
+  DEVICE_PACKAGES += -morse-fw-8108 -morse-fw-8108-tlm -morse-fw-8108-flm
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2711)
+  TARGET_DEVICES += bcm2711_ht-hc01p-spi
 endif
 
 define Device/bcm2711_mm6108-sdio
@@ -325,6 +366,67 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm8108-usb
 endif
 
+define Device/bcm2712_mm8108-spi
+  $(Device/morse_rpi5_base)
+  DEVICE_MODEL := RPI5-MM8108
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2712,mm8108-spi
+  DISTROCONFIG_EXTRA := mm810x-spi
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_mm8108-spi
+endif
+
+define Device/bcm2712_mm6108-spi
+  $(Device/morse_rpi5_base)
+  DEVICE_MODEL := RPI5-MM6108
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2712,mm6108-spi
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_mm6108-spi
+endif
+
+define Device/bcm2712_ht-hc01p-spi
+  $(Device/morse_rpi5_base)
+  DEVICE_MODEL := RPI5-HT-HC01P
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += heltec,ht-hc01p bcm2712,ht-hc01p-spi
+  DEVICE_PACKAGES += -morse-fw-8108 -morse-fw-8108-tlm -morse-fw-8108-flm
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_ht-hc01p-spi
+endif
+
+define Device/bcm2712_mm6108-sdio
+  $(Device/morse_rpi5_base)
+  DEVICE_MODEL := RPI5-MM6108
+  DEVICE_VARIANT := SDIO
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2712,mm6108-sdio
+  DISTROCONFIG_EXTRA := mm610x-sdio
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_mm6108-sdio
+endif
+
+define Device/bcm2712_mm8108-sdio
+  $(Device/morse_rpi5_base)
+  DEVICE_MODEL := RPI5-MM8108
+  DEVICE_VARIANT := SDIO
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += bcm2712,mm8108-sdio
+  DISTROCONFIG_EXTRA := mm810x-sdio
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_mm8108-sdio
+endif
+
 define Device/bcm2710_mm6108-spi
   $(Device/morse_pi3_base)
   DEVICE_MODEL := RPI3-MM6108
@@ -335,6 +437,19 @@ define Device/bcm2710_mm6108-spi
 endef
 ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm6108-spi
+endif
+
+define Device/bcm2710_ht-hc01p-spi
+  $(Device/morse_pi3_base)
+  DEVICE_MODEL := RPI3-HT-HC01P
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  SUPPORTED_DEVICES += heltec,ht-hc01p bcm2710,ht-hc01p-spi
+  DEVICE_PACKAGES += -morse-fw-8108 -morse-fw-8108-tlm -morse-fw-8108-flm
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2710)
+  TARGET_DEVICES += bcm2710_ht-hc01p-spi
 endif
 
 define Device/bcm2710_mm6108-sdio
