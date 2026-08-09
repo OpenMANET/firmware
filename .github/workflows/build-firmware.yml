@@ -64,14 +64,7 @@ jobs:
         with:
           path: |
             dl
-            staging_dir/host
-            staging_dir/hostpkg
-            staging_dir/toolchain-*
-            build_dir/host
-            build_dir/hostpkg
           key: ${{ inputs.board }}-${{ runner.os }}-${{ hashFiles('feeds.conf.default') }}
-          restore-keys: |
-            ${{ inputs.board }}-${{ runner.os }}-
 
       - name: Configure build for ${{ inputs.board }}
         run: |

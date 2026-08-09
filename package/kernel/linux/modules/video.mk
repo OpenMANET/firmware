@@ -700,6 +700,66 @@ endef
 
 $(eval $(call KernelPackage,video-fwnode))
 
+define KernelPackage/video-cci
+  TITLE:=V4L2 CCI support
+  KCONFIG:=CONFIG_V4L2_CCI
+  FILES:=$(LINUX_DIR)/drivers/media/$(V4L2_DIR)/v4l2-cci.ko
+  DEPENDS:=+kmod-regmap-i2c
+  $(call AddDepends/video)
+  AUTOLOAD:=$(call AutoProbe,v4l2-cci)
+endef
+
+$(eval $(call KernelPackage,video-cci))
+
+define KernelPackage/video-dw9807-vcm
+  TITLE:=DW9807/DW9817 lens voice coil support
+  KCONFIG:= \
+	CONFIG_VIDEO_DW9807_VCM \
+	CONFIG_MEDIA_CONTROLLER \
+	CONFIG_VIDEO_V4L2_SUBDEV_API \
+	CONFIG_V4L2_ASYNC
+  FILES:=$(LINUX_DIR)/drivers/media/i2c/dw9807-vcm.ko
+  DEPENDS:=+kmod-video-async
+  $(call AddDepends/video)
+  AUTOLOAD:=$(call AutoProbe,dw9807-vcm)
+endef
+
+define KernelPackage/video-dw9807-vcm/description
+ DW9807/DW9817 lens voice coil support
+endef
+
+$(eval $(call KernelPackage,video-dw9807-vcm))
+
+#
+# Camera sensor modules
+# Args:
+#  $1: Name of the camera sensor
+#  $2: Extra dependencies for the camera
+define camera-sensor
+  define KernelPackage/video-$(1)
+    SUBMENU:=$(VIDEO_MENU)
+    TITLE:=$(1) sensor support
+    DEPENDS:=+kmod-video-core \
+            +kmod-video-fwnode \
+            $(2)
+    KCONFIG:=CONFIG_VIDEO_$$(shell echo $(1) | tr '[:lower:]' '[:upper:]') \
+            CONFIG_VIDEO_V4L2_SUBDEV_API=y
+    FILES:=$(LINUX_DIR)/drivers/media/i2c/$(1).ko
+    AUTOLOAD:=$$(call AutoProbe,$(1))
+  endef
+
+  define KernelPackage/video-$(1)/description
+    $(1) sensor support
+  endef
+
+  $$(eval $$(call KernelPackage,video-$(1)))
+endef
+
+$(eval $(call camera-sensor,imx477))
+$(eval $(call camera-sensor,imx219,+kmod-video-cci))
+$(eval $(call camera-sensor,ov5647))
+$(eval $(call camera-sensor,imx708,+kmod-video-dw9807-vcm))
+
 define KernelPackage/video-cpia2
   TITLE:=CPIA2 video driver
   DEPENDS:=@USB_SUPPORT
