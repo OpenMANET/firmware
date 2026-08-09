@@ -2,10 +2,10 @@
 A MANET (Mobile Ad-Hoc Network) is a self-forming wireless mesh where each node connects directly without centralized infrastructure. This technology is especially useful in the civilian space for search and rescue, disaster response, airsoft events, and any disconnected communications scenario. Designed to be budget-friendly with excellent long-range performance. The build is designed to integrate with ATAK over multicast, but works equally well over standard IP and internet links.
 
 **Software Specifications**
-- OpenWRT 24.10 Base
+- OpenWRT 24.10 Distribution
 - Linux Kernel 6.6.138
 - Wifi Drivers back-ported from 6.12.61
-- Morse Micro Drivers 2.0
+- Morse Micro Drivers 2.0.x
 
 ## Supported Hardware
 ### SBC
@@ -27,7 +27,7 @@ A MANET (Mobile Ad-Hoc Network) is a self-forming wireless mesh where each node 
 | Silex SX-SDMAH      | ✅ Tested |   SDIO     | 6108       | Very low dBm and high amount of noise     |
 | Alfa AHPI6108E      | ✅ Tested |   SDIO     | 6108       | Decent performance                        |
 | Gateworks GW16167   | ✅ Tested |   USB      | 8108       | Great performance +26dBm Transmit Power   |
-| Gateworks GW16170   | ✅ Tested |   USB      | 8108-M20   | Great performance +28.5dBm Transmit Power |
+| Gateworks GW16170   | ✅ Tested |   USB      | 8108-M20   | Best performance +28.5dBm Transmit Power  |
 
 ## Building OpenMANET Firmware
 ### Dependencies
