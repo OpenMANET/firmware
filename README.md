@@ -16,6 +16,8 @@ A MANET (Mobile Ad-Hoc Network) is a self-forming wireless mesh where each node 
 | Raspberry Pi 3B   | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
 | Raspberry Pi 2W   | ✅ Tested | ✅ Working (SPI)  | Onboard Wifi Only in AP Mode |
 | HaLowLink 2       | ✅ Tested | ✅ Working        | Storage limited              |
+| Heltec HT-HD01-V2 | ✅ Tested | ✅ Working        | Storage limited              |
+| Gateworks Venice  | ✅ Tested | N/A               |                              |
 
 ### HaLow
 
