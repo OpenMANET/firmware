@@ -27,7 +27,7 @@ A MANET (Mobile Ad-Hoc Network) is a self-forming wireless mesh where each node 
 | Silex SX-SDMAH      | ✅ Tested |   SDIO     | 6108       | Very low dBm and high amount of noise     |
 | Alfa AHPI6108E      | ✅ Tested |   SDIO     | 6108       | Decent performance                        |
 | Gateworks GW16167   | ✅ Tested |   USB      | 8108       | Great performance +26dBm Transmit Power   |
-| Gateworks GW16170   | ✅ Tested |   USB      | 8108       | Great performance +28.5dBm Transmit Power |
+| Gateworks GW16170   | ✅ Tested |   USB      | 8108-M20   | Great performance +28.5dBm Transmit Power |
 
 ## Building OpenMANET Firmware
 ### Dependencies
