@@ -26,6 +26,7 @@ CONFIG_PACKAGE_kmod-ftdi-usb-spi=n
 # No audio hardware on this board
 CONFIG_PACKAGE_alsa-ucm-conf=n
 CONFIG_PACKAGE_alsa-utils=n
+CONFIG_PACKAGE_openvlm=n
 
 # Exclude WiFi firmware/drivers not used on this board
 CONFIG_PACKAGE_ath10k-firmware-qca6174=n
