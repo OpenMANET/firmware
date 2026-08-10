@@ -13,7 +13,14 @@ CONFIG_PACKAGE_kmod-mt7603=y
 CONFIG_PACKAGE_morse-board-config=y
 CONFIG_PACKAGE_libcap=y
 
-# HaLow Link 2 uses MM8108 only - exclude MM6108 firmware
+# HaLow Link 2 uses MM8108 only (SDIO-attached) - exclude MM6108 firmware.
+# Pin the MM8108 driver/firmware explicitly rather than relying on the
+# device profile's DEVICE_PACKAGES, and keep the old unified Gateworks
+# kmod-morse driver off (it also PROVIDES kmod-morse and ships its own
+# dot11ah.ko).
+CONFIG_PACKAGE_kmod-mm8108=y
+CONFIG_PACKAGE_mm8108-firmware=y
+CONFIG_PACKAGE_kmod-morse=n
 CONFIG_PACKAGE_morse-fw-6108=n
 CONFIG_PACKAGE_morse-fw-6108-tlm=n
 CONFIG_PACKAGE_kmod-mm6108=n
