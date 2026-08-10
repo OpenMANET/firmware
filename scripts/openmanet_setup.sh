@@ -258,7 +258,11 @@ case "${MODE}" in
         # busybox's install dir accumulates applet symlinks and is shared
         # per-arch across boards; rebuild it from scratch whenever the
         # effective busybox config changes (e.g. switching boards).
-        busybox_cfg_before=$(grep '^CONFIG_BUSYBOX_' .config 2>/dev/null | sort | md5sum)
+        # Empty when no prior .config exists (fresh/distcleaned tree).
+        busybox_cfg_before=
+        if [ -f .config ]; then
+            busybox_cfg_before=$( { grep '^CONFIG_BUSYBOX_' .config || true; } | sort | md5sum)
+        fi
 
         for file in ./boards/"${BOARD}"/*_diffconfig; do
             if ! [ "$(basename "$file")" = target_diffconfig ]; then
@@ -297,7 +301,8 @@ case "${MODE}" in
         echo Make defconfig...
         make defconfig
 
-        if [ "$busybox_cfg_before" != "$(grep '^CONFIG_BUSYBOX_' .config | sort | md5sum)" ]; then
+        if [ -n "$busybox_cfg_before" ] && \
+           [ "$busybox_cfg_before" != "$( { grep '^CONFIG_BUSYBOX_' .config || true; } | sort | md5sum)" ]; then
             echo "Busybox config changed; cleaning busybox build dir..."
             make package/busybox/dirclean
         fi
