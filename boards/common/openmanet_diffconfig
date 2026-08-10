@@ -114,12 +114,10 @@ CONFIG_PACKAGE_kmod-sdhci=y
 CONFIG_PACKAGE_kmod-mux-gpio=y
 CONFIG_PACKAGE_kmod-gpio-button-hotplug=y
 
-# add I2C tools applets to busybox
-CONFIG_BUSYBOX_CONFIG_I2CGET=y
-CONFIG_BUSYBOX_CONFIG_I2CSET=y
-CONFIG_BUSYBOX_CONFIG_I2CDUMP=y
-CONFIG_BUSYBOX_CONFIG_I2CDETECT=y
-CONFIG_BUSYBOX_CONFIG_I2CTRANSFER=y
+# I2C CLI tools via the full package. Busybox stays stock on all boards:
+# custom applets install the same /usr/sbin paths as real packages and
+# poison the shared per-arch busybox build dir when boards diverge.
+CONFIG_PACKAGE_i2c-tools=y
 
 # Disable Packages not needed for OpenMANET
 CONFIG_PACKAGE_dahdi-linux=n
