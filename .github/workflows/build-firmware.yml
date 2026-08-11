@@ -29,6 +29,13 @@ on:
         required: false
         type: string
         default: ''
+    secrets:
+      USIGN_PRIVATE_KEY:
+        description: 'usign private key used to sign package indexes. Optional; an ephemeral key is generated when absent.'
+        required: false
+      USIGN_PUBLIC_KEY:
+        description: 'usign public key matching USIGN_PRIVATE_KEY, installed into images as the trusted opkg key.'
+        required: false
 
 jobs:
   build:
@@ -69,6 +76,33 @@ jobs:
       - name: Configure build for ${{ inputs.board }}
         run: |
           ./scripts/openmanet_setup.sh -i -b ${{ inputs.board }}
+
+      - name: Install package signing key
+        if: inputs.releasepackages
+        env:
+          USIGN_PRIVATE_KEY: ${{ secrets.USIGN_PRIVATE_KEY }}
+          USIGN_PUBLIC_KEY: ${{ secrets.USIGN_PUBLIC_KEY }}
+        run: |
+          if [ -z "$USIGN_PRIVATE_KEY" ] || [ -z "$USIGN_PUBLIC_KEY" ]; then
+            echo "Signing key secrets unavailable; build will generate an ephemeral key."
+            exit 0
+          fi
+          # usign requires the two-line signify format; restore the comment
+          # line if the secret holds only the base64 key material.
+          write_key() {
+            dest="$1"; content="$2"; comment="$3"
+            case "$content" in
+              "untrusted comment:"*) printf '%s\n' "$content" > "$dest" ;;
+              *)
+                printf 'untrusted comment: %s\n' "$comment" > "$dest"
+                printf '%s\n' "$content" >> "$dest"
+                ;;
+            esac
+          }
+          write_key key-build "$USIGN_PRIVATE_KEY" "OpenMANET packages private key"
+          write_key key-build.pub "$USIGN_PUBLIC_KEY" "OpenMANET packages public key"
+          chmod 600 key-build
+          echo "Installed persistent package signing key."
 
       - name: Download dependencies
         run: |

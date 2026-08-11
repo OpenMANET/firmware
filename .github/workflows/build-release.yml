@@ -25,6 +25,7 @@ jobs:
       description: "Raspberry Pi 4, CM4"
       releasepackages: true
       cpu_arch: aarch64_cortex-a72
+    secrets: inherit
 
   build-ekh-bcm2710:
     name: Build ekh-bcm2710
@@ -36,29 +37,31 @@ jobs:
       description: "Raspberry Pi 3B, 2W"
       releasepackages: true
       cpu_arch: ''
+    secrets: inherit
 
-  # NOTE: ADD NEEDS DEPENDENCIES TO RELEASE JOB IF UNCOMMENTING THESE
-  # build-halowlink2:
-  #   name: Build HalowLink2
-  #   uses: ./.github/workflows/build-firmware.yml
-  #   with:
-  #     board: halowlink2
-  #     target: ramips
-  #     subtarget: mt7621
-  #     description: "HalowLink 2 (MT7621)"
-  #     releasepackages: true
-  #     cpu_arch: mipsel_24kc
+  build-halowlink2:
+    name: Build HalowLink2
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: halowlink2
+      target: ramips
+      subtarget: mt7621
+      description: "HalowLink 2 (MT7621)"
+      releasepackages: true
+      cpu_arch: mipsel_24kc
+    secrets: inherit
 
-  # build-hd01-v2:
-  #   name: Build HD01 V2
-  #   uses: ./.github/workflows/build-firmware.yml
-  #   with:
-  #     board: ht-hd01-v2
-  #     target: ramips
-  #     subtarget: mt76x8
-  #     description: "Heltec HT-HD01 V2 (MT76x8)"
-  #     releasepackages: true
-  #     cpu_arch: ''
+  build-hd01-v2:
+    name: Build HD01 V2
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: ht-hd01-v2
+      target: ramips
+      subtarget: mt76x8
+      description: "Heltec HT-HD01 V2 (MT76x8)"
+      releasepackages: true
+      cpu_arch: ''
+    secrets: inherit
 
   build-venice:
     name: Build venice
@@ -70,10 +73,11 @@ jobs:
       description: "Gateworks Venice"
       releasepackages: true
       cpu_arch: aarch64_cortex-a53
+    secrets: inherit
 
   publish-packages:
     name: Publish Packages to packages-repo
-    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-venice]
+    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-halowlink2, build-hd01-v2, build-venice]
     runs-on: ubuntu-24.04
     steps:
       - name: Download target packages artifacts
