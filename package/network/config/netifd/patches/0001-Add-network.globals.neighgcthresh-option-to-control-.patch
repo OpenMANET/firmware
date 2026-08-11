@@ -1,0 +1,137 @@
+From c9f37ef24abcdb4336a5535d2ff909068d1488a9 Mon Sep 17 00:00:00 2001
+From: Evan Benn <evan.benn@morsemicro.com>
+Date: Wed, 8 Oct 2025 11:58:47 +1100
+Subject: [PATCH 1/2] Add network.globals.neighgcthresh option to control ARP
+ gc_thresh
+
+Add a single option to control all 6 gc_thresh levels. Default the
+option to 128, which is the built in default for gc_thresh1 for both
+ipv4 and ipv6. Maintain the kernel relative sizes for gc_thresh2 and
+gc_thresh3.
+---
+ config.c       | 21 ++++++++++++++++++++-
+ system-dummy.c |  6 ++++++
+ system-linux.c | 33 +++++++++++++++++++++++++++++++++
+ system.h       |  2 ++
+ 4 files changed, 61 insertions(+), 1 deletion(-)
+
+Index: netifd-2025.05.23~7901e66c/config.c
+===================================================================
+--- netifd-2025.05.23~7901e66c.orig/config.c
++++ netifd-2025.05.23~7901e66c/config.c
+@@ -533,7 +533,7 @@ config_init_globals(void)
+ 	struct uci_section *globals = uci_lookup_section(
+ 			uci_ctx, uci_network, "globals");
+ 	if (!globals)
+-		return;
++		goto defaults;
+ 
+ 	const char *ula_prefix = uci_lookup_option_string(
+ 			uci_ctx, globals, "ula_prefix");
+@@ -548,6 +548,25 @@ config_init_globals(void)
+ 			uci_ctx, globals, "udp_l3mdev");
+ 	if (udp_l3mdev)
+ 		system_udp_l3mdev(!strcmp(udp_l3mdev, "1"));
++
++	const char *neighgcthresh = uci_lookup_option_string(
++			uci_ctx, globals, "neighgcthresh");
++	if (neighgcthresh && *neighgcthresh) {
++		char *end;
++		unsigned long val = strtoul(neighgcthresh, &end, 0);
++
++		if (*end == '\0')
++			system_set_neigh_gc_thresh((unsigned int)val, (unsigned int)val + 384, (unsigned int)val + 896);
++		else
++			goto defaults;
++		} else {
++			goto defaults;
++		}
++	return;
++
++defaults:
++	system_set_neigh_gc_thresh(128, 512, 1024);
++
+ }
+ 
+ static void
+Index: netifd-2025.05.23~7901e66c/system-dummy.c
+===================================================================
+--- netifd-2025.05.23~7901e66c.orig/system-dummy.c
++++ netifd-2025.05.23~7901e66c/system-dummy.c
+@@ -30,6 +30,12 @@ int system_init(void)
+ 	return 0;
+ }
+ 
++void system_set_neigh_gc_thresh(unsigned int thresh1, unsigned int thresh2,
++                                unsigned int thresh3)
++{
++
++}
++
+ int system_bridge_addbr(struct device *bridge, struct bridge_config *cfg)
+ {
+ 	D(SYSTEM, "brctl addbr %s vlan_filtering=%d",
+Index: netifd-2025.05.23~7901e66c/system-linux.c
+===================================================================
+--- netifd-2025.05.23~7901e66c.orig/system-linux.c
++++ netifd-2025.05.23~7901e66c/system-linux.c
+@@ -409,6 +409,13 @@ dev_sysfs_path(const char *ifname, const
+ 	return dev_buf;
+ }
+ 
++static const char *
++global_sysctl_path(const char *file)
++{
++	snprintf(dev_buf, sizeof(dev_buf), "%s/sys/net/%s", proc_path, file);
++	return dev_buf;
++}
++
+ static void
+ system_set_dev_sysctl(const char *prefix, const char *file, const char *ifname,
+ 		      const char *val)
+@@ -432,6 +439,32 @@ system_set_dev_sysfs(const char *file, c
+ 	write_file(dev_sysfs_path(ifname, file), val);
+ }
+ 
++void system_set_neigh_gc_thresh(unsigned int thresh1, unsigned int thresh2,
++								unsigned int thresh3)
++{
++	static const char * const paths[] = {
++		"ipv4/neigh/default/gc_thresh1",
++		"ipv6/neigh/default/gc_thresh1",
++		"ipv4/neigh/default/gc_thresh2",
++		"ipv6/neigh/default/gc_thresh2",
++		"ipv4/neigh/default/gc_thresh3",
++		"ipv6/neigh/default/gc_thresh3",
++	};
++	char buf[16];
++
++	snprintf(buf, sizeof(buf), "%u", thresh1);
++	write_file(global_sysctl_path(paths[0]), buf);
++	write_file(global_sysctl_path(paths[1]), buf);
++
++	snprintf(buf, sizeof(buf), "%u", thresh2);
++	write_file(global_sysctl_path(paths[2]), buf);
++	write_file(global_sysctl_path(paths[3]), buf);
++
++	snprintf(buf, sizeof(buf), "%u", thresh3);
++	write_file(global_sysctl_path(paths[4]), buf);
++	write_file(global_sysctl_path(paths[5]), buf);
++}
++
+ static void
+ system_set_dev_sysfs_int(const char *file, const char *ifname, int val)
+ {
+Index: netifd-2025.05.23~7901e66c/system.h
+===================================================================
+--- netifd-2025.05.23~7901e66c.orig/system.h
++++ netifd-2025.05.23~7901e66c/system.h
+@@ -241,6 +241,8 @@ static inline int system_get_addr_len(un
+ extern const char * const bonding_policy_str[__BONDING_MODE_MAX];
+ 
+ int system_init(void);
++void system_set_neigh_gc_thresh(unsigned int thresh1, unsigned int thresh2,
++                                unsigned int thresh3);
+ 
+ int system_bridge_addbr(struct device *bridge, struct bridge_config *cfg);
+ int system_bridge_delbr(struct device *bridge);

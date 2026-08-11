@@ -1,0 +1,98 @@
+From 3df42cecaced413825306e12c663c55f433bc8b0 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Mon, 27 Oct 2025 14:30:47 +1100
+Subject: [PATCH 5/8] config: enable configuration of S1G
+
+---
+ hostapd/config_file.c | 12 ++++++++++++
+ hostapd/defconfig     |  3 +++
+ hostapd/hostapd.conf  | 41 +++++++++++++++++++++++++++++++++++++----
+ 3 files changed, 52 insertions(+), 4 deletions(-)
+
+--- a/hostapd/config_file.c
++++ b/hostapd/config_file.c
+@@ -3991,6 +3991,18 @@ static int hostapd_config_fill(struct ho
+ 		}
+ 		conf->mbssid = mbssid;
+ #endif /* CONFIG_IEEE80211AX */
++#ifdef CONFIG_IEEE80211AH
++	} else if (os_strcmp(buf, "ieee80211ah") == 0) {
++		conf->ieee80211ah = atoi(pos);
++	} else if (os_strcmp(buf, "s1g_oper_chwidth") == 0) {
++		conf->s1g_oper_chwidth = atoi(pos);
++	} else if (os_strcmp(buf, "s1g_oper_centr_freq_idx") == 0) {
++		conf->s1g_oper_centr_freq_idx = atoi(pos);
++	} else if (os_strcmp(buf, "s1g_pri_loc") == 0) {
++		conf->s1g_pri_loc = atoi(pos);
++	} else if (os_strcmp(buf, "s1g_primary_2mhz") == 0) {
++		conf->s1g_primary_2mhz = atoi(pos);
++#endif /* CONFIG_IEEE80211AH */
+ 	} else if (os_strcmp(buf, "max_listen_interval") == 0) {
+ 		bss->max_listen_interval = atoi(pos);
+ 	} else if (os_strcmp(buf, "disable_pmksa_caching") == 0) {
+--- a/hostapd/defconfig
++++ b/hostapd/defconfig
+@@ -438,3 +438,6 @@ CONFIG_DPP2=y
+ 
+ # Wi-Fi Aware unsynchronized service discovery (NAN USD)
+ #CONFIG_NAN_USD=y
++
++# IEEE 802.11ah (S1G) support
++#CONFIG_IEEE80211AH=y
+--- a/hostapd/hostapd.conf
++++ b/hostapd/hostapd.conf
+@@ -147,10 +147,10 @@ ssid=test
+ # g = IEEE 802.11g (2.4 GHz), ad = IEEE 802.11ad (60 GHz); a/g options are used
+ # with IEEE 802.11n (HT), too, to specify band). For IEEE 802.11ac (VHT), this
+ # needs to be set to hw_mode=a. For IEEE 802.11ax (HE) on 6 GHz this needs
+-# to be set to hw_mode=a. When using ACS (see channel parameter), a
+-# special value "any" can be used to indicate that any support band can be used.
+-# This special case is currently supported only with drivers with which
+-# offloaded ACS is used.
++# to be set to hw_mode=a. For IEEE 802.11ah (S1G) this needs to be set to
++# hw_mode=a. When using ACS (see channel parameter), a special value "any" can
++# be used to indicate that any support band can be used. This special case is
++#currently supported only with drivers with which offloaded ACS is used.
+ # Default: IEEE 802.11b
+ hw_mode=g
+ 
+@@ -1101,6 +1101,39 @@ wmm_ac_vo_acm=0
+ # as the AP MLD MAC address. If not set, the current interface hardware address
+ # will be used as the AP MLD MAC address.
+ #mld_addr=02:03:04:05:06:07
++#
++##### IEEE 802.11ah related configuration ################################
++
++# IEEE 802.11ah (S1G) supported.
++# 0 = disabled (default)
++# 1 = enabled
++#ieee80211ah=1
++
++# S1G operating channel
++# indicates the channel index of the BSS operating channel
++#s1g_oper_centr_freq_idx=37
++
++# S1G operating channel bandwidth.
++# 0 = 1 MHz
++# 1 = 2 MHz
++# 2 = 4 MHz
++# 3 = 8 MHz
++# 4 = 16 MHz
++#s1g_oper_chwidth=2
++
++# S1G primary 2MHz
++# Specifies is a 2MHz primary channel is being used. If a 2MHz primary is
++# selected, s1g_pri_loc must be configured.
++# 0 = 1MHz primary
++# 1 = 2MHz primary
++#s1g_primary_2mhz=1
++
++# S1G primary channel location
++# Specifies the location of the 1MHz primary subchannel when a 2MHz primary
++# channel is in use
++# 0 = lower 1MHz
++# 1 = upper 1MHz
++# s1g_pri_loc=0
+ 
+ ##### IEEE 802.1X-2004 related configuration ##################################
+ 

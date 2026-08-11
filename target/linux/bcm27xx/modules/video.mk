@@ -32,15 +32,14 @@ define KernelPackage/camera-bcm2835-unicam
     $(LINUX_DIR)/drivers/staging/vc04_services/bcm2835-isp/bcm2835-isp.ko \
     $(LINUX_DIR)/drivers/media/platform/bcm2835/bcm2835-unicam.ko
   AUTOLOAD:=$(call AutoLoad,65,bcm2835-unicam bcm2835-isp)
-  $(call AddDepends/video,@TARGET_bcm27xx +kmod-vchiq-mmal-bcm2835 +kmod-video-videobuf2 +kmod-video-dma-contig +kmod-video-fwnode)
+  $(call AddDepends/video,@TARGET_bcm27xx +kmod-vchiq-mmal-bcm2835 +kmod-video-videobuf2 +kmod-video-dma-contig +kmod-video-fwnode +kmod-video-async)
 endef
 
 define KernelPackage/camera-bcm2835-unicam/description
- Camera host interface devices for Broadcom BCM2835 SoC needed for unicam.
+  Camera host interface devices for Broadcom BCM2835 SoC needed for unicam.
 endef
 
 $(eval $(call KernelPackage,camera-bcm2835-unicam))
-
 
 define KernelPackage/codec-bcm2835
   TITLE:=BCM2835 Video Codec
@@ -215,3 +214,9 @@ define KernelPackage/drm-rp1-vec/description
 endef
 
 $(eval $(call KernelPackage,drm-rp1-vec))
+
+# The V4L2 CCI package (kmod-video-cci) and the camera sensor packages
+# (video-imx477/imx219/ov5647/imx708) are now provided by the generic
+# package/kernel/linux/modules/video.mk; the local duplicates that shipped
+# the same v4l2-cci.ko (as kmod-video-cci-i2c) were removed to avoid rootfs
+# file clashes.

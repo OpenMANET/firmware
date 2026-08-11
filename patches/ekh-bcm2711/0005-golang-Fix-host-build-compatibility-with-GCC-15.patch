@@ -1,0 +1,37 @@
+From b0c81b768d74cc3b5990eca1cead7e6a1b827065 Mon Sep 17 00:00:00 2001
+From: Jeffery To <jeffery.to@gmail.com>
+Date: Thu, 5 Jun 2025 21:37:53 +0800
+Subject: [PATCH] golang: Fix host build compatibility with GCC 15
+
+Fixes https://github.com/openwrt/packages/issues/26446.
+
+Signed-off-by: Jeffery To <jeffery.to@gmail.com>
+(cherry picked from commit f7d2ebfe3784ab793c1db0d7bb6bbf98b7dbc064)
+---
+ lang/golang/golang/Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/feeds/packages/lang/golang/golang/Makefile b/feeds/packages/lang/golang/golang/Makefile
+index d71cc7c82..fc12f03e5 100644
+--- a/feeds/packages/lang/golang/golang/Makefile
++++ b/feeds/packages/lang/golang/golang/Makefile
+@@ -12,7 +12,7 @@ GO_VERSION_PATCH:=12
+ 
+ PKG_NAME:=golang
+ PKG_VERSION:=$(GO_VERSION_MAJOR_MINOR)$(if $(GO_VERSION_PATCH),.$(GO_VERSION_PATCH))
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+ 
+ GO_SOURCE_URLS:=https://dl.google.com/go/ \
+                 https://mirrors.ustc.edu.cn/golang/ \
+@@ -267,6 +267,7 @@ endef
+ define Host/Compile
+ 	$(call GoCompiler/Bootstrap/Make, \
+ 		$(HOST_GO_VARS) \
++		CC="$(HOSTCC_NOCACHE) -std=gnu17" \
+ 	)
+ 
+ 	$(call GoCompiler/Bootstrap-1.17/Make, \
+-- 
+2.51.0
+

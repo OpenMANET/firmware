@@ -90,6 +90,10 @@ function iface_freq_info(iface, config, params)
 	if (!freq)
 		return null;
 
+	let freq_offset = params.frequency_offset;
+	if (freq < 1000 && !freq_offset)
+		return null;
+
 	let sec_offset = params.sec_chan_offset;
 	if (sec_offset != -1 && sec_offset != 1)
 		sec_offset = 0;
@@ -113,7 +117,7 @@ function iface_freq_info(iface, config, params)
 	if (freq < 4000)
 		width = 0;
 
-	return hostapd.freq_info(freq, sec_offset, width);
+	return hostapd.freq_info(freq, freq_offset, sec_offset, width);
 }
 
 function iface_add(phy, config, phy_status)
@@ -850,6 +854,7 @@ let main_obj = {
 			radio: 0,
 			up: true,
 			frequency: 0,
+			frequency_offset: 0,
 			sec_chan_offset: 0,
 			csa: true,
 			csa_count: 0,

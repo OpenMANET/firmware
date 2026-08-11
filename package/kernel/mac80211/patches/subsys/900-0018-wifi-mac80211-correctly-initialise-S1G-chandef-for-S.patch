@@ -1,0 +1,263 @@
+From 31e7681da78d7e8d2d83185c0e640012a018f229 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Thu, 18 Sep 2025 15:19:12 +1000
+Subject: [PATCH 18/21] wifi: mac80211: correctly initialise S1G chandef for
+ STA
+
+When moving to the APs channel, ensure we correctly initialise the chandef
+and perform the required validation. Additionally, if the AP is beaconing on a
+2MHz primary, calculate the 2MHz primary center frequency by extracting
+the sibling 1MHz primary and averaging the frequencies to find the 2MHz
+primary center frequency.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250918051913.500781-3-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/linux/ieee80211.h  | 18 ++++++++++++-
+ net/mac80211/ieee80211_i.h |  3 ++-
+ net/mac80211/main.c        |  6 +++--
+ net/mac80211/mlme.c        | 53 +++++++++++++++++++++++++++++++++-----
+ net/mac80211/scan.c        | 13 +++++-----
+ net/mac80211/util.c        | 39 +++++++++++++++++++++++-----
+ 6 files changed, 109 insertions(+), 23 deletions(-)
+
+--- a/include/linux/ieee80211.h
++++ b/include/linux/ieee80211.h
+@@ -1182,6 +1182,18 @@ enum ieee80211_s1g_chanwidth {
+ 	IEEE80211_S1G_CHANWIDTH_16MHZ = 15,
+ };
+ 
++/**
++ * enum ieee80211_s1g_pri_chanwidth - S1G primary channel widths
++ *	described in IEEE80211-2024 Table 10-39.
++ *
++ * @IEEE80211_S1G_PRI_CHANWIDTH_2MHZ: 2MHz primary channel
++ * @IEEE80211_S1G_PRI_CHANWIDTH_1MHZ: 1MHz primary channel
++ */
++enum ieee80211_s1g_pri_chanwidth {
++	IEEE80211_S1G_PRI_CHANWIDTH_2MHZ = 0,
++	IEEE80211_S1G_PRI_CHANWIDTH_1MHZ = 1,
++};
++
+ #define WLAN_SA_QUERY_TR_ID_LEN 2
+ #define WLAN_MEMBERSHIP_LEN 8
+ #define WLAN_USER_POSITION_LEN 16
+@@ -3131,8 +3143,12 @@ ieee80211_he_spr_size(const u8 *he_spr_i
+ 
+ #define S1G_CAP9_LINK_ADAPT_PER_CONTROL_RESPONSE BIT(0)
+ 
+-#define S1G_OPER_CH_WIDTH_PRIMARY_1MHZ	BIT(0)
++#define S1G_OPER_CH_WIDTH_PRIMARY	BIT(0)
+ #define S1G_OPER_CH_WIDTH_OPER		GENMASK(4, 1)
++#define S1G_OPER_CH_PRIMARY_LOCATION	BIT(5)
++
++#define S1G_2M_PRIMARY_LOCATION_LOWER	0
++#define S1G_2M_PRIMARY_LOCATION_UPPER	1
+ 
+ /* EHT MAC capabilities as defined in P802.11be_D2.0 section 9.4.2.313.2 */
+ #define IEEE80211_EHT_MAC_CAP0_EPCS_PRIO_ACCESS			0x01
+--- a/net/mac80211/ieee80211_i.h
++++ b/net/mac80211/ieee80211_i.h
+@@ -2646,7 +2646,8 @@ bool ieee80211_chandef_he_6ghz_oper(stru
+ 				    const struct ieee80211_he_operation *he_oper,
+ 				    const struct ieee80211_eht_operation *eht_oper,
+ 				    struct cfg80211_chan_def *chandef);
+-bool ieee80211_chandef_s1g_oper(const struct ieee80211_s1g_oper_ie *oper,
++bool ieee80211_chandef_s1g_oper(struct ieee80211_local *local,
++				const struct ieee80211_s1g_oper_ie *oper,
+ 				struct cfg80211_chan_def *chandef);
+ void ieee80211_chandef_downgrade(struct cfg80211_chan_def *chandef,
+ 				 struct ieee80211_conn_settings *conn);
+--- a/net/mac80211/main.c
++++ b/net/mac80211/main.c
+@@ -1249,11 +1249,13 @@ int ieee80211_register_hw(struct ieee802
+ 		if (!dflt_chandef.chan) {
+ 			/*
+ 			 * Assign the first enabled channel to dflt_chandef
+-			 * from the list of channels
++			 * from the list of channels. For S1G interfaces
++			 * ensure it can be used as a primary.
+ 			 */
+ 			for (i = 0; i < sband->n_channels; i++)
+ 				if (!(sband->channels[i].flags &
+-						IEEE80211_CHAN_DISABLED))
++				      (IEEE80211_CHAN_DISABLED |
++				       IEEE80211_CHAN_S1G_NO_PRIMARY)))
+ 					break;
+ 			/* if none found then use the first anyway */
+ 			if (i == sband->n_channels)
+--- a/net/mac80211/mlme.c
++++ b/net/mac80211/mlme.c
+@@ -175,10 +175,11 @@ ieee80211_determine_ap_chan(struct ieee8
+ 
+ 	/* get special S1G case out of the way */
+ 	if (sband->band == NL80211_BAND_S1GHZ) {
+-		if (!ieee80211_chandef_s1g_oper(elems->s1g_oper, chandef)) {
+-			sdata_info(sdata,
+-				   "Missing S1G Operation Element? Trying operating == primary\n");
+-			chandef->width = ieee80211_s1g_channel_width(channel);
++		if (!ieee80211_chandef_s1g_oper(sdata->local, elems->s1g_oper,
++						chandef)) {
++			/* Fallback to default 1MHz */
++			chandef->width = NL80211_CHAN_WIDTH_1;
++			chandef->s1g_primary_2mhz = false;
+ 		}
+ 
+ 		return IEEE80211_CONN_MODE_S1G;
+@@ -865,6 +866,14 @@ again:
+ 			ret = -EINVAL;
+ 			goto free;
+ 		}
++
++		chanreq->oper = *ap_chandef;
++		if (!cfg80211_chandef_usable(sdata->wdev.wiphy, &chanreq->oper,
++					     IEEE80211_CHAN_DISABLED)) {
++			ret = -EINVAL;
++			goto free;
++		}
++
+ 		return elems;
+ 	case NL80211_BAND_6GHZ:
+ 		if (ap_mode < IEEE80211_CONN_MODE_HE) {
+@@ -6681,6 +6690,38 @@ static bool ieee80211_mgd_ssid_mismatch(
+ 	return memcmp(elems->ssid, cfg->ssid, cfg->ssid_len);
+ }
+ 
++static bool
++ieee80211_rx_beacon_freq_valid(struct ieee80211_local *local,
++			       struct ieee80211_mgmt *mgmt,
++			       struct ieee80211_rx_status *rx_status,
++			       struct ieee80211_chanctx_conf *chanctx)
++{
++	u32 pri_2mhz_khz;
++	struct ieee80211_channel *s1g_sibling_1mhz;
++	u32 pri_khz = ieee80211_channel_to_khz(chanctx->def.chan);
++	u32 rx_khz = ieee80211_rx_status_to_khz(rx_status);
++
++	if (rx_khz == pri_khz)
++		return true;
++
++	if (!chanctx->def.s1g_primary_2mhz)
++		return false;
++
++	/*
++	 * If we have an S1G interface with a 2MHz primary, beacons are
++	 * sent on the center frequency of the 2MHz primary. Find the sibling
++	 * 1MHz channel and calculate the 2MHz primary center frequency.
++	 */
++	s1g_sibling_1mhz = cfg80211_s1g_get_primary_sibling(local->hw.wiphy,
++							    &chanctx->def);
++	if (!s1g_sibling_1mhz)
++		return false;
++
++	pri_2mhz_khz =
++		(pri_khz + ieee80211_channel_to_khz(s1g_sibling_1mhz)) / 2;
++	return rx_khz == pri_2mhz_khz;
++}
++
+ static void ieee80211_rx_mgmt_beacon(struct ieee80211_link_data *link,
+ 				     struct ieee80211_hdr *hdr, size_t len,
+ 				     struct ieee80211_rx_status *rx_status)
+@@ -6735,8 +6776,8 @@ static void ieee80211_rx_mgmt_beacon(str
+ 		return;
+ 	}
+ 
+-	if (ieee80211_rx_status_to_khz(rx_status) !=
+-	    ieee80211_channel_to_khz(chanctx_conf->def.chan)) {
++	if (!ieee80211_rx_beacon_freq_valid(local, mgmt, rx_status,
++					    chanctx_conf)) {
+ 		rcu_read_unlock();
+ 		return;
+ 	}
+--- a/net/mac80211/scan.c
++++ b/net/mac80211/scan.c
+@@ -973,15 +973,15 @@ static void ieee80211_scan_state_set_cha
+ 	local->scan_chandef.freq1_offset = chan->freq_offset;
+ 	local->scan_chandef.center_freq2 = 0;
+ 
+-	/* For scanning on the S1G band, detect the channel width according to
+-	 * the channel being scanned.
+-	 */
++	/* For S1G, only scan the 1MHz primaries. */
+ 	if (chan->band == NL80211_BAND_S1GHZ) {
+-		local->scan_chandef.width = ieee80211_s1g_channel_width(chan);
++		local->scan_chandef.width = NL80211_CHAN_WIDTH_1;
++		local->scan_chandef.s1g_primary_2mhz = false;
+ 		goto set_channel;
+ 	}
+ 
+-	/* If scanning on oper channel, use whatever channel-type
++	/*
++	 * If scanning on oper channel, use whatever channel-type
+ 	 * is currently in use.
+ 	 */
+ 	if (chan == local->hw.conf.chandef.chan)
+@@ -1190,7 +1190,8 @@ int ieee80211_request_ibss_scan(struct i
+ 
+ 		for (band = 0; band < NUM_NL80211_BANDS; band++) {
+ 			if (!local->hw.wiphy->bands[band] ||
+-			    band == NL80211_BAND_6GHZ)
++			    band == NL80211_BAND_6GHZ ||
++			    band == NL80211_BAND_S1GHZ)
+ 				continue;
+ 
+ 			max_n = local->hw.wiphy->bands[band]->n_channels;
+--- a/net/mac80211/util.c
++++ b/net/mac80211/util.c
+@@ -3169,10 +3169,11 @@ bool ieee80211_chandef_he_6ghz_oper(stru
+ 	return true;
+ }
+ 
+-bool ieee80211_chandef_s1g_oper(const struct ieee80211_s1g_oper_ie *oper,
++bool ieee80211_chandef_s1g_oper(struct ieee80211_local *local,
++				const struct ieee80211_s1g_oper_ie *oper,
+ 				struct cfg80211_chan_def *chandef)
+ {
+-	u32 oper_freq;
++	u32 oper_khz, pri_1mhz_khz, pri_2mhz_khz;
+ 
+ 	if (!oper)
+ 		return false;
+@@ -3197,12 +3198,36 @@ bool ieee80211_chandef_s1g_oper(const st
+ 		return false;
+ 	}
+ 
+-	oper_freq = ieee80211_channel_to_freq_khz(oper->oper_ch,
+-						  NL80211_BAND_S1GHZ);
+-	chandef->center_freq1 = KHZ_TO_MHZ(oper_freq);
+-	chandef->freq1_offset = oper_freq % 1000;
++	chandef->s1g_primary_2mhz = false;
+ 
+-	return true;
++	switch (u8_get_bits(oper->ch_width, S1G_OPER_CH_WIDTH_PRIMARY)) {
++	case IEEE80211_S1G_PRI_CHANWIDTH_1MHZ:
++		pri_1mhz_khz = ieee80211_channel_to_freq_khz(
++			oper->primary_ch, NL80211_BAND_S1GHZ);
++		break;
++	case IEEE80211_S1G_PRI_CHANWIDTH_2MHZ:
++		chandef->s1g_primary_2mhz = true;
++		pri_2mhz_khz = ieee80211_channel_to_freq_khz(
++			oper->primary_ch, NL80211_BAND_S1GHZ);
++
++		if (u8_get_bits(oper->ch_width, S1G_OPER_CH_PRIMARY_LOCATION) ==
++		    S1G_2M_PRIMARY_LOCATION_LOWER)
++			pri_1mhz_khz = pri_2mhz_khz - 500;
++		else
++			pri_1mhz_khz = pri_2mhz_khz + 500;
++		break;
++	default:
++		return false;
++	}
++
++	oper_khz = ieee80211_channel_to_freq_khz(oper->oper_ch,
++						 NL80211_BAND_S1GHZ);
++	chandef->center_freq1 = KHZ_TO_MHZ(oper_khz);
++	chandef->freq1_offset = oper_khz % 1000;
++	chandef->chan =
++		ieee80211_get_channel_khz(local->hw.wiphy, pri_1mhz_khz);
++
++	return chandef->chan;
+ }
+ 
+ int ieee80211_put_srates_elem(struct sk_buff *skb,

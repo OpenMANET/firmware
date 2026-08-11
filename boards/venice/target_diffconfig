@@ -14,17 +14,20 @@ CONFIG_ZRAM_DEF_COMP_LZORLE=y
 CONFIG_ZSTD_OPTIMIZE_O3=y
 
 ## Morse Micro Specific ##
-CONFIG_PACKAGE_morsectrl=y
-CONFIG_PACKAGE_morse-board-config=y
-CONFIG_PACKAGE_morse-board-config-hotplug-model=y
-CONFIG_PACKAGE_morse-fw-8108=y
-CONFIG_PACKAGE_morse-fw-8108-tlm=y
-CONFIG_PACKAGE_morse-fw-8108-flm=m
-CONFIG_MORSE_SDIO=y
+# Venice is MM8108-only (USB). Select the split driver =y so the morse
+# userspace stack's kmod-morse dependency resolves at =y (see
+# boards/ekh-bcm2711/target_diffconfig for the full rationale), and keep
+# the old unified Gateworks kmod-morse driver off: it ships its own
+# dot11ah.ko and clashes with kmod-dot11ah at package/install.
+CONFIG_PACKAGE_kmod-mm8108=y
+CONFIG_PACKAGE_mm8108-firmware=y
+CONFIG_PACKAGE_kmod-mm6108=n
+CONFIG_PACKAGE_mm6108-firmware=n
+CONFIG_PACKAGE_kmod-morse=n
+CONFIG_PACKAGE_morse-board-config=n
 CONFIG_MORSE_USB=y
 CONFIG_MORSE_USER_ACCESS=y
 CONFIG_MORSE_VENDOR_COMMAND=y
-CONFIG_MORSE_SDIO_ALIGNMENT=4
 CONFIG_MORSE_POWERSAVE_MODE=0
 CONFIG_MORSE_RC=y
 CONFIG_MORSE_MONITOR=y
@@ -50,7 +53,6 @@ CONFIG_PACKAGE_rtl-sdr=n
 
 CONFIG_USB=y
 CONFIG_USB_STORAGE=y
-CONFIG_BUSYBOX_CUSTOM=y
 CONFIG_ATH10K-CT_LEDS=y
 CONFIG_ATH10K_LEDS=y
 CONFIG_ATH11K_THERMAL=y
@@ -68,10 +70,10 @@ CONFIG_BRCMFMAC_PCIE=y
 CONFIG_BRCMFMAC_SDIO=y
 CONFIG_BRCMFMAC_USB=y
 CONFIG_BRCMSMAC_USE_FW_FROM_WL=y
-CONFIG_BUSYBOX_CONFIG_ARPING=y
-# CONFIG_BUSYBOX_CONFIG_DEVMEM=y
-CONFIG_BUSYBOX_CONFIG_DIFF=y
-CONFIG_BUSYBOX_CONFIG_STTY=y
+# Replacements for the former busybox custom applets (stock busybox now)
+CONFIG_PACKAGE_iputils-arping=y
+CONFIG_PACKAGE_diffutils=y
+CONFIG_PACKAGE_coreutils-stty=y
 CONFIG_DRIVER_11AC_SUPPORT=y
 CONFIG_DRIVER_11AX_SUPPORT=y
 CONFIG_DRIVER_11BE_SUPPORT=y
@@ -749,7 +751,6 @@ CONFIG_PACKAGE_gwsoc=y
 # CONFIG_PACKAGE_kmod-mlxfw=m
 # CONFIG_PACKAGE_kmod-mmc=y
 # CONFIG_PACKAGE_kmod-mmc-spi=m
-# CONFIG_PACKAGE_kmod-morse=y
 # CONFIG_PACKAGE_kmod-mpls=m
 # CONFIG_PACKAGE_kmod-mppe=m
 # CONFIG_PACKAGE_kmod-mrf24j40=m

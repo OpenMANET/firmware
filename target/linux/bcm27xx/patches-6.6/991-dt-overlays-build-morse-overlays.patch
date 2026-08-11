@@ -1,6 +1,6 @@
 --- a/arch/arm/boot/dts/overlays/Makefile
 +++ b/arch/arm/boot/dts/overlays/Makefile
-@@ -170,7 +170,10 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
+@@ -184,7 +184,10 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
  	miniuart-bt.dtbo \
  	mipi-dbi-spi.dtbo \
  	mlx90640.dtbo \
@@ -11,3 +11,11 @@
  	mz61581.dtbo \
  	ov2311.dtbo \
  	ov5647.dtbo \
+@@ -228,6 +231,7 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
+ 	qca7000-uart0.dtbo \
+ 	ramoops.dtbo \
+ 	ramoops-pi4.dtbo \
++	raven.dtbo \
+ 	rootmaster.dtbo \
+ 	rotary-encoder.dtbo \
+ 	rpi-backlight.dtbo \

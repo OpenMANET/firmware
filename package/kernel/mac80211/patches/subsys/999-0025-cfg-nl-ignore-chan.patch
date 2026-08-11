@@ -1,0 +1,39 @@
+Index: backports-6.12.61/include/net/cfg80211.h
+===================================================================
+--- backports-6.12.61.orig/include/net/cfg80211.h
++++ backports-6.12.61/include/net/cfg80211.h
+@@ -136,6 +136,8 @@ struct wiphy;
+  * @IEEE80211_CHAN_NO_4MHZ: 4 MHz bandwidth is not permitted on this channel.
+  * @IEEE80211_CHAN_NO_8MHZ: 8 MHz bandwidth is not permitted on this channel.
+  * @IEEE80211_CHAN_NO_16MHZ: 16 MHz bandwidth is not permitted on this channel.
++ * @IEEE80211_CHAN_IGNORE: Mark this channel as disabled when
++ *	communicating channel list via nl80211.
+  */
+ enum ieee80211_channel_flags {
+ 	IEEE80211_CHAN_DISABLED			= BIT(0),
+@@ -169,8 +171,11 @@ enum ieee80211_channel_flags {
+ 	IEEE80211_CHAN_NO_4MHZ			= BIT(28),
+ 	IEEE80211_CHAN_NO_8MHZ			= BIT(29),
+ 	IEEE80211_CHAN_NO_16MHZ			= BIT(30),
++	IEEE80211_CHAN_IGNORE                   = BIT(31),
+ };
+ 
++#define HAS_IEEE80211_CHAN_IGNORE
++
+ #define IEEE80211_CHAN_NO_HT40 \
+ 	(IEEE80211_CHAN_NO_HT40PLUS | IEEE80211_CHAN_NO_HT40MINUS)
+ 
+Index: backports-6.12.61/net/wireless/nl80211.c
+===================================================================
+--- backports-6.12.61.orig/net/wireless/nl80211.c
++++ backports-6.12.61/net/wireless/nl80211.c
+@@ -1141,6 +1141,9 @@ static int nl80211_msg_put_channel(struc
+ 	if ((chan->flags & IEEE80211_CHAN_DISABLED) &&
+ 	    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_DISABLED))
+ 		goto nla_put_failure;
++	if ((chan->flags & IEEE80211_CHAN_IGNORE) &&
++	    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_DISABLED))
++		goto nla_put_failure;
+ 	if (chan->flags & IEEE80211_CHAN_NO_IR) {
+ 		if (nla_put_flag(msg, NL80211_FREQUENCY_ATTR_NO_IR))
+ 			goto nla_put_failure;

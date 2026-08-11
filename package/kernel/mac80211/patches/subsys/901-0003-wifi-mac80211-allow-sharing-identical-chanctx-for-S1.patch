@@ -1,0 +1,63 @@
+From f9e788c5fd3a23edecd808ebb354e2cb1aef87c3 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Wed, 26 Nov 2025 12:57:58 +1100
+Subject: [PATCH] wifi: mac80211: allow sharing identical chanctx for S1G
+ interfaces
+
+Introduce support for sharing identical channel contexts for S1G
+interfaces. Additionally, do not downgrade channel requests for
+S1G interfaces.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20251126015758.149034-1-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ net/mac80211/chan.c | 13 ++++++++++++-
+ net/mac80211/mlme.c |  5 +++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/net/mac80211/chan.c b/net/mac80211/chan.c
+index c8aba4183c9a..d0bfb1216401 100644
+--- a/net/mac80211/chan.c
++++ b/net/mac80211/chan.c
+@@ -654,8 +654,19 @@ static void _ieee80211_change_chanctx(struct ieee80211_local *local,
+ 	};
+ 	u32 changed = 0;
+ 
+-	/* expected to handle only 20/40/80/160/320 channel widths */
++	/* 5/10 MHz not handled here */
+ 	switch (chandef->width) {
++	case NL80211_CHAN_WIDTH_1:
++	case NL80211_CHAN_WIDTH_2:
++	case NL80211_CHAN_WIDTH_4:
++	case NL80211_CHAN_WIDTH_8:
++	case NL80211_CHAN_WIDTH_16:
++		/*
++		 * mac80211 currently only supports sharing identical
++		 * chanctx's for S1G interfaces.
++		 */
++		WARN_ON(!ieee80211_chanreq_identical(&ctx_req, chanreq));
++		return;
+ 	case NL80211_CHAN_WIDTH_20_NOHT:
+ 	case NL80211_CHAN_WIDTH_20:
+ 	case NL80211_CHAN_WIDTH_40:
+diff --git a/net/mac80211/mlme.c b/net/mac80211/mlme.c
+index c705d3f45aff..e56ad4b9330f 100644
+--- a/net/mac80211/mlme.c
++++ b/net/mac80211/mlme.c
+@@ -6108,9 +6108,10 @@ static int ieee80211_prep_channel(struct ieee80211_sub_if_data *sdata,
+ 	ret = ieee80211_link_use_channel(link, &chanreq,
+ 					 IEEE80211_CHANCTX_SHARED);
+ 
+-	/* don't downgrade for 5 and 10 MHz channels, though. */
++	/* don't downgrade for 5/10/S1G MHz channels, though. */
+ 	if (chanreq.oper.width == NL80211_CHAN_WIDTH_5 ||
+-	    chanreq.oper.width == NL80211_CHAN_WIDTH_10)
++	    chanreq.oper.width == NL80211_CHAN_WIDTH_10 ||
++	    cfg80211_chandef_is_s1g(&chanreq.oper))
+ 		return ret;
+ 
+ 	while (ret && chanreq.oper.width != NL80211_CHAN_WIDTH_20_NOHT) {
+-- 
+2.50.1
+

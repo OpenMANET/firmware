@@ -55,7 +55,7 @@ function wiphy_get_entry(phy, path) {
 
 function freq_to_channel(freq) {
 	if (freq < 1000)
-		return 0;
+		return 41;
 	if (freq == 2484)
 		return 14;
 	if (freq == 5935)
@@ -101,9 +101,8 @@ function wiphy_detect() {
 		};
 
 		for (let radio in phy.radios) {
-			// S1G is not supported yet
 			radio.freq_ranges = filter(radio.freq_ranges,
-				(range) => range.end > 2000000
+				(range) => range.end > 800000
 			);
 
 			if (!length(radio.freq_ranges))
@@ -133,6 +132,8 @@ function wiphy_detect() {
 				band_name = "5G";
 			else if (freq > 2000)
 				band_name = "2G";
+			else if (freq > 800)
+				band_name = "S1G";
 			else
 				continue;
 			bands[band_name] = band_info;
@@ -167,6 +168,9 @@ function wiphy_detect() {
 				band_info.max_width = 40;
 			else
 				band_info.max_width = 20;
+
+			if (band_name == "S1G")
+				band_info.max_width = 16;
 
 			let modes = band_info.modes = [ "NOHT" ];
 			if (band_info.ht)

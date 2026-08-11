@@ -128,9 +128,8 @@
 	clock-names = "source", "hclk";
 	max-frequency = <48000000>;
 
-	/* Use base dtsi's mmc_reg_3v3 for both (stock uses 3.3V for both) */
-	vmmc-supply = <&mmc_reg_3v3>;
-	vqmmc-supply = <&mmc_reg_3v3>;
+	/* Base dtsi's reg_vmmc/reg_vqmmc are both fixed 3.3V, matching the
+	   stock V2 firmware, so its vmmc/vqmmc supplies are inherited as-is. */
 
 	cap-sd-highspeed;
 	cap-mmc-highspeed;

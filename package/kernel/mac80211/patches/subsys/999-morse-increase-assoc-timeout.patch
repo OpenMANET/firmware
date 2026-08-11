@@ -1,0 +1,27 @@
+#Description: (APP-5559) Increase association timeout to improve connection reliability
+
+#This patch increases the association timeout for station connections in
+# ieee80211_sta_work() by replacing IEEE80211_ASSOC_TIMEOUT_SHORT with the longer IEEE80211_ASSOC_TIMEOUT.
+
+#The purpose is to align the association timeout for all encryption modes (not just SAE) in order to
+# handle access points that respond slowly during the association process. Previously, the shorter timeout
+# could cause premature failures in cases where the AP took longer to complete the handshake.
+
+#This issue was particularly visible with Opportunistic Wireless Encryption (OWE) mode, where connections to
+# certain APs (such as the EKH-03) failed due to the shorter timeout expiring before the AP responded.
+# By giving a longer grace period, the STA now waits sufficiently long for AP responses, improving robustness
+# across OWE and other non-SAE authentication modes.
+
+Index: backports-6.1.110-1/net/mac80211/mlme.c
+===================================================================
+--- backports-6.1.110-1.orig/net/mac80211/mlme.c
++++ backports-6.1.110-1/net/mac80211/mlme.c
+@@ -6211,7 +6211,7 @@ void ieee80211_sta_work(struct ieee80211
+ 			    ieee80211_is_reassoc_req(fc))) {
+ 			if (status_acked) {
+ 				ifmgd->assoc_data->timeout =
+-					jiffies + IEEE80211_ASSOC_TIMEOUT_SHORT;
++					jiffies + IEEE80211_ASSOC_TIMEOUT;
+ 				run_again(sdata, ifmgd->assoc_data->timeout);
+ 			} else {
+ 				ifmgd->assoc_data->timeout = jiffies - 1;

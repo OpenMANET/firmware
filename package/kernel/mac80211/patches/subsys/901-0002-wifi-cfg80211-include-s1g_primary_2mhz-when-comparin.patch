@@ -1,0 +1,32 @@
+From cba1ba11c1bae87de9c2e13d342bfbd6a3c1cf63 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Tue, 25 Nov 2025 13:59:26 +1100
+Subject: [PATCH] wifi: cfg80211: include s1g_primary_2mhz when comparing
+ chandefs
+
+When comparing chandefs, ensure we include s1g_primary_2mhz.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20251125025927.245280-3-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/net/cfg80211.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/include/net/cfg80211.h b/include/net/cfg80211.h
+index 3d3ed1932262..899f267b7cf9 100644
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -974,7 +974,8 @@ cfg80211_chandef_identical(const struct cfg80211_chan_def *chandef1,
+ 		chandef1->center_freq1 == chandef2->center_freq1 &&
+ 		chandef1->freq1_offset == chandef2->freq1_offset &&
+ 		chandef1->center_freq2 == chandef2->center_freq2 &&
+-		chandef1->punctured == chandef2->punctured);
++		chandef1->punctured == chandef2->punctured &&
++		chandef1->s1g_primary_2mhz == chandef2->s1g_primary_2mhz);
+ }
+ 
+ /**
+-- 
+2.50.1
+

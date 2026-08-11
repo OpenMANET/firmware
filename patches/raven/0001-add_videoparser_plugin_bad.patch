@@ -1,0 +1,31 @@
+From cbcdf1d3f1532d42f20dbb7d4abb2ea4c1c1479b Mon Sep 17 00:00:00 2001
+From: Sophronia Koilpillai <sophronia.koilpillai@morsemicro.com>
+Date: Fri, 17 Nov 2023 06:26:54 +0000
+Subject: [PATCH] patches: gst1-plugins-bad: (APP-1421) patch gst1-plugins-bad
+ to add videoparsersbad
+
+videoparsersbad plugin is required for H264 video parsing which is required by KVS.
+Add support for videoparsersbad by patching gst1-plugins-bad.
+
+Approved-by: Milad Mohtashamirad
+Approved-by: James Haggerty
+---
+ multimedia/gst1-plugins-bad/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/feeds/packages/multimedia/gst1-plugins-bad/Makefile b/feeds/packages/multimedia/gst1-plugins-bad/Makefile
+index ca00d4f0a..5fb44f9cd 100644
+--- a/feeds/packages/multimedia/gst1-plugins-bad/Makefile
++++ b/feeds/packages/multimedia/gst1-plugins-bad/Makefile
+@@ -400,7 +400,7 @@ $(eval $(call GstBuildPlugin,switchbin,switchbin support,,,))
+ $(eval $(call GstBuildPlugin,timecode,timecode support,,,))
+ $(eval $(call GstBuildPlugin,videofiltersbad,videofiltersbad support,,,))
+ $(eval $(call GstBuildPlugin,videoframe_audiolevel,videoframe_audiolevel support,,,))
+-#$(eval $(call GstBuildPlugin,videoparsersbad,videoparsersbad support,,,))
++$(eval $(call GstBuildPlugin,videoparsersbad,videoparsersbad support,codecparsers,,))
+ $(eval $(call GstBuildPlugin,videosignal,videosignal support,,,))
+ $(eval $(call GstBuildPlugin,vmnc,vmnc support,,,))
+ $(eval $(call GstBuildPlugin,y4mdec,y4mdec support,,,))
+-- 
+2.43.0
+

@@ -31,17 +31,19 @@ $(strip $(if $(CONFIG_PER_FEED_REPO), \
   $(PACKAGE_DIR)))
 endef
 
+CUSTOM_FEED_FILTER := $(call qstrip,$(CONFIG_FEEDS_WITH_CUSTOM_REPO))
+
 # 1: destination file
 define FeedSourcesAppendOPKG
 ( \
-  echo 'src/gz %d_core %U/targets/%S/packages'; \
+  echo 'src/gz %d_core $(if $(filter $(CUSTOM_FEED_FILTER),core),%p,%U)/targets/%S/packages'; \
   $(strip $(if $(CONFIG_PER_FEED_REPO), \
 	echo 'src/gz %d_base %U/packages/%A/base'; \
 	$(if $(CONFIG_BUILDBOT), \
 		echo 'src/gz %d_kmods %U/targets/%S/kmods/$(LINUX_VERSION)-$(LINUX_RELEASE)-$(LINUX_VERMAGIC)';) \
 	$(foreach feed,$(FEEDS_AVAILABLE), \
 		$(if $(CONFIG_FEED_$(feed)), \
-			echo '$(if $(filter m,$(CONFIG_FEED_$(feed))),# )src/gz %d_$(feed) %U/packages/%A/$(feed)';)))) \
+			echo '$(if $(filter m,$(CONFIG_FEED_$(feed))),# )src/gz %d_$(feed) $(if $(filter $(CUSTOM_FEED_FILTER),$(feed)),%p,%U)/packages/%A/$(feed)';)))) \
 ) >> $(1)
 endef
 

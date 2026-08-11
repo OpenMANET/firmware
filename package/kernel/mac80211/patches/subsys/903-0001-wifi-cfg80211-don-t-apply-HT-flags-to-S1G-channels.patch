@@ -1,0 +1,46 @@
+From d8af6dd43260a072d52acedc190e9946c81aaf58 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Sat, 10 Jan 2026 01:00:28 +1100
+Subject: [PATCH] wifi: cfg80211: don't apply HT flags to S1G channels
+
+HT flags don't really make sense when applied to S1G channels
+which can look rather confusing from usermode programs such as
+iwinfo. Additionally, the bonded channels are validated during
+chandef validation within cfg80211_chandef_usable() rendering
+the application of these flags redundant.
+
+Don't apply HT flags to channels within the S1G band since they
+are redundant and don't really make much sense.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+---
+ net/wireless/reg.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/net/wireless/reg.c b/net/wireless/reg.c
+index a8ab0ab22d90..491427362698 100644
+--- a/net/wireless/reg.c
++++ b/net/wireless/reg.c
+@@ -2332,8 +2332,18 @@ static void reg_process_ht_flags(struct wiphy *wiphy)
+ 	if (!wiphy)
+ 		return;
+ 
+-	for (band = 0; band < NUM_NL80211_BANDS; band++)
++	for (band = 0; band < NUM_NL80211_BANDS; band++) {
++		/*
++		 * Don't apply HT flags to channels within the S1G band.
++		 * As with 80/160/..MHz channels, each bonded channel will
++		 * instead be validated individually in
++		 * cfg80211_chandef_usable().
++		 */
++		if (band == NL80211_BAND_S1GHZ)
++			continue;
++
+ 		reg_process_ht_flags_band(wiphy, wiphy->bands[band]);
++	}
+ }
+ 
+ static bool reg_wdev_chan_valid(struct wiphy *wiphy, struct wireless_dev *wdev)
+-- 
+2.43.0
+

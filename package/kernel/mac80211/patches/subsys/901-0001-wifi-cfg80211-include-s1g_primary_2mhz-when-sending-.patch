@@ -1,0 +1,32 @@
+From 3fc830cd8c9d0e5efae64da38a1a5eac01584b2f Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Tue, 25 Nov 2025 13:59:25 +1100
+Subject: [PATCH] wifi: cfg80211: include s1g_primary_2mhz when sending chandef
+
+The chandef now includes a flag denoting the use of a 2MHz primary
+channel for S1G interfaces, include this when sending the chandef.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20251125025927.245280-2-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ net/wireless/nl80211.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/net/wireless/nl80211.c b/net/wireless/nl80211.c
+index 29c92bc8291b..c961cd42a832 100644
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -4178,6 +4178,9 @@ int nl80211_send_chandef(struct sk_buff *msg, const struct cfg80211_chan_def *ch
+ 	if (chandef->punctured &&
+ 	    nla_put_u32(msg, NL80211_ATTR_PUNCT_BITMAP, chandef->punctured))
+ 		return -ENOBUFS;
++	if (chandef->s1g_primary_2mhz &&
++	    nla_put_flag(msg, NL80211_ATTR_S1G_PRIMARY_2MHZ))
++		return -ENOBUFS;
+ 
+ 	return 0;
+ }
+-- 
+2.50.1
+

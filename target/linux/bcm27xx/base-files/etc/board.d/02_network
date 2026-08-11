@@ -10,6 +10,14 @@ board_config_update
 board=$(board_name)
 
 case "$board" in
+morse,ekh01 |\
+morse,mm6108-ekh01-sdio |\
+morse,mm8108-ekh01-sdio |\
+morse,mm6108-ekh01-spi |\
+morse,mm8108-ekh01-spi |\
+raspberrypi,model-b |\
+raspberrypi,model-b-plus |\
+raspberrypi,model-b-rev2 |\
 raspberrypi,2-model-b |\
 raspberrypi,2-model-b-rev2 |\
 raspberrypi,3-model-b |\

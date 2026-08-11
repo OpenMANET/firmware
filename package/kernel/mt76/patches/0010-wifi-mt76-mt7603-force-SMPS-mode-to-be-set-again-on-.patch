@@ -1,0 +1,33 @@
+From 054c9d3fb35f0a3cdd81cce8adb8810149847010 Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Mon, 16 Dec 2024 13:21:22 +1100
+Subject: [PATCH] wifi: mt76: mt7603: force SMPS mode to be set again on
+ association
+
+When Dynamic power save was in the HT IE, even though the command was
+being sent to the firmware (in the rate table update after the station
+was added) it wasn't taking effect: MCS15 was still used without RTS.
+
+Forcing it to set this in the firmware again after association seems
+to resolve the issue.
+---
+ mt7603/main.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/mt7603/main.c b/mt7603/main.c
+index 89d738de..ea97f0f2 100644
+--- a/mt7603/main.c
++++ b/mt7603/main.c
+@@ -373,6 +373,9 @@ mt7603_sta_assoc(struct mt76_dev *mdev, struct ieee80211_vif *vif,
+ 		 struct ieee80211_sta *sta)
+ {
+ 	struct mt7603_dev *dev = container_of(mdev, struct mt7603_dev, mt76);
++	struct mt7603_sta *msta = (struct mt7603_sta *)sta->drv_priv;
++
++	msta->smps = ~0;
+ 
+ 	mt7603_wtbl_update_cap(dev, sta);
+ }
+-- 
+2.34.1
+

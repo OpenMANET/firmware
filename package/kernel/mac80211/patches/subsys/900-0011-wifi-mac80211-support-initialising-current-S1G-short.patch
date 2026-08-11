@@ -1,0 +1,142 @@
+From 2758b703a9b389158964b3ae6ca171b66bfc883c Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Thu, 17 Jul 2025 17:42:04 +1000
+Subject: [PATCH 11/21] wifi: mac80211: support initialising current S1G short
+ beacon index
+
+Introduce the sb_count variable which tracks the number of
+beacon intervals until the next long beacon. To initialise this
+value, we find the current short beacon index into this period
+which represents the number of short beacons left to send before
+the next long beacon. We use the same TSF value used to initialise
+the DTIM count to ensure the short beacon count and DTIM count
+are in sync as its common for the long beacon period and DTIM period
+to be equivalent.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250717074205.312577-4-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ net/mac80211/cfg.c            |  8 +++++++-
+ net/mac80211/debugfs_netdev.c |  2 +-
+ net/mac80211/ieee80211_i.h    |  6 +++---
+ net/mac80211/mesh.c           |  2 +-
+ net/mac80211/util.c           | 31 ++++++++++++++++++++++++++++---
+ 5 files changed, 40 insertions(+), 9 deletions(-)
+
+--- a/net/mac80211/cfg.c
++++ b/net/mac80211/cfg.c
+@@ -1331,6 +1331,7 @@ static int ieee80211_start_ap(struct wip
+ 	struct ieee80211_link_data *link;
+ 	struct ieee80211_bss_conf *link_conf;
+ 	struct ieee80211_chan_req chanreq = { .oper = params->chandef };
++	u64 tsf;
+ 
+ 	lockdep_assert_wiphy(local->hw.wiphy);
+ 
+@@ -1552,7 +1553,12 @@ static int ieee80211_start_ap(struct wip
+ 		goto error;
+ 	}
+ 
+-	ieee80211_recalc_dtim(local, sdata);
++	tsf = drv_get_tsf(local, sdata);
++	ieee80211_recalc_dtim(sdata, tsf);
++
++	if (link->u.ap.s1g_short_beacon)
++		ieee80211_recalc_sb_count(sdata, tsf);
++
+ 	ieee80211_vif_cfg_change_notify(sdata, BSS_CHANGED_SSID);
+ 	ieee80211_link_info_change_notify(sdata, link, changed);
+ 
+--- a/net/mac80211/debugfs_netdev.c
++++ b/net/mac80211/debugfs_netdev.c
+@@ -705,7 +705,7 @@ static ssize_t ieee80211_if_parse_tsf(
+ 		}
+ 	}
+ 
+-	ieee80211_recalc_dtim(local, sdata);
++	ieee80211_recalc_dtim(sdata, drv_get_tsf(local, sdata));
+ 	return buflen;
+ }
+ IEEE80211_IF_FILE_RW(tsf);
+--- a/net/mac80211/ieee80211_i.h
++++ b/net/mac80211/ieee80211_i.h
+@@ -318,6 +318,7 @@ struct ps_data {
+ 	atomic_t num_sta_ps; /* number of stations in PS mode */
+ 	int dtim_count;
+ 	bool dtim_bc_mc;
++	int sb_count; /* num short beacons til next long beacon */
+ };
+ 
+ struct ieee80211_if_ap {
+@@ -2706,9 +2707,8 @@ void ieee80211_dfs_radar_detected_work(s
+ 				       struct wiphy_work *work);
+ int ieee80211_send_action_csa(struct ieee80211_sub_if_data *sdata,
+ 			      struct cfg80211_csa_settings *csa_settings);
+-
+-void ieee80211_recalc_dtim(struct ieee80211_local *local,
+-			   struct ieee80211_sub_if_data *sdata);
++void ieee80211_recalc_sb_count(struct ieee80211_sub_if_data *sdata, u64 tsf);
++void ieee80211_recalc_dtim(struct ieee80211_sub_if_data *sdata, u64 tsf);
+ int ieee80211_check_combinations(struct ieee80211_sub_if_data *sdata,
+ 				 const struct cfg80211_chan_def *chandef,
+ 				 enum ieee80211_chanctx_mode chanmode,
+--- a/net/mac80211/mesh.c
++++ b/net/mac80211/mesh.c
+@@ -1204,7 +1204,7 @@ int ieee80211_start_mesh(struct ieee8021
+ 		return -ENOMEM;
+ 	}
+ 
+-	ieee80211_recalc_dtim(local, sdata);
++	ieee80211_recalc_dtim(sdata, drv_get_tsf(local, sdata));
+ 	ieee80211_link_info_change_notify(sdata, &sdata->deflink, changed);
+ 
+ 	netif_carrier_on(sdata->dev);
+--- a/net/mac80211/util.c
++++ b/net/mac80211/util.c
+@@ -3903,10 +3903,8 @@ int ieee80211_parse_p2p_noa(const struct
+ }
+ EXPORT_SYMBOL(ieee80211_parse_p2p_noa);
+ 
+-void ieee80211_recalc_dtim(struct ieee80211_local *local,
+-			   struct ieee80211_sub_if_data *sdata)
++void ieee80211_recalc_dtim(struct ieee80211_sub_if_data *sdata, u64 tsf)
+ {
+-	u64 tsf = drv_get_tsf(local, sdata);
+ 	u64 dtim_count = 0;
+ 	u32 beacon_int = sdata->vif.bss_conf.beacon_int * 1024;
+ 	u8 dtim_period = sdata->vif.bss_conf.dtim_period;
+@@ -3944,6 +3942,33 @@ void ieee80211_recalc_dtim(struct ieee80
+ 	ps->dtim_count = dtim_count;
+ }
+ 
++/*
++ * Given a long beacon period, calculate the current index into
++ * that period to determine the number of TSBTTs until the next TBTT.
++ * It is completely valid to have a short beacon period that differs
++ * from the dtim period (i.e a TBTT thats not a DTIM).
++ */
++void ieee80211_recalc_sb_count(struct ieee80211_sub_if_data *sdata, u64 tsf)
++{
++	u32 sb_idx;
++	struct ps_data *ps = &sdata->bss->ps;
++	u8 lb_period = sdata->vif.bss_conf.s1g_long_beacon_period;
++	u32 beacon_int = sdata->vif.bss_conf.beacon_int * 1024;
++
++	/* No mesh / IBSS support for short beaconing */
++	if (tsf == -1ULL || !lb_period ||
++	    (sdata->vif.type != NL80211_IFTYPE_AP &&
++	     sdata->vif.type != NL80211_IFTYPE_AP_VLAN))
++		return;
++
++	/* find the current TSBTT index in our lb_period */
++	do_div(tsf, beacon_int);
++	sb_idx = do_div(tsf, lb_period);
++
++	/* num TSBTTs until the next TBTT */
++	ps->sb_count = sb_idx ? lb_period - sb_idx : 0;
++}
++
+ static u8 ieee80211_chanctx_radar_detect(struct ieee80211_local *local,
+ 					 struct ieee80211_chanctx *ctx)
+ {

@@ -1,0 +1,21 @@
+From 836a105e64a4e91ee93c534b2d4163c55986aa9c Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Mon, 27 Oct 2025 10:54:48 +1100
+Subject: [PATCH 4/8] tests: expose scan_freq_offset
+
+---
+ tests/hwsim/wpasupplicant.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+--- a/tests/hwsim/wpasupplicant.py
++++ b/tests/hwsim/wpasupplicant.py
+@@ -1135,7 +1135,8 @@ class WpaSupplicant:
+                       "wpa_deny_ptk0_rekey",
+                       "max_idle",
+                       "ssid_protection",
+-                      "enable_4addr_mode"]
++                      "enable_4addr_mode",
++                      "scan_freq_offset"]
+         for field in not_quoted:
+             if field in kwargs and kwargs[field]:
+                 self.set_network(id, field, kwargs[field])

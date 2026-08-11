@@ -1,4 +1,9 @@
 #!/bin/sh
+# Modified for OpenMANET / Morse Micro HaLow support: get_freq() knows the
+# s1g band and returns fractional MHz with a first-enabled-frequency
+# fallback for it. Non-s1g bands keep upstream behaviour (integer MHz,
+# single value) — stock wpa_supplicant rejects fractional frequencies in
+# mesh/adhoc network blocks.
 . /lib/netifd/netifd-wireless.sh
 . /lib/netifd/hostapd.sh
 . /lib/functions/system.sh
@@ -31,9 +36,10 @@ drv_mac80211_init_device_config() {
 	config_add_string distance
 	config_add_string ifname_prefix
 	config_add_string macaddr_base
-	config_add_int radio beacon_int chanbw frag rts
+	config_add_int radio chanbw frag rts
 	config_add_int rxantenna txantenna txpower min_tx_power
 	config_add_int num_global_macaddr multiple_bssid
+	config_add_int s1g_oper_chwidth op_class
 	config_add_boolean noscan ht_coex acs_exclude_dfs background_radar
 	config_add_array ht_capab
 	config_add_array channels
@@ -95,6 +101,9 @@ drv_mac80211_init_iface_config() {
 	config_add_int $MP_CONFIG_INT
 	config_add_boolean $MP_CONFIG_BOOL
 	config_add_string $MP_CONFIG_STRING
+
+	#beacon interval
+	config_add_int beacon_int
 }
 
 mac80211_add_capabilities() {
@@ -522,6 +531,38 @@ mac80211_hostapd_setup_base() {
 			append base_cfg "eht_oper_centr_freq_seg0_idx=$eht_center_seg0" "$N"
 		}
 	fi
+	[ "$band" = "s1g" ] && {
+		append base_cfg "ieee80211ah=1" "$N"
+		json_get_vars s1g_oper_chwidth
+
+		if [ "$s1g_oper_chwidth" -le 1 ]; then
+			s1g_chwidth_start_channel=1
+		else
+			s1g_chwidth_start_channel=5
+		fi
+
+		if [ "$s1g_oper_chwidth" -ge 0 ] && [ "$s1g_oper_chwidth" -le 4 ]; then
+			op_class=$((68 + s1g_oper_chwidth))
+		else
+			op_class=
+		fi
+
+		s1g_width_mhz=$(( 1 << s1g_oper_chwidth ))
+
+		if [ "$channel" -ge 1 ] && [ "$channel" -le 51 ] && [ $((channel % 2)) -eq 1 ] && [ "$channel" -ge "$s1g_chwidth_start_channel" ]; then
+			s1g_oper_centr_freq_idx=$(( s1g_chwidth_start_channel + (s1g_width_mhz - 1) + 2*s1g_width_mhz * ((channel - s1g_chwidth_start_channel) / (2*s1g_width_mhz)) ))
+		else
+			s1g_oper_centr_freq_idx=
+		fi
+
+		# 2MHz operating channel index used to calculate s1g_pri_loc
+		s1g_2MHz_oper_centr_freq_idx=$(( 2 + 4*((channel - 1)/ (4)) ))
+		s1g_pri_loc=$(( channel > s1g_2MHz_oper_centr_freq_idx ))
+		append base_cfg "s1g_pri_loc=$s1g_pri_loc" "$N"
+
+		[ -n "$s1g_oper_centr_freq_idx" ] && [ "$s1g_oper_centr_freq_idx" -le 51 ] && append base_cfg "s1g_oper_centr_freq_idx=$s1g_oper_centr_freq_idx" "$N"
+		[ -n "$op_class" ] && append base_cfg "op_class=$op_class" "$N"
+	}
 
 	hostapd_prepare_device_config "$hostapd_conf_file" nl80211
 	cat >> "$hostapd_conf_file" <<EOF
@@ -792,7 +833,7 @@ mac80211_add_mesh_params() {
 
 mac80211_setup_adhoc() {
 	local enable=$1
-	json_get_vars bssid ssid key mcast_rate
+	json_get_vars bssid ssid key mcast_rate beacon_int:100
 
 	NEWUMLIST="${NEWUMLIST}$ifname "
 
@@ -851,7 +892,7 @@ mac80211_setup_adhoc() {
 }
 
 mac80211_setup_mesh() {
-	json_get_vars ssid mesh_id mcast_rate
+	json_get_vars ssid mesh_id mcast_rate beacon_int
 	json_get_values iface_basic_rate_list basic_rate
 
 	mcval=
@@ -1082,6 +1123,7 @@ get_freq() {
 		5g) band="2:";;
 		60g) band="3:";;
 		6g) band="4:";;
+		s1g) band="5:";;
 	esac
 
 	iw "$phy" info | awk -v band="$band" -v channel="[$channel]" '
@@ -1090,9 +1132,20 @@ $1 ~ /Band/ {
 	band_match = band == $2
 }
 
-band_match && $3 == "MHz" && $4 == channel {
-	print int($2)
-	exit
+band_match && $3 == "MHz" {
+	if (band == "5:" && first_enabled_freq == "" && $5 != "(disabled)") {
+		first_enabled_freq = $2
+	}
+	if ($4 == channel) {
+		freq = $2
+	}
+}
+
+END {
+	if (band == "5:")
+		print freq, first_enabled_freq
+	else
+		print int(freq)
 }
 '
 }
@@ -1132,8 +1185,10 @@ drv_mac80211_setup() {
 		radio phy macaddr path \
 		country chanbw distance \
 		txpower \
+		op_class \
+		s1g_oper_chwidth \
 		rxantenna txantenna \
-		frag rts beacon_int:100 htmode \
+		frag rts htmode \
 		num_global_macaddr:1 multiple_bssid \
 		ifname_prefix macaddr_base
 	json_get_values basic_rate_list basic_rate

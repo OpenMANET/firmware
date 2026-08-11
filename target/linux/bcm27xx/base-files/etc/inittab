@@ -2,3 +2,4 @@
 ::shutdown:/etc/init.d/rcS K shutdown
 ::askconsole:/usr/libexec/login.sh
 tty1::askfirst:/usr/libexec/login.sh
+ttyUSB0::askfirst:/usr/libexec/login.sh

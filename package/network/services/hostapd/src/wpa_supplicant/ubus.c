@@ -14,7 +14,9 @@
 #include "common/ieee802_11_defs.h"
 #include "wpa_supplicant_i.h"
 #include "wps_supplicant.h"
+#include "dpp_supplicant.h"
 #include "ubus.h"
+#include <libubox/blobmsg_json.h>
 
 static struct ubus_context *ctx;
 static struct blob_buf b;
@@ -159,12 +161,45 @@ wpas_bss_wps_cancel(struct ubus_context *ctx, struct ubus_object *obj,
 }
 #endif
 
+#ifdef CONFIG_DPP3
+enum {
+	DPP_PUSH_BUTTON_COMMAND,
+	__DPP_PUSH_BUTTON_MAX
+};
+
+static const struct blobmsg_policy dpp_push_button_policy[__DPP_PUSH_BUTTON_MAX] = {
+	[DPP_PUSH_BUTTON_COMMAND] = { "command", BLOBMSG_TYPE_STRING },
+};
+
+static int
+wpas_bss_dpp_push_button(struct ubus_context *ctx, struct ubus_object *obj,
+			 struct ubus_request_data *req, const char *method,
+			 struct blob_attr *msg)
+{
+	int rc;
+	struct blob_attr *tb[__DPP_PUSH_BUTTON_MAX];
+	struct wpa_supplicant *wpa_s = get_wpas_from_object(obj);
+
+	blobmsg_parse(dpp_push_button_policy, __DPP_PUSH_BUTTON_MAX, tb, blob_data(msg), blob_len(msg));
+
+	rc = wpas_dpp_push_button(wpa_s, tb[DPP_PUSH_BUTTON_COMMAND] ? blobmsg_data(tb[DPP_PUSH_BUTTON_COMMAND]) : NULL);
+
+	if (rc != 0)
+		return UBUS_STATUS_NOT_SUPPORTED;
+
+	return 0;
+}
+#endif
+
 static const struct ubus_method bss_methods[] = {
 	UBUS_METHOD_NOARG("reload", wpas_bss_reload),
 	UBUS_METHOD_NOARG("get_features", wpas_bss_get_features),
 #ifdef CONFIG_WPS
 	UBUS_METHOD_NOARG("wps_start", wpas_bss_wps_start),
 	UBUS_METHOD_NOARG("wps_cancel", wpas_bss_wps_cancel),
+#endif
+#ifdef CONFIG_DPP3
+	UBUS_METHOD("dpp_push_button", wpas_bss_dpp_push_button, dpp_push_button_policy),
 #endif
 };
 
@@ -206,6 +241,52 @@ void wpas_ubus_free_bss(struct wpa_supplicant *wpa_s)
 
 	free(name);
 }
+
+void wpas_ubus_notify_type(struct wpa_supplicant *wpa_s, const char *type)
+{
+	if (!wpa_s->ubus.obj.has_subscribers)
+		return;
+
+	ubus_notify(ctx, &wpa_s->ubus.obj, type, NULL, -1);
+}
+
+#ifdef CONFIG_DPP3
+void wpas_ubus_notify_dpp_pb_result(struct wpa_supplicant *wpa_s, const char *status)
+{
+	blob_buf_init(&b, 0);
+
+	blobmsg_add_string(&b, "ifname", wpa_s->ifname);
+	blobmsg_add_string(&b, "status", status);
+
+	ubus_send_event(ctx, "dpp.result", b.head);
+}
+#endif
+
+#ifdef CONFIG_DPP
+void wpas_ubus_notify_dpp_conf_failed(struct wpa_supplicant *wpa_s)
+{
+	blob_buf_init(&b, 0);
+
+	blobmsg_add_string(&b, "ifname", wpa_s->ifname);
+
+	ubus_send_event(ctx, "dpp.conf_failed", b.head);
+}
+
+void wpas_ubus_notify_dpp_conf_received(struct wpa_supplicant *wpa_s,
+                                        const struct dpp_config_obj *conf)
+{
+	void *tbl;
+
+	blob_buf_init(&b, 0);
+
+	blobmsg_add_string(&b, "ifname", wpa_s->ifname);
+	tbl = blobmsg_open_table(&b, "conf");
+	blobmsg_add_json_from_string(&b, conf->conf_obj);
+	blobmsg_close_table(&b, tbl);
+
+	ubus_send_event(ctx, "dpp.conf_received", b.head);
+}
+#endif
 
 #ifdef CONFIG_WPS
 void wpas_ubus_notify(struct wpa_supplicant *wpa_s, const struct wps_credential *cred)

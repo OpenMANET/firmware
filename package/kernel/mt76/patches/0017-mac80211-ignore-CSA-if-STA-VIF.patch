@@ -1,0 +1,53 @@
+From 0b022732c321b3b0b63a92dc0b055f23b25c6d80 Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Mon, 24 Nov 2025 12:54:55 +1100
+Subject: [PATCH] mac80211: ignore CSA if STA VIF
+
+Without this, if there was an AP and STA on the same radio and
+the STA received a CSA a lot of kernel warnings would be emitted:
+
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.810941] WARNING: CPU: 0 PID: 0 at /home/james.haggerty/a/morse_openwrt_23/build_dir/target-mipsel-openwrt-linux-musl_musl/linux-ramips_mt7621/backports-6.1.145-1/net/mac80211/tx.c:5133 ieee80211_beacon_cntdwn_is_complete+0xdc/0x150 [mac80211]
+...
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.811725] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W         5.15.189 #0
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.811740] Stack : 00000000 80084018 00000000 00000004 00000000 00000000 8140dd04 80a40000
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.811789]         80880000 807a587c 8087d318 8087ce03 00000000 00000001 8140dcb0 81456e40
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.811840]         00000000 00000000 807a587c 8140db50 c0000873 00000000 ffffffea 00000000
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.811889]         8140db5c 00000873 80882960 20202020 807a587c 00000000 00000000 82e39220
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.811939]         00000009 82ca0dc0 00000001 00000002 00000008 00000020 00000000 80a40000
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.811987]         ...
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.812001] Call Trace:
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.812006] [<80007f24>] show_stack+0x28/0xf0
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.812029] [<80383db0>] dump_stack_lvl+0x60/0x80
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.812046] [<8002df88>] __warn+0x9c/0x124
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.812066] [<8002e06c>] warn_slowpath_fmt+0x5c/0xac
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.812093] [<82e39220>] ieee80211_beacon_cntdwn_is_complete+0xdc/0x150 [mac80211]
+Thu Nov 20 03:59:40 2025 kern.warn kernel: [  902.812257] [<82c944f8>] mt76_csa_finish+0xc0/0x268 [mt76]
+---
+ mac80211.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+Index: mt76-2025.09.15~6467af3b/mac80211.c
+===================================================================
+--- mt76-2025.09.15~6467af3b.orig/mac80211.c
++++ mt76-2025.09.15~6467af3b/mac80211.c
+@@ -1824,7 +1824,10 @@ EXPORT_SYMBOL_GPL(mt76_get_sar_power);
+ static void
+ __mt76_csa_finish(void *priv, u8 *mac, struct ieee80211_vif *vif)
+ {
+-	if (vif->bss_conf.csa_active && ieee80211_beacon_cntdwn_is_complete(vif, 0))
++	if (!vif->bss_conf.csa_active || vif->type == NL80211_IFTYPE_STATION)
++		return;
++
++	if (ieee80211_beacon_cntdwn_is_complete(vif, 0))
+ 		ieee80211_csa_finish(vif, 0);
+ }
+ 
+@@ -1846,7 +1849,7 @@ __mt76_csa_check(void *priv, u8 *mac, st
+ {
+ 	struct mt76_dev *dev = priv;
+ 
+-	if (!vif->bss_conf.csa_active)
++	if (!vif->bss_conf.csa_active || vif->type == NL80211_IFTYPE_STATION)
+ 		return;
+ 
+ 	dev->csa_complete |= ieee80211_beacon_cntdwn_is_complete(vif, 0);

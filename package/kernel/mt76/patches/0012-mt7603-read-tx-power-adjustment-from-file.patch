@@ -1,0 +1,207 @@
+
+---
+ mt7603/mcu.c    | 91 +++++++++++++++++++++++++++++++++++++++++++++++++
+ mt7603/mt7603.h | 53 ++++++++++++++++++++++++++++
+ 2 files changed, 144 insertions(+)
+
+diff --git a/mt7603/mcu.c b/mt7603/mcu.c
+index 301668c3..576f875c 100644
+--- a/mt7603/mcu.c
++++ b/mt7603/mcu.c
+@@ -113,6 +113,50 @@ mt7603_mcu_restart(struct mt76_dev *dev)
+ 	return mt76_mcu_send_msg(dev, -MCU_CMD_RESTART_DL_REQ, NULL, 0, true);
+ }
+ 
++static int mt7603_load_tx_power_table(struct mt7603_dev *dev)
++{
++	const struct firmware *tf;/*Table Frimware*/
++	const char *tf_path;
++	u8 tf_magic[4] = MT7603_TXPAT_MAGIC;
++	const size_t table_size = sizeof(struct mt7603_txpat);
++	tf_path = MT7603_TXPAT_PATH;
++
++	dev->txpat_loaded = 0;
++	memset(&dev->txpat, 0, table_size);
++
++	if (request_firmware(&tf, tf_path, dev->mt76.dev)) {
++		dev_info(dev->mt76.dev,
++			"No TX Power Adjust file (%s) found.\n",
++			tf_path);
++		return 0; /*It's ok if this file is not found.*/
++	}
++
++	if (tf->size != table_size) {
++		dev_err(dev->mt76.dev,
++			"TX Power Adjust file (%s) size doesn't match. Expected: %zuB. read %zuB\n",
++			tf_path, table_size, tf->size);
++		release_firmware(tf);
++		return -EINVAL;
++	}
++	/* Read the file into our txpat structure.*/
++	memcpy(&dev->txpat, tf->data, table_size);
++
++	if (memcmp(dev->txpat.magic, tf_magic, sizeof(dev->txpat.magic))) {
++		dev_err(dev->mt76.dev,"TX Power Adjust file magic doesn't match. (%s)\n", tf_path);
++		release_firmware(tf);
++		return -EINVAL;
++	}
++	/* Print the text message of the table.*/
++	/* make sure that the last byte of text section is null.*/
++	dev->txpat.message[sizeof(dev->txpat.message) - 1] = 0;
++	dev_info(dev->mt76.dev, "TX power adjustment table text: %s.\n",
++		dev->txpat.message);
++
++	dev->txpat_loaded = 1;
++	release_firmware(tf);
++	return 0;
++}
++
+ static int mt7603_load_firmware(struct mt7603_dev *dev)
+ {
+ 	const struct firmware *fw;
+@@ -122,6 +166,10 @@ static int mt7603_load_firmware(struct mt7603_dev *dev)
+ 	u32 addr, val;
+ 	int ret;
+ 
++	ret = mt7603_load_tx_power_table(dev);
++	if (ret)
++		return ret;
++
+ 	if (is_mt7628(dev)) {
+ 		if (mt76xx_rev(dev) == MT7628_REV_E1)
+ 			firmware = MT7628_FIRMWARE_E1;
+@@ -337,6 +385,33 @@ int mt7603_mcu_set_eeprom(struct mt7603_dev *dev)
+ 	return ret;
+ }
+ 
++/* 
++   Add the adjustment value to eeprom content (according to mt7603 eeprom datasheet) .
++   eeprom_val: value read from eeprom.
++   adjust_val: the adjusted power multiplied by 2 (dbm x2).
++*/
++static u8 set_delta(u8 eeprom_val, int adjust_val) {
++	int int_value = adjust_val;
++	u8 result = 0;
++
++	int is_positive = (eeprom_val & 0x40) >> 6;
++	int value_part = eeprom_val & 0x3F;
++	if (is_positive == 0) {
++		value_part = -value_part;
++	}
++
++	int_value += value_part;
++
++	if (int_value < 0) {
++		result |= 0x80;
++		int_value = -int_value;
++	} else {
++		result |= 0xc0;
++	}
++	result |= int_value & 0x3F;
++	return result;
++}
++
+ static int mt7603_mcu_set_tx_power(struct mt7603_dev *dev)
+ {
+ 	struct {
+@@ -370,10 +445,26 @@ static int mt7603_mcu_set_tx_power(struct mt7603_dev *dev)
+ #undef EEP_VAL
+ 	};
+ 	u8 *eep = (u8 *)dev->mt76.eeprom.data;
++	int i, rate_tx_pw_adjust, bw_tx_power_adjust;
+ 
+ 	memcpy(req.rate_power_delta, eep + MT_EE_TX_POWER_CCK,
+ 	       sizeof(req.rate_power_delta));
+ 
++	if (dev->txpat_loaded) {
++		for (i = 0; i < TXPAT_NOF_RATES; i++) {
++			rate_tx_pw_adjust = dev->txpat.rate_table[i][req.center_channel - 1];
++			if (rate_tx_pw_adjust)
++			{
++				req.rate_power_delta[i] = set_delta(req.rate_power_delta[i], rate_tx_pw_adjust);
++			}
++		}
++
++		bw_tx_power_adjust = dev->txpat.bw_table[req.center_channel - 1];
++		if (bw_tx_power_adjust) {
++			req.bw_power_delta = set_delta(0x80, bw_tx_power_adjust);
++		}
++	}
++
+ 	memcpy(req.temp_comp_power, eep + MT_EE_STEP_NUM_NEG_6_7,
+ 	       sizeof(req.temp_comp_power));
+ 
+diff --git a/mt7603/mt7603.h b/mt7603/mt7603.h
+index ac9235ba..2ff5a554 100644
+--- a/mt7603/mt7603.h
++++ b/mt7603/mt7603.h
+@@ -39,6 +39,57 @@
+ #define MT7603_CFEND_RATE_DEFAULT	0x69 /* chip default (24M) */
+ #define MT7603_CFEND_RATE_11B		0x03 /* 11B LP, 11M */
+ 
++/*TXPAT: Tx Power Adjustment Table */
++#define MT7603_TXPAT_PATH    "mt7603e_txpat.bin"
++#define MT7603_TXPAT_MAGIC   {0xA0, 0xF0, 0xA1, 0xF1}
++#define MT7603_TXPAT_TXT_SIZE   64
++#define TXPAT_NOF_CH 14
++#define TXPAT_NOF_RATES 14
++
++
++//     /* mt7603_txpat.rate_table contains the adjust value to the values that are
++//     /* read from eeprom.
++//      * Each row corresponds to a channel (ch 1...14) for a certain rate/modulation.
++//      * mt7603_txpat.bw_table is the 40MHz TX power adjustment comparing to 20MHz in that
++//      * channel.
++//      * PLAESE NOTE that the values are multiplied by 2 in the table. i.e. if you
++//      * want to reduce the tx power by 4.5dbm, you need to set it to -9 in the table.
++//      * the content of mt7603_txpat structure is read from MT7603_TXPAT_PATH
++//     */
++//     int8_t rate_table [TXPAT_NOF_RATES][TXPAT_NOF_CH]=
++//     {
++//     /*  CHANNEL  ->      1    2    3    4    5    6    7    8    9   10   11   12   13   14 */
++//     /*    RATE    */
++//
++//     /*     CCK_1_2M*/  {-6  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-6  ,-6  ,-6  , 0  },
++//     /*    CCK_5_11M*/  {-6  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-6  ,-6  ,-6  , 0  },
++//
++//     /*    OFDM_6_9M*/  {-8  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-6  ,-6  ,-6  , 0  },
++//     /*  OFDM_12_18M*/  {-8  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-6  ,-6  ,-6  , 0  },
++//     /*  OFDM_24_36M*/  {-9  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-7  ,-7  ,-7  , 0  },
++//     /*     OFDM_48M*/  {-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  , 0  },
++//     /*     OFDM_54M*/  {-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  ,-3  , 0  },
++//
++//     /*      MCS_0_8*/  {-10 ,-3  ,-2  ,-2  ,-4  ,-4  ,-1  ,-1  ,-1  ,-1  ,-10 ,-10 ,-10 , 0  },
++//     /*       MCS_32*/  { 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  },
++//     /* MCS_1_2_9_10*/  {-10 ,-3  ,-2  ,-2  ,-4  ,-4  ,-1  ,-1  ,-1  ,-1  ,-10 ,-10 ,-10 , 0  },
++//     /*MCS_3_4_11_12*/  {-10 ,-3  ,-2  ,-2  ,-4  ,-4  ,-2  ,-2  ,-2  ,-2  ,-10 ,-10 ,-10 , 0  },
++//     /*     MCS_5_13*/  {-6  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-6  ,-6  ,-6  , 0  },
++//     /*     MCS_6_14*/  {-6  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-6  ,-6  ,-6  , 0  },
++//     /*     MCS_7_15*/  {-6  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-2  ,-6  ,-6  ,-6  , 0  }
++//     };
++//     int8_t bw_table [TXPAT_NOF_CH]=
++//     /*  CHANNEL  ->      1    2    3    4    5    6    7    8    9   10   11   12   13   14 */
++//     /*        40M*/    {-5  ,-8  ,-6  ,-5  ,-5  ,-8  , 0  , 0  , 0  , 0  ,-6  ,-6  ,-6  , 0  };
++
++struct mt7603_txpat
++{
++	char message[64];
++	u8 magic[4];
++	int8_t rate_table [TXPAT_NOF_RATES][TXPAT_NOF_CH];
++	int8_t bw_table [TXPAT_NOF_CH];
++}__packed;
++
+ struct mt7603_vif;
+ struct mt7603_sta;
+ 
+@@ -154,6 +205,8 @@ struct mt7603_dev {
+ 	u16 rx_dma_idx;
+ 
+ 	u32 reset_test;
++	u8 txpat_loaded;
++	struct mt7603_txpat txpat;
+ 
+ 	unsigned int reset_cause[__RESET_CAUSE_MAX];
+ };
+-- 
+2.25.1
+

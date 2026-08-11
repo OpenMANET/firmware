@@ -1,0 +1,16 @@
+dtoverlay=raven
+dtoverlay=disable-bt
+dtoverlay=disable-wifi
+hdmi_blanking=2
+dtoverlay=pps-gpio,gpiopin=18
+dtparam=i2c_vc=on
+# Power tuning disabled for bring-up: validate boot stability at stock
+# clocks/voltage first, then re-enable one line at a time.
+# Limit maximum CPU frequency to 1.0 GHz (Stock is 1500)
+#arm_freq=1000
+# Drop idle frequency to the minimum stable floor
+#arm_freq_min=200
+# Under-volt the CPU SoC to reduce thermal output
+#over_voltage=-2
+# Limit GPU frequencies to save power
+#gpu_freq=250

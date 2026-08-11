@@ -1,0 +1,353 @@
+From ee63609454838ea2b108f96f74a287be72d281ee Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Fri, 25 Jul 2025 23:22:19 +1000
+Subject: [PATCH 14/21] wifi: mac80211: support block bitmap S1G TIM encoding
+
+An S1G TIM PVB is encoded differently compared to a non-s1g TIM PVB.
+As the AP dictates which encoding mode it uses, here we only implement
+block bitmap encoding. This is the default encoding mode used by
+all current vendor implementations.
+
+Additionally, S1G has a maximum AID count of 8192, however we are
+limiting the current implementation to 1600. This has no resemblence
+to the standard and is purely an implementation detail. The reason for
+this is due to the TIM elements maximum length of 255. This allows for,
+at most, 25 encoded blocks for a PVB encoded with block bitmap. Support
+for the maximum of 8192 AIDs will require an implementation of page slicing
+to be added to mac80211.
+
+As a result, we perform extra validation on both the STA and AP side
+when receiving an AID as an S1G interface.
+
+Add support for block bitmap encoding for an S1G AP and limit the
+maximum AID count to 1600 for the current mac80211 implementations.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250725132221.258217-2-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/uapi/linux/nl80211.h |   3 +-
+ net/mac80211/cfg.c           |  10 ++-
+ net/mac80211/ieee80211_i.h   |   8 ++
+ net/mac80211/mlme.c          |  19 ++--
+ net/mac80211/tx.c            | 166 +++++++++++++++++++++++++++--------
+ 5 files changed, 156 insertions(+), 50 deletions(-)
+
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -2265,7 +2265,8 @@ enum nl80211_commands {
+  * @NL80211_ATTR_PEER_AID: Association ID for the peer TDLS station (u16).
+  *	This is similar to @NL80211_ATTR_STA_AID but with a difference of being
+  *	allowed to be used with the first @NL80211_CMD_SET_STATION command to
+- *	update a TDLS peer STA entry.
++ *	update a TDLS peer STA entry. For S1G interfaces, this is limited to
++ *	1600 for the current mac80211 implementation.
+  *
+  * @NL80211_ATTR_COALESCE_RULE: Coalesce rule information.
+  *
+--- a/net/mac80211/cfg.c
++++ b/net/mac80211/cfg.c
+@@ -2098,10 +2098,16 @@ static int sta_apply_parameters(struct i
+ 
+ 	/*
+ 	 * cfg80211 validates this (1-2007) and allows setting the AID
+-	 * only when creating a new station entry
++	 * only when creating a new station entry. For S1G APs, the current
++	 * implementation supports a maximum of 1600 AIDs.
+ 	 */
+-	if (params->aid)
++	if (params->aid) {
++		if (sdata->vif.cfg.s1g &&
++		    params->aid > IEEE80211_MAX_SUPPORTED_S1G_AID)
++			return -EINVAL;
++
+ 		sta->sta.aid = params->aid;
++	}
+ 
+ 	/*
+ 	 * Some of the following updates would be racy if called on an
+--- a/net/mac80211/ieee80211_i.h
++++ b/net/mac80211/ieee80211_i.h
+@@ -86,6 +86,14 @@ extern const u8 ieee80211_ac_to_qos_mask
+ 
+ #define IEEE80211_MAX_NAN_INSTANCE_ID 255
+ 
++/*
++ * Current mac80211 implementation supports a maximum of 1600 AIDS
++ * for S1G interfaces. With regards to an S1G TIM, this covers 25 blocks
++ * as each block is 64 AIDs.
++ */
++#define IEEE80211_MAX_SUPPORTED_S1G_AID	1600
++#define IEEE80211_MAX_SUPPORTED_S1G_TIM_BLOCKS 25
++
+ enum ieee80211_status_data {
+ 	IEEE80211_STATUS_TYPE_MASK	= 0x00f,
+ 	IEEE80211_STATUS_TYPE_INVALID	= 0,
+--- a/net/mac80211/mlme.c
++++ b/net/mac80211/mlme.c
+@@ -5747,6 +5747,7 @@ static void ieee80211_rx_mgmt_assoc_resp
+ 	};
+ 	u8 ap_mld_addr[ETH_ALEN] __aligned(2);
+ 	unsigned int link_id;
++	u16 max_aid = IEEE80211_MAX_AID;
+ 
+ 	lockdep_assert_wiphy(sdata->local->hw.wiphy);
+ 
+@@ -5771,10 +5772,12 @@ static void ieee80211_rx_mgmt_assoc_resp
+ 	reassoc = ieee80211_is_reassoc_resp(mgmt->frame_control);
+ 	capab_info = le16_to_cpu(mgmt->u.assoc_resp.capab_info);
+ 	status_code = le16_to_cpu(mgmt->u.assoc_resp.status_code);
+-	if (assoc_data->s1g)
++	if (assoc_data->s1g) {
+ 		elem_start = mgmt->u.s1g_assoc_resp.variable;
+-	else
++		max_aid = IEEE80211_MAX_SUPPORTED_S1G_AID;
++	} else {
+ 		elem_start = mgmt->u.assoc_resp.variable;
++	}
+ 
+ 	/*
+ 	 * Note: this may not be perfect, AP might misbehave - if
+@@ -5798,16 +5801,15 @@ static void ieee80211_rx_mgmt_assoc_resp
+ 
+ 	if (elems->aid_resp)
+ 		aid = le16_to_cpu(elems->aid_resp->aid);
+-	else if (assoc_data->s1g)
+-		aid = 0; /* TODO */
+ 	else
+ 		aid = le16_to_cpu(mgmt->u.assoc_resp.aid);
+ 
+ 	/*
+-	 * The 5 MSB of the AID field are reserved
+-	 * (802.11-2016 9.4.1.8 AID field)
++	 * The 5 MSB of the AID field are reserved for a non-S1G STA. For
++	 * an S1G STA the 3 MSBs are reserved.
++	 * (802.11-2016 9.4.1.8 AID field).
+ 	 */
+-	aid &= 0x7ff;
++	aid &= assoc_data->s1g ? 0x1fff : 0x7ff;
+ 
+ 	sdata_info(sdata,
+ 		   "RX %sssocResp from %pM (capab=0x%x status=%d aid=%d)\n",
+@@ -5844,7 +5846,7 @@ static void ieee80211_rx_mgmt_assoc_resp
+ 		event.u.mlme.reason = status_code;
+ 		drv_event_callback(sdata->local, sdata, &event);
+ 	} else {
+-		if (aid == 0 || aid > IEEE80211_MAX_AID) {
++		if (aid == 0 || aid > max_aid) {
+ 			sdata_info(sdata,
+ 				   "invalid AID value %d (out of range), turn off PS\n",
+ 				   aid);
+@@ -5882,6 +5884,7 @@ static void ieee80211_rx_mgmt_assoc_resp
+ 		}
+ 
+ 		sdata->vif.cfg.aid = aid;
++		sdata->vif.cfg.s1g = assoc_data->s1g;
+ 
+ 		if (!ieee80211_assoc_success(sdata, mgmt, elems,
+ 					     elem_start, elem_len)) {
+--- a/net/mac80211/tx.c
++++ b/net/mac80211/tx.c
+@@ -4892,15 +4892,114 @@ void ieee80211_tx_pending(struct tasklet
+ 
+ /* functions for drivers to get certain frames */
+ 
++static void ieee80211_beacon_add_tim_pvb(struct ps_data *ps,
++					 struct sk_buff *skb,
++					 bool mcast_traffic)
++{
++	int i, n1 = 0, n2;
++
++	/*
++	 * Find largest even number N1 so that bits numbered 1 through
++	 * (N1 x 8) - 1 in the bitmap are 0 and number N2 so that bits
++	 * (N2 + 1) x 8 through 2007 are 0.
++	 */
++	for (i = 0; i < IEEE80211_MAX_TIM_LEN; i++) {
++		if (ps->tim[i]) {
++			n1 = i & 0xfe;
++			break;
++		}
++	}
++	n2 = n1;
++	for (i = IEEE80211_MAX_TIM_LEN - 1; i >= n1; i--) {
++		if (ps->tim[i]) {
++			n2 = i;
++			break;
++		}
++	}
++
++	/* Bitmap control */
++	skb_put_u8(skb, n1 | mcast_traffic);
++	/* Part Virt Bitmap */
++	skb_put_data(skb, ps->tim + n1, n2 - n1 + 1);
++}
++
++/*
++ * mac80211 currently supports encoding using block bitmap mode, non
++ * inversed. The current implementation supports up to 1600 AIDs.
++ *
++ * Block bitmap encoding breaks down the AID bitmap into blocks of 64
++ * AIDs. Each block contains between 0 and 8 subblocks. Each subblock
++ * describes 8 AIDs and the presence of a subblock is determined by
++ * the block bitmap.
++ */
++static void ieee80211_s1g_beacon_add_tim_pvb(struct ps_data *ps,
++					     struct sk_buff *skb,
++					     bool mcast_traffic)
++{
++	int blk;
++
++	/*
++	 * Emit a bitmap control block with a page slice number of 31 and a
++	 * page index of 0 which indicates as per IEEE80211-2024 9.4.2.5.1
++	 * that the entire page (2048 bits) indicated by the page index
++	 * is encoded in the partial virtual bitmap.
++	 */
++	skb_put_u8(skb, mcast_traffic | (31 << 1));
++
++	/* Emit an encoded block for each non-zero sub-block */
++	for (blk = 0; blk < IEEE80211_MAX_SUPPORTED_S1G_TIM_BLOCKS; blk++) {
++		u8 blk_bmap = 0;
++		int sblk;
++
++		for (sblk = 0; sblk < 8; sblk++) {
++			int sblk_idx = blk * 8 + sblk;
++
++			/*
++			 * If the current subblock is non-zero, increase the
++			 * number of subblocks to emit for the current block.
++			 */
++			if (ps->tim[sblk_idx])
++				blk_bmap |= BIT(sblk);
++		}
++
++		/* If the current block contains no non-zero sublocks */
++		if (!blk_bmap)
++			continue;
++
++		/*
++		 * Emit a block control byte for the current encoded block
++		 * with an encoding mode of block bitmap (0x0), not inverse
++		 * (0x0) and the current block offset (5 bits)
++		 */
++		skb_put_u8(skb, blk << 3);
++
++		/*
++		 * Emit the block bitmap for the current encoded block which
++		 * contains the present subblocks.
++		 */
++		skb_put_u8(skb, blk_bmap);
++
++		/* Emit the present subblocks */
++		for (sblk = 0; sblk < 8; sblk++) {
++			int sblk_idx = blk * 8 + sblk;
++
++			if (!(blk_bmap & BIT(sblk)))
++				continue;
++
++			skb_put_u8(skb, ps->tim[sblk_idx]);
++		}
++	}
++}
++
+ static void __ieee80211_beacon_add_tim(struct ieee80211_sub_if_data *sdata,
+ 				       struct ieee80211_link_data *link,
+ 				       struct ps_data *ps, struct sk_buff *skb,
+ 				       bool is_template)
+ {
+-	u8 *pos, *tim;
+-	int aid0 = 0;
+-	int i, have_bits = 0, n1, n2;
++	struct element *tim;
++	bool mcast_traffic = false, have_bits = false;
+ 	struct ieee80211_bss_conf *link_conf = link->conf;
++	bool s1g = ieee80211_get_link_sband(link)->band == NL80211_BAND_S1GHZ;
+ 
+ 	/* Generate bitmap for TIM only if there are any STAs in power save
+ 	 * mode. */
+@@ -4908,7 +5007,8 @@ static void __ieee80211_beacon_add_tim(s
+ 		/* in the hope that this is faster than
+ 		 * checking byte-for-byte */
+ 		have_bits = !bitmap_empty((unsigned long *)ps->tim,
+-					  IEEE80211_MAX_AID+1);
++					  IEEE80211_MAX_AID + 1);
++
+ 	if (!is_template) {
+ 		if (ps->dtim_count == 0)
+ 			ps->dtim_count = link_conf->dtim_period - 1;
+@@ -4916,51 +5016,39 @@ static void __ieee80211_beacon_add_tim(s
+ 			ps->dtim_count--;
+ 	}
+ 
+-	tim = pos = skb_put(skb, 5);
+-	*pos++ = WLAN_EID_TIM;
+-	*pos++ = 3;
+-	*pos++ = ps->dtim_count;
+-	*pos++ = link_conf->dtim_period;
++	/* Length is set after parsing the AID bitmap */
++	tim = skb_put(skb, sizeof(struct element));
++	tim->id = WLAN_EID_TIM;
++	skb_put_u8(skb, ps->dtim_count);
++	skb_put_u8(skb, link_conf->dtim_period);
+ 
+ 	if (ps->dtim_count == 0 && !skb_queue_empty(&ps->bc_buf))
+-		aid0 = 1;
++		mcast_traffic = true;
+ 
+-	ps->dtim_bc_mc = aid0 == 1;
++	ps->dtim_bc_mc = mcast_traffic;
+ 
+ 	if (have_bits) {
+-		/* Find largest even number N1 so that bits numbered 1 through
+-		 * (N1 x 8) - 1 in the bitmap are 0 and number N2 so that bits
+-		 * (N2 + 1) x 8 through 2007 are 0. */
+-		n1 = 0;
+-		for (i = 0; i < IEEE80211_MAX_TIM_LEN; i++) {
+-			if (ps->tim[i]) {
+-				n1 = i & 0xfe;
+-				break;
+-			}
+-		}
+-		n2 = n1;
+-		for (i = IEEE80211_MAX_TIM_LEN - 1; i >= n1; i--) {
+-			if (ps->tim[i]) {
+-				n2 = i;
+-				break;
+-			}
+-		}
+-
+-		/* Bitmap control */
+-		*pos++ = n1 | aid0;
+-		/* Part Virt Bitmap */
+-		skb_put_data(skb, ps->tim + n1, n2 - n1 + 1);
+-
+-		tim[1] = n2 - n1 + 4;
++		if (s1g)
++			ieee80211_s1g_beacon_add_tim_pvb(ps, skb,
++							 mcast_traffic);
++		else
++			ieee80211_beacon_add_tim_pvb(ps, skb, mcast_traffic);
+ 	} else {
+-		*pos++ = aid0; /* Bitmap control */
+-
+-		if (ieee80211_get_link_sband(link)->band != NL80211_BAND_S1GHZ) {
+-			tim[1] = 4;
++		/*
++		 * If there is no buffered unicast traffic for an S1G
++		 * interface, we can exclude the bitmap control. This is in
++		 * contrast to other phy types as they do include the bitmap
++		 * control and pvb even when there is no buffered traffic.
++		 */
++		if (!s1g) {
++			/* Bitmap control */
++			skb_put_u8(skb, mcast_traffic);
+ 			/* Part Virt Bitmap */
+ 			skb_put_u8(skb, 0);
+ 		}
+ 	}
++
++	tim->datalen = skb_tail_pointer(skb) - tim->data;
+ }
+ 
+ static int ieee80211_beacon_add_tim(struct ieee80211_sub_if_data *sdata,

@@ -1,0 +1,435 @@
+--- a/net/mac80211/mesh.h
++++ b/net/mac80211/mesh.h
+@@ -229,7 +229,13 @@
+ #define MESH_MAX_MPATHS		1024
+ 
+ /* Number of frames buffered per destination for unresolved destinations */
+-#define MESH_FRAME_QUEUE_LEN	10
++#define MESH_FRAME_QUEUE_LEN	50
++
++/* Best metric for single hop HaLow link */
++#define BEST_SINGLE_HOP_METRIC_HALOW  253
++
++/* Max path discovery timeout in msecs */
++#define MESH_MAX_MPATH_DISCOVERY_TIMEOUT      2000
+ 
+ /* Public interfaces */
+ /* Various */
+--- a/net/mac80211/mesh_hwmp.c
++++ b/net/mac80211/mesh_hwmp.c
+@@ -132,13 +132,13 @@
+ 
+ 	switch (action) {
+ 	case MPATH_PREQ:
+-		mhwmp_dbg(sdata, "sending PREQ to %pM\n", target);
++		mhwmp_dbg(sdata, "sending PREQ to %pM da:%pM\n", target, da);
+ 		ie_len = 37;
+ 		pos = skb_put(skb, 2 + ie_len);
+ 		*pos++ = WLAN_EID_PREQ;
+ 		break;
+ 	case MPATH_PREP:
+-		mhwmp_dbg(sdata, "sending PREP to %pM\n", orig_addr);
++		mhwmp_dbg(sdata, "sending PREP to %pM da:%pM\n", orig_addr, da);
+ 		ie_len = 31;
+ 		pos = skb_put(skb, 2 + ie_len);
+ 		*pos++ = WLAN_EID_PREP;
+@@ -384,6 +384,32 @@
+ 	return (x < y) && (x < (y - x / 10));
+ }
+ 
++void ieee80211_mpath_dump(struct ieee80211_sub_if_data *sdata)
++{
++    struct mesh_path *mpath;
++    u32 exp_time = 0;
++    int idx = 0;
++
++    mhwmp_dbg(sdata, "************** mpath Table **************\n");
++    while ((mpath = mesh_path_lookup_by_idx(sdata, idx))) {
++        if (time_before(jiffies, mpath->exp_time))
++            exp_time = jiffies_to_msecs(mpath->exp_time - jiffies);
++        else
++            exp_time = 0;
++
++        mhwmp_dbg(sdata, "idx:%d dst:%pM next_hop:%pM metric:%d hops:%d exp_time:%d flags:%x\n",
++            idx,
++            mpath->dst,
++            rcu_access_pointer(mpath->next_hop)->addr,
++            mpath->metric,
++            mpath->hop_count,
++            exp_time,
++            mpath->flags);
++
++        idx++;
++    }
++}
++
+ /**
+  * hwmp_route_info_get - Update routing info to originator and transmitter
+  *
+@@ -408,6 +434,7 @@
+ 	struct ieee80211_local *local = sdata->local;
+ 	struct mesh_path *mpath;
+ 	struct sta_info *sta;
++	struct ieee80211_if_mesh *ifmsh = &sdata->u.mesh;
+ 	bool fresh_info;
+ 	const u8 *orig_addr, *ta;
+ 	u32 orig_sn, orig_metric;
+@@ -416,6 +443,7 @@
+ 	bool flush_mpath = false;
+ 	bool process = true;
+ 	u8 hopcount;
++	bool new_path = false;
+ 
+ 	rcu_read_lock();
+ 	sta = sta_info_get(sdata, mgmt->sa);
+@@ -467,22 +495,26 @@
+ 		mpath = mesh_path_lookup(sdata, orig_addr);
+ 		if (mpath) {
+ 			spin_lock_bh(&mpath->state_lock);
++			mhwmp_dbg(sdata, "%s from:%pM->%pM new_metric:%d metric:%d hops:%d \n",
++				action ? "PREP" : "PREQ", orig_addr, mgmt->sa, new_metric,
++				mpath->metric, hopcount);
+ 			if (mpath->flags & MESH_PATH_FIXED)
+ 				fresh_info = false;
+-			else if ((mpath->flags & MESH_PATH_ACTIVE) &&
++			if ((mpath->flags & MESH_PATH_ACTIVE) &&
+ 			    (mpath->flags & MESH_PATH_SN_VALID)) {
+ 				if (SN_GT(mpath->sn, orig_sn) ||
+-				    (mpath->sn == orig_sn &&
+-				     (rcu_access_pointer(mpath->next_hop) !=
+-						      sta ?
+-					      !is_metric_better(new_metric, mpath->metric) :
+-					      new_metric >= mpath->metric))) {
+-					process = false;
+-					fresh_info = false;
++					(mpath->metric &&
++					(rcu_access_pointer(mpath->next_hop) != sta) &&
++					(mult_frac(new_metric, 10, 9) >= mpath->metric))) {
++					 mhwmp_dbg(sdata, "skip long path orig:%pM sa:%pM \n",
++						orig_addr, mgmt->sa);
++					 process = false;
++					 fresh_info = false;
+ 				}
+ 			} else if (!(mpath->flags & MESH_PATH_ACTIVE)) {
+ 				bool have_sn, newer_sn, bounced;
+ 
++				mhwmp_dbg(sdata, "expired path for %pM flags %x \n", orig_addr, mpath->flags);
+ 				have_sn = mpath->flags & MESH_PATH_SN_VALID;
+ 				newer_sn = have_sn && SN_GT(orig_sn, mpath->sn);
+ 				bounced = have_sn &&
+@@ -496,7 +528,13 @@
+ 					/* if SN is way different than what
+ 					 * we had then assume the other side
+ 					 * rebooted or restarted */;
++				} else if (have_sn && mpath->metric && (new_metric <= mpath->metric)) {
++					/* Accept frame */
+ 				} else {
++					mhwmp_dbg(sdata, "dropping %s from:%pM->%pM expired path"
++						"have_sn:%d new:%d bounce:%d delta:%d new_metric:%d metric:%d\n",
++						action ? "PREP" : "PREQ", orig_addr, mgmt->sa, have_sn, newer_sn,
++						bounced, SN_DELTA(orig_sn, mpath->sn), new_metric, mpath->metric);
+ 					process = false;
+ 					fresh_info = false;
+ 				}
+@@ -508,6 +546,9 @@
+ 				return 0;
+ 			}
+ 			spin_lock_bh(&mpath->state_lock);
++			new_path = true;
++			mhwmp_dbg(sdata, "New Dst node path %pM with %s\n",
++			 orig_addr, action ? "PREP" : "PREQ");
+ 		}
+ 
+ 		if (fresh_info) {
+@@ -519,6 +560,14 @@
+ 			mpath->flags |= MESH_PATH_SN_VALID;
+ 			mpath->metric = new_metric;
+ 			mpath->sn = orig_sn;
++			/* re-confirm if new paths are the optimal */
++			if (new_path) {
++				/* Overwrite expiry time with smaller value to re-confirm
++				 * if new path is optimal, with path refresh operation */
++				unsigned long refresh_time_jif =
++					msecs_to_jiffies(sdata->u.mesh.mshcfg.path_refresh_time);
++				exp_time = refresh_time_jif + jiffies;
++			}
+ 			mpath->exp_time = time_after(mpath->exp_time, exp_time)
+ 					  ?  mpath->exp_time : exp_time;
+ 			mpath->hop_count = hopcount;
+@@ -529,6 +578,11 @@
+ 			ewma_mesh_fail_avg_init(&sta->mesh->fail_avg);
+ 			/* init it at a low value - 0 start is tricky */
+ 			ewma_mesh_fail_avg_add(&sta->mesh->fail_avg, 1);
++			mhwmp_dbg(sdata, "updated path %pM with %s\n",
++				mpath->dst, action ? "PREP" : "PREQ");
++#ifdef CONFIG_MAC80211_MHWMP_DEBUG
++			ieee80211_mpath_dump(sdata);
++#endif
+ 			mesh_path_tx_pending(mpath);
+ 			/* draft says preq_id should be saved to, but there does
+ 			 * not seem to be any use for it, skipping by now
+@@ -538,8 +592,11 @@
+ 	}
+ 
+ 	/* Update and check transmitter routing info */
++	new_path = false;
++	exp_time = TU_TO_EXP_TIME(orig_lifetime);
+ 	ta = mgmt->sa;
+-	if (ether_addr_equal(orig_addr, ta))
++	if (ether_addr_equal(orig_addr, ta) ||
++        (ifmsh->mshcfg.dot11MeshNolearn))
+ 		fresh_info = false;
+ 	else {
+ 		fresh_info = true;
+@@ -554,11 +611,14 @@
+ 				       last_hop_metric > mpath->metric))))
+ 				fresh_info = false;
+ 		} else {
++			new_path = true;
+ 			mpath = mesh_path_add(sdata, ta);
+ 			if (IS_ERR(mpath)) {
+ 				rcu_read_unlock();
+ 				return 0;
+ 			}
++			mhwmp_dbg(sdata, "New Tx node path %pM with %s\n",
++			 ta, action ? "PREP" : "PREQ");
+ 			spin_lock_bh(&mpath->state_lock);
+ 		}
+ 
+@@ -569,6 +629,14 @@
+ 			}
+ 			mesh_path_assign_nexthop(mpath, sta);
+ 			mpath->metric = last_hop_metric;
++			/* re-confirm if new paths are the optimal */
++			if (new_path) {
++				/* Overwrite expiry time with smaller value to re-confirm
++				 * if new path is optimal, with path refresh operation */
++				unsigned long refresh_time_jif =
++					msecs_to_jiffies(sdata->u.mesh.mshcfg.path_refresh_time);
++				exp_time = refresh_time_jif + jiffies;
++			}
+ 			mpath->exp_time = time_after(mpath->exp_time, exp_time)
+ 					  ?  mpath->exp_time : exp_time;
+ 			mpath->hop_count = 1;
+@@ -579,6 +647,11 @@
+ 			ewma_mesh_fail_avg_init(&sta->mesh->fail_avg);
+ 			/* init it at a low value - 0 start is tricky */
+ 			ewma_mesh_fail_avg_add(&sta->mesh->fail_avg, 1);
++			mhwmp_dbg(sdata, "updated Tx node path %pM with %s\n",
++				ta, action ? "PREP" : "PREQ");
++#ifdef CONFIG_MAC80211_MHWMP_DEBUG
++			ieee80211_mpath_dump(sdata);
++#endif
+ 			mesh_path_tx_pending(mpath);
+ 		} else
+ 			spin_unlock_bh(&mpath->state_lock);
+@@ -616,7 +689,7 @@
+ 	mhwmp_dbg(sdata, "received PREQ from %pM\n", orig_addr);
+ 
+ 	if (ether_addr_equal(target_addr, sdata->vif.addr)) {
+-		mhwmp_dbg(sdata, "PREQ is for us\n");
++		mhwmp_dbg(sdata, "PREQ is for us from %pM\n", mgmt->sa);
+ 		forward = false;
+ 		reply = true;
+ 		target_metric = 0;
+@@ -823,6 +896,10 @@
+ 		    !(mpath->flags & MESH_PATH_FIXED) &&
+ 		    (!(mpath->flags & MESH_PATH_SN_VALID) ||
+ 		    SN_GT(target_sn, mpath->sn)  || target_sn == 0)) {
++			mhwmp_dbg(sdata, "PERR deactivate path for :%pM flags:%x exp_time:%d"
++				"hops:%d metric:%d Queue_len:%d\n",
++				mpath->dst, mpath->flags, jiffies_to_msecs(mpath->exp_time - jiffies),
++				mpath->hop_count, mpath->metric, skb_queue_len(&mpath->frame_queue));
+ 			mpath->flags &= ~MESH_PATH_ACTIVE;
+ 			if (target_sn != 0)
+ 				mpath->sn = target_sn;
+@@ -1108,6 +1185,7 @@
+ 			mpath->flags |= MESH_PATH_RESOLVING;
+ 			mpath->discovery_retries = 0;
+ 			mpath->discovery_timeout = disc_timeout_jiff(sdata);
++			mhwmp_dbg(sdata, "New start discovery for %pM \n", mpath->dst);
+ 		}
+ 	} else if (!(mpath->flags & MESH_PATH_RESOLVING) ||
+ 			mpath->flags & MESH_PATH_RESOLVED) {
+@@ -1188,6 +1266,7 @@
+ 	/* no nexthop found, start resolving */
+ 	mpath = mesh_path_lookup(sdata, target_addr);
+ 	if (!mpath) {
++		mhwmp_dbg(sdata, "no mpath found for %pM, add one \n", target_addr);
+ 		mpath = mesh_path_add(sdata, target_addr);
+ 		if (IS_ERR(mpath)) {
+ 			mesh_path_discard_frame(sdata, skb);
+@@ -1195,13 +1274,16 @@
+ 		}
+ 	}
+ 
+-	if (!(mpath->flags & MESH_PATH_RESOLVING) &&
+-	    mesh_path_sel_is_hwmp(sdata))
+-		mesh_queue_preq(mpath, PREQ_Q_F_START);
++	if (!(mpath->flags & (MESH_PATH_RESOLVING | MESH_PATH_REQ_QUEUED)) &&
++	    mesh_path_sel_is_hwmp(sdata)) {
++		mhwmp_dbg(sdata, "no nexthop found for %pM, start resolving \n", target_addr);
++		mesh_queue_preq(mpath, PREQ_Q_F_START | PREQ_Q_F_REFRESH);
++	}
+ 
+-	if (skb_queue_len(&mpath->frame_queue) >= MESH_FRAME_QUEUE_LEN)
++	if (skb_queue_len(&mpath->frame_queue) >= MESH_FRAME_QUEUE_LEN) {
++        IEEE80211_IFSTA_MESH_CTR_INC(&sdata->u.mesh, dropped_frames_no_route);
+ 		skb_to_free = skb_dequeue(&mpath->frame_queue);
+-
++	}
+ 	info->control.flags |= IEEE80211_TX_INTCFL_NEED_TXPROCESSING;
+ 	ieee80211_set_qos_hdr(sdata, skb);
+ 	skb_queue_tail(&mpath->frame_queue, skb);
+@@ -1245,18 +1327,37 @@
+ 	return 0;
+ }
+ 
++/**
++ * Checks if the given mpath is optimal.
++ *
++ * @param mpath: Pointer to the mpath structure containing path data.
++ * @return true if the mpath is optimal, false otherwise.
++ */
++bool hwmp_is_mpath_optimal(struct mesh_path *mpath)
++{
++    /* Check if the metric is within acceptable limits */
++    return (mpath->metric <= (mpath->hop_count * BEST_SINGLE_HOP_METRIC_HALOW));
++}
++
+ void mesh_path_refresh(struct ieee80211_sub_if_data *sdata,
+ 		       struct mesh_path *mpath, const u8 *addr)
+ {
+-	if (mpath->flags & (MESH_PATH_REQ_QUEUED | MESH_PATH_FIXED |
+-			    MESH_PATH_RESOLVING))
++	unsigned long refresh_time_jif = msecs_to_jiffies(sdata->u.mesh.mshcfg.path_refresh_time);
++
++	if ((mpath->flags & (MESH_PATH_REQ_QUEUED | MESH_PATH_FIXED | MESH_PATH_RESOLVING)))
+ 		return;
+ 
+-	if (time_after(jiffies,
+-		       mpath->exp_time -
+-		       msecs_to_jiffies(sdata->u.mesh.mshcfg.path_refresh_time)) &&
+-	    (!addr || ether_addr_equal(sdata->vif.addr, addr)))
++	if(time_after(jiffies, (mpath->exp_time - refresh_time_jif)) &&
++	   (!addr || ether_addr_equal(sdata->vif.addr, addr)))
+ 		mesh_queue_preq(mpath, PREQ_Q_F_START | PREQ_Q_F_REFRESH);
++
++	if (hwmp_is_mpath_optimal(mpath) && mpath->hop_count == 1) {
++		/* Refresh path, if path is being actively used & optimal */
++		unsigned long exp_time =
++			msecs_to_jiffies(sdata->u.mesh.mshcfg.dot11MeshHWMPactivePathTimeout);
++		mpath->exp_time = time_after(mpath->exp_time, (exp_time + jiffies)) ?
++			mpath->exp_time : (exp_time + jiffies);
++	}
+ }
+ 
+ /**
+@@ -1316,12 +1417,28 @@
+ 		mpath->flags &= ~(MESH_PATH_RESOLVING | MESH_PATH_RESOLVED);
+ 		spin_unlock_bh(&mpath->state_lock);
+ 	} else if (mpath->discovery_retries < max_preq_retries(sdata)) {
+-		++mpath->discovery_retries;
+-		mpath->discovery_timeout *= 2;
+-		mpath->flags &= ~MESH_PATH_REQ_QUEUED;
+-		spin_unlock_bh(&mpath->state_lock);
+-		mesh_queue_preq(mpath, 0);
+-	} else {
++        mpath->discovery_retries++;
++        /* Fast fallback to gate */
++        if (!mpath->is_gate && mesh_gate_num(sdata) > 0 &&
++            mpath->discovery_retries >= max_preq_retries(sdata) / 2) {
++            mpath->flags &= ~(MESH_PATH_RESOLVING |
++                            MESH_PATH_RESOLVED |
++                            MESH_PATH_REQ_QUEUED);
++            mpath->exp_time = jiffies;
++            spin_unlock_bh(&mpath->state_lock);
++
++            ret = mesh_path_send_to_gates(mpath);
++            if (ret)
++                mhwmp_dbg(sdata, "Fast fallback: no gate was reachable\n");
++            return;
++        }
++        /* Continue retrying PREQ */
++        mpath->discovery_timeout = min(mpath->discovery_timeout * 2,
++                            msecs_to_jiffies(MESH_MAX_MPATH_DISCOVERY_TIMEOUT));
++        mpath->flags &= ~MESH_PATH_REQ_QUEUED;
++        spin_unlock_bh(&mpath->state_lock);
++        mesh_queue_preq(mpath, PREQ_Q_F_REFRESH);
++    } else {
+ 		mpath->flags &= ~(MESH_PATH_RESOLVING |
+ 				  MESH_PATH_RESOLVED |
+ 				  MESH_PATH_REQ_QUEUED);
+--- a/net/mac80211/mesh_pathtbl.c
++++ b/net/mac80211/mesh_pathtbl.c
+@@ -779,6 +779,12 @@
+ 		if (rcu_access_pointer(mpath->next_hop) == sta &&
+ 		    mpath->flags & MESH_PATH_ACTIVE &&
+ 		    !(mpath->flags & MESH_PATH_FIXED)) {
++			mhwmp_dbg(sdata, "Broken path for :%pM flags:%x exp_time:%d"
++				"hops:%d metric:%d Queue_len:%d\n",
++				mpath->dst, mpath->flags,
++				jiffies_to_msecs(mpath->exp_time - jiffies),
++				mpath->hop_count, mpath->metric,
++				skb_queue_len(&mpath->frame_queue));
+ 			spin_lock_bh(&mpath->state_lock);
+ 			mpath->flags &= ~MESH_PATH_ACTIVE;
+ 			++mpath->sn;
+--- a/net/mac80211/rx.c
++++ b/net/mac80211/rx.c
+@@ -2992,21 +2992,13 @@
+ 		memcpy(fwd_hdr->addr2, sdata->vif.addr, ETH_ALEN);
+ 		/* update power mode indication when forwarding */
+ 		ieee80211_mps_set_frame_flags(sdata, NULL, fwd_hdr);
+-	} else if (!mesh_nexthop_lookup(sdata, fwd_skb)) {
++	} else if (!mesh_nexthop_resolve(sdata, fwd_skb)) {
+ 		/* mesh power mode flags updated in mesh_nexthop_lookup */
+ 		IEEE80211_IFSTA_MESH_CTR_INC(ifmsh, fwded_unicast);
+ 	} else {
+-		/* unable to resolve next hop */
+-		if (sta)
+-			mesh_path_error_tx(sdata, ifmsh->mshcfg.element_ttl,
+-					   hdr.addr3, 0,
+-					   WLAN_REASON_MESH_PATH_NOFORWARD,
+-					   sta->sta.addr);
+-		IEEE80211_IFSTA_MESH_CTR_INC(ifmsh, dropped_frames_no_route);
+-		kfree_skb(fwd_skb);
+-		goto rx_accept;
++		/* skb queued: don't free */
++		return RX_QUEUED;
+ 	}
+-
+ 	IEEE80211_IFSTA_MESH_CTR_INC(ifmsh, fwded_frames);
+ 	ieee80211_set_qos_hdr(sdata, fwd_skb);
+ 	ieee80211_add_pending_skb(local, fwd_skb);
+--- a/net/wireless/mesh.c
++++ b/net/wireless/mesh.c
+@@ -18,7 +18,7 @@
+ #define MESH_CONF_T 		100
+ #define MESH_HOLD_T 		100
+ 
+-#define MESH_PATH_TIMEOUT	5000
++#define MESH_PATH_TIMEOUT	50000
+ #define MESH_RANN_INTERVAL      5000
+ #define MESH_PATH_TO_ROOT_TIMEOUT      6000
+ #define MESH_ROOT_INTERVAL     5000
+@@ -31,16 +31,16 @@
+  */
+ #define MESH_PREQ_MIN_INT	10
+ #define MESH_PERR_MIN_INT	100
+-#define MESH_DIAM_TRAVERSAL_TIME 50
++#define MESH_DIAM_TRAVERSAL_TIME 200
+ 
+-#define MESH_RSSI_THRESHOLD	0
++#define MESH_RSSI_THRESHOLD	-80
+ 
+ /*
+  * A path will be refreshed if it is used PATH_REFRESH_TIME milliseconds
+  * before timing out.  This way it will remain ACTIVE and no data frames
+  * will be unnecessarily held in the pending queue.
+  */
+-#define MESH_PATH_REFRESH_TIME			1000
++#define MESH_PATH_REFRESH_TIME			10000
+ #define MESH_MIN_DISCOVERY_TIMEOUT (2 * MESH_DIAM_TRAVERSAL_TIME)
+ 
+ /* Default maximum number of established plinks per interface */

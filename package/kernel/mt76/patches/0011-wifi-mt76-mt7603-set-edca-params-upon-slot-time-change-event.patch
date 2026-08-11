@@ -1,0 +1,141 @@
+From f70fa0490c0edb46549ded73dbaf670b7fe4e289 Mon Sep 17 00:00:00 2001
+From: Sophronia Koilpillai <sophronia.koilpillai@morsemicro.com>
+Date: Wed, 18 Dec 2024 13:58:02 +1100
+Subject: [PATCH] 0011-
+ 0011-wifi-mt76-mt7603-set-ac-params-upon-slot-time-change-event
+
+The TX queue parameters control how packets are transmitted in the network, 
+including timing for retries, backoff intervals, and queue timeouts. 
+These parameters depend on the slot time, a critical timing unit used by the MAC protocol,
+driver, and firmware for collision avoidance and backoff calculations.
+Changing the slot time without updating the TX queue parameters can lead to timing mismatches,
+resulting in inefficiencies, increased collisions, and degraded network performance.
+Proper synchronization ensures smooth and efficient medium access.
+
+---
+ mt7603/main.c   | 83 +++++++++++++++++++++++++++++--------------------
+ mt7603/mt7603.h |  1 +
+ 2 files changed, 51 insertions(+), 33 deletions(-)
+
+--- a/mt7603/main.c
++++ b/mt7603/main.c
+@@ -296,12 +296,53 @@ mt7603_configure_filter(struct ieee80211
+ 	mt76_wr(dev, MT_WF_RFCR, dev->rxfilter);
+ }
+ 
++static void mt7603_conf_edca_params(struct ieee80211_hw *hw,
++				u16 queue, const struct ieee80211_tx_queue_params *params)
++{
++	struct mt7603_dev *dev = hw->priv;
++	u16 cw_min = (1 << 5) - 1;
++	u16 cw_max = (1 << 10) - 1;
++	u32 val;
++
++	queue = dev->mphy.q_tx[queue]->hw_idx;
++
++	if (params->cw_min)
++		cw_min = params->cw_min;
++	if (params->cw_max)
++		cw_max = params->cw_max;
++
++	mt7603_mac_stop(dev);
++
++	val = mt76_rr(dev, MT_WMM_TXOP(queue));
++	val &= ~(MT_WMM_TXOP_MASK << MT_WMM_TXOP_SHIFT(queue));
++	val |= params->txop << MT_WMM_TXOP_SHIFT(queue);
++	mt76_wr(dev, MT_WMM_TXOP(queue), val);
++
++	val = mt76_rr(dev, MT_WMM_AIFSN);
++	val &= ~(MT_WMM_AIFSN_MASK << MT_WMM_AIFSN_SHIFT(queue));
++	val |= params->aifs << MT_WMM_AIFSN_SHIFT(queue);
++	mt76_wr(dev, MT_WMM_AIFSN, val);
++
++	val = mt76_rr(dev, MT_WMM_CWMIN);
++	val &= ~(MT_WMM_CWMIN_MASK << MT_WMM_CWMIN_SHIFT(queue));
++	val |= cw_min << MT_WMM_CWMIN_SHIFT(queue);
++	mt76_wr(dev, MT_WMM_CWMIN, val);
++
++	val = mt76_rr(dev, MT_WMM_CWMAX(queue));
++	val &= ~(MT_WMM_CWMAX_MASK << MT_WMM_CWMAX_SHIFT(queue));
++	val |= cw_max << MT_WMM_CWMAX_SHIFT(queue);
++	mt76_wr(dev, MT_WMM_CWMAX(queue), val);
++
++	mt7603_mac_start(dev);
++}
++
+ static void
+ mt7603_bss_info_changed(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+ 			struct ieee80211_bss_conf *info, u64 changed)
+ {
+ 	struct mt7603_dev *dev = hw->priv;
+ 	struct mt7603_vif *mvif = (struct mt7603_vif *)vif->drv_priv;
++	u16 ac;
+ 
+ 	mutex_lock(&dev->mt76.mutex);
+ 
+@@ -325,6 +366,10 @@ mt7603_bss_info_changed(struct ieee80211
+ 			dev->slottime = slottime;
+ 			mt7603_mac_set_timing(dev);
+ 		}
++
++		for (ac = 0; ac < IEEE80211_NUM_ACS; ac++) {
++			mt7603_conf_edca_params(hw, ac, &mvif->tx_params[ac]);
++		}
+ 	}
+ 
+ 	if (changed & (BSS_CHANGED_BEACON_ENABLED | BSS_CHANGED_BEACON_INT)) {
+@@ -538,41 +583,11 @@ mt7603_conf_tx(struct ieee80211_hw *hw,
+ 	       const struct ieee80211_tx_queue_params *params)
+ {
+ 	struct mt7603_dev *dev = hw->priv;
+-	u16 cw_min = (1 << 5) - 1;
+-	u16 cw_max = (1 << 10) - 1;
+-	u32 val;
+-
+-	queue = dev->mphy.q_tx[queue]->hw_idx;
+-
+-	if (params->cw_min)
+-		cw_min = params->cw_min;
+-	if (params->cw_max)
+-		cw_max = params->cw_max;
++	struct mt7603_vif *mvif = (struct mt7603_vif*)vif->drv_priv;
++	mvif->tx_params[queue] = *params;
+ 
+ 	mutex_lock(&dev->mt76.mutex);
+-	mt7603_mac_stop(dev);
+-
+-	val = mt76_rr(dev, MT_WMM_TXOP(queue));
+-	val &= ~(MT_WMM_TXOP_MASK << MT_WMM_TXOP_SHIFT(queue));
+-	val |= params->txop << MT_WMM_TXOP_SHIFT(queue);
+-	mt76_wr(dev, MT_WMM_TXOP(queue), val);
+-
+-	val = mt76_rr(dev, MT_WMM_AIFSN);
+-	val &= ~(MT_WMM_AIFSN_MASK << MT_WMM_AIFSN_SHIFT(queue));
+-	val |= params->aifs << MT_WMM_AIFSN_SHIFT(queue);
+-	mt76_wr(dev, MT_WMM_AIFSN, val);
+-
+-	val = mt76_rr(dev, MT_WMM_CWMIN);
+-	val &= ~(MT_WMM_CWMIN_MASK << MT_WMM_CWMIN_SHIFT(queue));
+-	val |= cw_min << MT_WMM_CWMIN_SHIFT(queue);
+-	mt76_wr(dev, MT_WMM_CWMIN, val);
+-
+-	val = mt76_rr(dev, MT_WMM_CWMAX(queue));
+-	val &= ~(MT_WMM_CWMAX_MASK << MT_WMM_CWMAX_SHIFT(queue));
+-	val |= cw_max << MT_WMM_CWMAX_SHIFT(queue);
+-	mt76_wr(dev, MT_WMM_CWMAX(queue), val);
+-
+-	mt7603_mac_start(dev);
++	mt7603_conf_edca_params(hw, queue, params);
+ 	mutex_unlock(&dev->mt76.mutex);
+ 
+ 	return 0;
+--- a/mt7603/mt7603.h
++++ b/mt7603/mt7603.h
+@@ -86,6 +86,7 @@ struct mt7603_vif {
+ 	struct mt7603_sta sta; /* must be first */
+ 
+ 	u8 idx;
++	struct ieee80211_tx_queue_params tx_params[IEEE80211_NUM_ACS];
+ };
+ 
+ enum mt7603_reset_cause {

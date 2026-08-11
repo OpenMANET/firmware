@@ -7,17 +7,24 @@ CONFIG_VERSION_MANUFACTURER="MorseMicro"
 CONFIG_VERSION_PRODUCT="HaLowLink2"
 
 CONFIG_PACKAGE_bsp-halowlink2=y
-CONFIG_PACKAGE_morse-fw-8108=y
-CONFIG_PACKAGE_kmod-morse=y
 CONFIG_PACKAGE_kmod-mmc=y
 CONFIG_PACKAGE_kmod-sdhci-mt7620=y
 CONFIG_PACKAGE_kmod-mt7603=y
-CONFIG_PACKAGE_netifd-morse=y
+CONFIG_PACKAGE_morse-board-config=y
 CONFIG_PACKAGE_libcap=y
 
-# HaLow Link 2 uses MM8108 only - exclude MM6108 firmware
+# HaLow Link 2 uses MM8108 only (SDIO-attached) - exclude MM6108 firmware.
+# Pin the MM8108 driver/firmware explicitly rather than relying on the
+# device profile's DEVICE_PACKAGES, and keep the old unified Gateworks
+# kmod-morse driver off (it also PROVIDES kmod-morse and ships its own
+# dot11ah.ko).
+CONFIG_PACKAGE_kmod-mm8108=y
+CONFIG_PACKAGE_mm8108-firmware=y
+CONFIG_PACKAGE_kmod-morse=n
 CONFIG_PACKAGE_morse-fw-6108=n
 CONFIG_PACKAGE_morse-fw-6108-tlm=n
+CONFIG_PACKAGE_kmod-mm6108=n
+CONFIG_PACKAGE_mm6108-firmware=n
 
 # Not needed for this board
 CONFIG_PACKAGE_ftdi-usb-spi=n
@@ -26,6 +33,7 @@ CONFIG_PACKAGE_kmod-ftdi-usb-spi=n
 # No audio hardware on this board
 CONFIG_PACKAGE_alsa-ucm-conf=n
 CONFIG_PACKAGE_alsa-utils=n
+CONFIG_PACKAGE_openvlm=n
 
 # Exclude WiFi firmware/drivers not used on this board
 CONFIG_PACKAGE_ath10k-firmware-qca6174=n
@@ -69,7 +77,6 @@ CONFIG_PACKAGE_kmod-pps=y
 CONFIG_PACKAGE_kmod-ptp=y
 CONFIG_PACKAGE_kmod-qrtr=y
 CONFIG_PACKAGE_kmod-qrtr-mhi=y
-CONFIG_PACKAGE_morse-board-config-hotplug-model=y
 
 # Initramfs must use XZ compression (board u-boot requires it)
 CONFIG_TARGET_INITRAMFS_COMPRESSION_XZ=y

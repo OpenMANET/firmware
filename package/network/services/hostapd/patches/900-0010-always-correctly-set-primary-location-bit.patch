@@ -1,0 +1,25 @@
+From 7d41f2a6654af9bc7f822ef18e5738c846c52b8a Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Thu, 15 Jan 2026 22:28:11 +1100
+Subject: [PATCH] TEMP: always correctly set primary location bit
+
+---
+ src/ap/ieee802_11_s1g.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/ap/ieee802_11_s1g.c b/src/ap/ieee802_11_s1g.c
+index 11359741d9c0..ac9aeb53d2ab 100644
+--- a/src/ap/ieee802_11_s1g.c
++++ b/src/ap/ieee802_11_s1g.c
+@@ -62,7 +62,7 @@ u8 *hostapd_eid_s1g_oper(struct hostapd_data *hapd, u8 *eid)
+ 
+ 	ch_width |= (bss_width << 1) & S1G_OPER_IE_CHANWIDTH_OPER_CH_MASK;
+ 
+-	if (hapd->iconf->s1g_primary_2mhz && hapd->iconf->s1g_pri_loc)
++	if (hapd->iconf->s1g_pri_loc)
+ 		ch_width |= S1G_OPER_IE_CHANWIDTH_PRIM_OFFSET;
+ 
+ 	cap->ch_width   = ch_width;
+-- 
+2.43.0
+

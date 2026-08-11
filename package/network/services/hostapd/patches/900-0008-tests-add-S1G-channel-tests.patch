@@ -1,0 +1,205 @@
+From f0bcd83eabc551398daf5cbf054306206a125e06 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Mon, 27 Oct 2025 14:45:21 +1100
+Subject: [PATCH 8/8] tests: add S1G channel tests
+
+---
+ tests/hwsim/example-hostapd.config        |   1 +
+ tests/hwsim/example-wpa_supplicant.config |   1 +
+ tests/hwsim/test_s1g.py                   | 190 ++++++++++++++++++++++
+ 3 files changed, 192 insertions(+)
+ create mode 100644 tests/hwsim/test_s1g.py
+
+--- /dev/null
++++ b/tests/hwsim/test_s1g.py
+@@ -0,0 +1,190 @@
++# Test cases for IEEE 802.11ah S1G operations
++# Copyright (c) 2024, The hostapd contributors
++#
++# This software may be distributed under the terms of the BSD license.
++# See README for more details.
++import logging
++logger = logging.getLogger()
++import hostapd
++import hwsim_utils
++from utils import *
++
++# 4 MHz op 2 MHz primary lower 1 MHz
++def test_s1g_4mhz_op_2mhz_pri_lower_loc(dev, apdev):
++    """S1G 4 MHz op with 2 MHz primary lower location"""
++    check_sae_capab(dev[0])
++    hapd = None
++    clear_scan_cache(apdev[0])
++    try:
++        params = hostapd.wpa3_params(ssid="s1g-1mhz", password="s1gpass")
++        params.update({
++            "country_code": "US",
++            "ieee80211ah": "1",
++            "channel": "41",
++            "op_class": "70",
++            "hw_mode": "a",
++            "s1g_oper_centr_freq_idx": "40",
++            "s1g_oper_chwidth": "2",
++            "s1g_primary_2mhz": "1",
++            "s1g_pri_loc": "0",
++            "sae_pwe": "1",
++            "ieee80211n": "0",
++        })
++        hapd = hostapd.add_ap(apdev[0], params)
++        status = hapd.get_status()
++        if status.get("ieee80211ah") != "1":
++            raise Exception("AP did not report IEEE 802.11ah enabled")
++        dev[0].connect("s1g-1mhz", sae_password="s1gpass", key_mgmt="SAE",
++                       scan_freq="922", scan_freq_offset="500", sae_pwe="1",
++                       ieee80211w="2")
++    except Exception as e:
++        if isinstance(e, Exception) and str(e) == "AP startup failed":
++            raise HwsimSkip("S1G operation not supported in this environment")
++        raise
++    finally:
++        dev[0].request("DISCONNECT")
++        dev[0].wait_disconnected()
++        clear_regdom(hapd, dev)
++
++# 2 MHz op 2 MHz primary upper 1 MHz
++def test_s1g_2mhz_op_2mhz_pri_upper_loc(dev, apdev):
++    """S1G 2 MHz op with 2 MHz primary upper location"""
++    check_sae_capab(dev[0])
++    hapd = None
++    clear_scan_cache(apdev[0])
++    try:
++        params = hostapd.wpa3_params(ssid="s1g-1mhz", password="s1gpass")
++        params.update({
++            "country_code": "US",
++            "ieee80211ah": "1",
++            "channel": "31",
++            "op_class": "69",
++            "hw_mode": "a",
++            "s1g_oper_centr_freq_idx": "30",
++            "s1g_oper_chwidth": "1",
++            "s1g_primary_2mhz": "1",
++            "s1g_pri_loc": "1",
++            "sae_pwe": "1",
++            "ieee80211n": "0",
++        })
++        hapd = hostapd.add_ap(apdev[0], params)
++        status = hapd.get_status()
++        if status.get("ieee80211ah") != "1":
++            raise Exception("AP did not report IEEE 802.11ah enabled")
++        dev[0].connect("s1g-1mhz", sae_password="s1gpass", key_mgmt="SAE",
++                       scan_freq="917", scan_freq_offset="500", sae_pwe="1",
++                       ieee80211w="2")
++    except Exception as e:
++        if isinstance(e, Exception) and str(e) == "AP startup failed":
++            raise HwsimSkip("S1G operation not supported in this environment")
++        raise
++    finally:
++        dev[0].request("DISCONNECT")
++        dev[0].wait_disconnected()
++        clear_regdom(hapd, dev)
++
++# 2 MHz op 2 MHz primary lower 1 MHz
++def test_s1g_2mhz_op_2mhz_pri_lower_loc(dev, apdev):
++    """S1G 2 MHz op with 2 MHz primary lower location"""
++    check_sae_capab(dev[0])
++    hapd = None
++    clear_scan_cache(apdev[0])
++    try:
++        params = hostapd.wpa3_params(ssid="s1g-1mhz", password="s1gpass")
++        params.update({
++            "country_code": "US",
++            "ieee80211ah": "1",
++            "channel": "29",
++            "op_class": "69",
++            "hw_mode": "a",
++            "s1g_oper_centr_freq_idx": "30",
++            "s1g_oper_chwidth": "1",
++            "s1g_primary_2mhz": "1",
++            "s1g_pri_loc": "0",
++            "sae_pwe": "1",
++            "ieee80211n": "0",
++        })
++        hapd = hostapd.add_ap(apdev[0], params)
++        status = hapd.get_status()
++        if status.get("ieee80211ah") != "1":
++            raise Exception("AP did not report IEEE 802.11ah enabled")
++        dev[0].connect("s1g-1mhz", sae_password="s1gpass", key_mgmt="SAE",
++                       scan_freq="916", scan_freq_offset="500", sae_pwe="1",
++                       ieee80211w="2")
++    except Exception as e:
++        if isinstance(e, Exception) and str(e) == "AP startup failed":
++            raise HwsimSkip("S1G operation not supported in this environment")
++        raise
++    finally:
++        dev[0].request("DISCONNECT")
++        dev[0].wait_disconnected()
++        clear_regdom(hapd, dev)
++
++# 2 MHz 1 MHz primary lower
++def test_s1g_2mhz_op_1mhz_pri(dev, apdev):
++    """S1G 2 MHz op with 1 MHz primary"""
++    check_sae_capab(dev[0])
++    hapd = None
++    clear_scan_cache(apdev[0])
++    try:
++        params = hostapd.wpa3_params(ssid="s1g-1mhz", password="s1gpass")
++        params.update({
++            "country_code": "US",
++            "ieee80211ah": "1",
++            "channel": "1",
++            "op_class": "69",
++            "hw_mode": "a",
++            "s1g_oper_centr_freq_idx": "2",
++            "s1g_oper_chwidth": "1",
++            "sae_pwe": "1",
++            "ieee80211n": "0",
++        })
++        hapd = hostapd.add_ap(apdev[0], params)
++        status = hapd.get_status()
++        if status.get("ieee80211ah") != "1":
++            raise Exception("AP did not report IEEE 802.11ah enabled")
++        dev[0].connect("s1g-1mhz", sae_password="s1gpass", key_mgmt="SAE",
++                       scan_freq="902", scan_freq_offset="500", sae_pwe="1",
++                       ieee80211w="2")
++    except Exception as e:
++        if isinstance(e, Exception) and str(e) == "AP startup failed":
++            raise HwsimSkip("S1G operation not supported in this environment")
++        raise
++    finally:
++        dev[0].request("DISCONNECT")
++        dev[0].wait_disconnected()
++        clear_regdom(hapd, dev)
++
++def test_s1g_1mhz(dev, apdev):
++    """S1G 1 MHz AP with SAE"""
++    check_sae_capab(dev[0])
++    hapd = None
++    clear_scan_cache(apdev[0])
++    try:
++        params = hostapd.wpa3_params(ssid="s1g-1mhz", password="s1gpass")
++        params.update({
++            "country_code": "US",
++            "ieee80211ah": "1",
++            "channel": "1",
++            "op_class": "68",
++            "hw_mode": "a",
++            "s1g_oper_centr_freq_idx": "0",
++            "s1g_oper_chwidth": "0",
++            "sae_pwe": "1",
++            "ieee80211n": "0",
++        })
++        hapd = hostapd.add_ap(apdev[0], params)
++        status = hapd.get_status()
++        if status.get("ieee80211ah") != "1":
++            raise Exception("AP did not report IEEE 802.11ah enabled")
++        dev[0].connect("s1g-1mhz", sae_password="s1gpass", key_mgmt="SAE",
++                       scan_freq="902", scan_freq_offset="500", sae_pwe="1",
++                       ieee80211w="2")
++    except Exception as e:
++        if isinstance(e, Exception) and str(e) == "AP startup failed":
++            raise HwsimSkip("S1G operation not supported in this environment")
++        raise
++    finally:
++        dev[0].request("DISCONNECT")
++        dev[0].wait_disconnected()
++        clear_regdom(hapd, dev)

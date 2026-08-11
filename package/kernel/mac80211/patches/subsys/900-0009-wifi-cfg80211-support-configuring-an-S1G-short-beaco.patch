@@ -1,0 +1,265 @@
+From 6624a0af82a6e3a4d3609264ef591a8fa3467139 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Thu, 17 Jul 2025 17:42:02 +1000
+Subject: [PATCH 09/21] wifi: cfg80211: support configuring an S1G short
+ beaconing BSS
+
+S1G short beacons are an optional frame type used in an S1G BSS
+that contain a limited set of elements. While they are optional,
+they are a fundamental part of S1G that enables significant
+power saving.
+
+Expose 2 additional netlink attributes,
+NL80211_ATTR_S1G_LONG_BEACON_PERIOD which denotes the number of beacon
+intervals between each long beacon and NL80211_ATTR_S1G_SHORT_BEACON
+which is a nested attribute containing the short beacon tail and
+head. We split them as the long beacon period cannot be updated,
+and is only used when initialisng the interface, whereas the short
+beacon data can be used to both initialise and update the templates.
+This follows how things such as the beacon interval and DTIM period
+currently operate.
+
+During the initialisation path, we ensure we have the long beacon
+period if the short beacon data is being passed down, whereas
+the update path will simply update the template if its sent down.
+
+The short beacon data is validated using the same routines for regular
+beacons as they support correctly parsing the short beacon format
+while ensuring the frame is well-formed.
+
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250717074205.312577-2-lachlan.hodges@morsemicro.com
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/net/cfg80211.h       | 23 ++++++++++++
+ include/uapi/linux/nl80211.h | 39 +++++++++++++++++++
+ net/wireless/nl80211.c       | 72 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 134 insertions(+)
+
+--- a/include/net/cfg80211.h
++++ b/include/net/cfg80211.h
+@@ -1448,6 +1448,23 @@ struct cfg80211_unsol_bcast_probe_resp {
+ };
+ 
+ /**
++ * struct cfg80211_s1g_short_beacon - S1G short beacon data.
++ *
++ * @update: Set to true if the feature configuration should be updated.
++ * @short_head: Short beacon head.
++ * @short_tail: Short beacon tail.
++ * @short_head_len: Short beacon head len.
++ * @short_tail_len: Short beacon tail len.
++ */
++struct cfg80211_s1g_short_beacon {
++	bool update;
++	const u8 *short_head;
++	const u8 *short_tail;
++	size_t short_head_len;
++	size_t short_tail_len;
++};
++
++/**
+  * struct cfg80211_ap_settings - AP configuration
+  *
+  * Used to configure an AP interface.
+@@ -1488,6 +1505,8 @@ struct cfg80211_unsol_bcast_probe_resp {
+  * @fils_discovery: FILS discovery transmission parameters
+  * @unsol_bcast_probe_resp: Unsolicited broadcast probe response parameters
+  * @mbssid_config: AP settings for multiple bssid
++ * @s1g_long_beacon_period: S1G long beacon period
++ * @s1g_short_beacon: S1G short beacon data
+  */
+ struct cfg80211_ap_settings {
+ 	struct cfg80211_chan_def chandef;
+@@ -1522,6 +1541,8 @@ struct cfg80211_ap_settings {
+ 	struct cfg80211_fils_discovery fils_discovery;
+ 	struct cfg80211_unsol_bcast_probe_resp unsol_bcast_probe_resp;
+ 	struct cfg80211_mbssid_config mbssid_config;
++	u8 s1g_long_beacon_period;
++	struct cfg80211_s1g_short_beacon s1g_short_beacon;
+ };
+ 
+ 
+@@ -1533,11 +1554,13 @@ struct cfg80211_ap_settings {
+  * @beacon: beacon data
+  * @fils_discovery: FILS discovery transmission parameters
+  * @unsol_bcast_probe_resp: Unsolicited broadcast probe response parameters
++ * @s1g_short_beacon: S1G short beacon data
+  */
+ struct cfg80211_ap_update {
+ 	struct cfg80211_beacon_data beacon;
+ 	struct cfg80211_fils_discovery fils_discovery;
+ 	struct cfg80211_unsol_bcast_probe_resp unsol_bcast_probe_resp;
++	struct cfg80211_s1g_short_beacon s1g_short_beacon;
+ };
+ 
+ /**
+--- a/include/uapi/linux/nl80211.h
++++ b/include/uapi/linux/nl80211.h
+@@ -2871,6 +2871,19 @@ enum nl80211_commands {
+  * @NL80211_ATTR_VIF_RADIO_MASK: Bitmask of allowed radios (u32).
+  *	A value of 0 means all radios.
+  *
++ * @NL80211_ATTR_S1G_LONG_BEACON_PERIOD: (u8) Integer attribute that represents
++ *	the number of beacon intervals between each long beacon transmission
++ *	for an S1G BSS with short beaconing enabled. This is a required
++ *	attribute for initialising an S1G short beaconing BSS. When updating
++ *	the short beacon data, this is not required. It has a minimum value of
++ *	2 (i.e 2 beacon intervals).
++ *
++ * @NL80211_ATTR_S1G_SHORT_BEACON: Nested attribute containing the short beacon
++ *	head and tail used to set or update the short beacon templates. When
++ *	bringing up a new interface, %NL80211_ATTR_S1G_LONG_BEACON_PERIOD is
++ *	required alongside this attribute. Refer to
++ *	@enum nl80211_s1g_short_beacon_attrs for the attribute definitions.
++ *
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -3421,6 +3434,9 @@ enum nl80211_attrs {
+ 
+ 	NL80211_ATTR_VIF_RADIO_MASK,
+ 
++	NL80211_ATTR_S1G_LONG_BEACON_PERIOD,
++	NL80211_ATTR_S1G_SHORT_BEACON,
++
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	__NL80211_ATTR_AFTER_LAST,
+@@ -8080,4 +8096,27 @@ enum nl80211_wiphy_radio_freq_range {
+ 	NL80211_WIPHY_RADIO_FREQ_ATTR_MAX = __NL80211_WIPHY_RADIO_FREQ_ATTR_LAST - 1,
+ };
+ 
++/**
++ * enum nl80211_s1g_short_beacon_attrs - S1G short beacon data
++ *
++ * @__NL80211_S1G_SHORT_BEACON_ATTR_INVALID: Invalid
++ *
++ * @NL80211_S1G_SHORT_BEACON_ATTR_HEAD: Short beacon head (binary).
++ * @NL80211_S1G_SHORT_BEACON_ATTR_TAIL: Short beacon tail (binary).
++ *
++ * @__NL80211_S1G_SHORT_BEACON_ATTR_LAST: Internal
++ * @NL80211_S1G_SHORT_BEACON_ATTR_MAX: Highest attribute
++ */
++enum nl80211_s1g_short_beacon_attrs {
++	__NL80211_S1G_SHORT_BEACON_ATTR_INVALID,
++
++	NL80211_S1G_SHORT_BEACON_ATTR_HEAD,
++	NL80211_S1G_SHORT_BEACON_ATTR_TAIL,
++
++	/* keep last */
++	__NL80211_S1G_SHORT_BEACON_ATTR_LAST,
++	NL80211_S1G_SHORT_BEACON_ATTR_MAX =
++		__NL80211_S1G_SHORT_BEACON_ATTR_LAST - 1
++};
++
+ #endif /* __LINUX_NL80211_H */
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -465,6 +465,16 @@ nl80211_sta_wme_policy[NL80211_STA_WME_M
+ 	[NL80211_STA_WME_MAX_SP] = { .type = NLA_U8 },
+ };
+ 
++static const struct nla_policy
++nl80211_s1g_short_beacon[NL80211_S1G_SHORT_BEACON_ATTR_MAX + 1] = {
++	[NL80211_S1G_SHORT_BEACON_ATTR_HEAD] =
++		NLA_POLICY_VALIDATE_FN(NLA_BINARY, validate_beacon_head,
++				       IEEE80211_MAX_DATA_LEN),
++	[NL80211_S1G_SHORT_BEACON_ATTR_TAIL] =
++		NLA_POLICY_VALIDATE_FN(NLA_BINARY, validate_ie_attr,
++				       IEEE80211_MAX_DATA_LEN),
++};
++
+ static const struct netlink_range_validation nl80211_punct_bitmap_range = {
+ 	.min = 0,
+ 	.max = 0xffff,
+@@ -833,6 +843,9 @@ static const struct nla_policy nl80211_p
+ 	[NL80211_ATTR_MLO_TTLM_ULINK] = NLA_POLICY_EXACT_LEN(sizeof(u16) * 8),
+ 	[NL80211_ATTR_ASSOC_SPP_AMSDU] = { .type = NLA_FLAG },
+ 	[NL80211_ATTR_VIF_RADIO_MASK] = { .type = NLA_U32 },
++	[NL80211_ATTR_S1G_LONG_BEACON_PERIOD] = NLA_POLICY_MIN(NLA_U8, 2),
++	[NL80211_ATTR_S1G_SHORT_BEACON] =
++		NLA_POLICY_NESTED(nl80211_s1g_short_beacon),
+ };
+ 
+ /* policy for the key attributes */
+@@ -6097,6 +6110,41 @@ static int nl80211_validate_ap_phy_opera
+ 	return 0;
+ }
+ 
++static int
++nl80211_parse_s1g_short_beacon(struct cfg80211_registered_device *rdev,
++			       struct nlattr *attrs,
++			       struct cfg80211_s1g_short_beacon *sb)
++{
++	struct nlattr *tb[NL80211_S1G_SHORT_BEACON_ATTR_MAX + 1];
++	int ret;
++
++	if (!rdev->wiphy.bands[NL80211_BAND_S1GHZ])
++		return -EINVAL;
++
++	ret = nla_parse_nested(tb, NL80211_S1G_SHORT_BEACON_ATTR_MAX, attrs,
++			       NULL, NULL);
++	if (ret)
++		return ret;
++
++	/* Short beacon tail is optional (i.e might only include the TIM) */
++	if (!tb[NL80211_S1G_SHORT_BEACON_ATTR_HEAD])
++		return -EINVAL;
++
++	sb->short_head = nla_data(tb[NL80211_S1G_SHORT_BEACON_ATTR_HEAD]);
++	sb->short_head_len = nla_len(tb[NL80211_S1G_SHORT_BEACON_ATTR_HEAD]);
++	sb->short_tail_len = 0;
++
++	if (tb[NL80211_S1G_SHORT_BEACON_ATTR_TAIL]) {
++		sb->short_tail =
++			nla_data(tb[NL80211_S1G_SHORT_BEACON_ATTR_TAIL]);
++		sb->short_tail_len =
++			nla_len(tb[NL80211_S1G_SHORT_BEACON_ATTR_TAIL]);
++	}
++
++	sb->update = true;
++	return 0;
++}
++
+ static int nl80211_start_ap(struct sk_buff *skb, struct genl_info *info)
+ {
+ 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+@@ -6361,6 +6409,22 @@ static int nl80211_start_ap(struct sk_bu
+ 		goto out;
+ 	}
+ 
++	if (info->attrs[NL80211_ATTR_S1G_SHORT_BEACON]) {
++		if (!info->attrs[NL80211_ATTR_S1G_LONG_BEACON_PERIOD]) {
++			err = -EINVAL;
++			goto out;
++		}
++
++		params->s1g_long_beacon_period = nla_get_u8(
++			info->attrs[NL80211_ATTR_S1G_LONG_BEACON_PERIOD]);
++
++		err = nl80211_parse_s1g_short_beacon(
++			rdev, info->attrs[NL80211_ATTR_S1G_SHORT_BEACON],
++			&params->s1g_short_beacon);
++		if (err)
++			goto out;
++	}
++
+ 	err = nl80211_calculate_ap_params(params);
+ 	if (err)
+ 		goto out;
+@@ -6468,6 +6532,14 @@ static int nl80211_set_beacon(struct sk_
+ 		if (err)
+ 			goto out;
+ 	}
++
++	attr = info->attrs[NL80211_ATTR_S1G_SHORT_BEACON];
++	if (attr) {
++		err = nl80211_parse_s1g_short_beacon(rdev, attr,
++						     &params->s1g_short_beacon);
++		if (err)
++			goto out;
++	}
+ 
+ 	err = rdev_change_beacon(rdev, dev, params);
+ 

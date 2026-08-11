@@ -1,0 +1,27 @@
+From f105ee87afdf2000613b8a3cb5009acb4cc8dc0d Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Wed, 5 Nov 2025 09:42:06 +1100
+Subject: [PATCH 2/2] wifi: mt76: mt7603: tweak EDCCA threshold
+
+Adjust EDCCA threshold to -81dB, as advised by GL.iNet for
+CE certification requirements.
+---
+ mt7603/mac.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mt7603/mac.c b/mt7603/mac.c
+index cf21d062..8a25c237 100644
+--- a/mt7603/mac.c
++++ b/mt7603/mac.c
+@@ -1640,7 +1640,7 @@ mt7603_edcca_set_strict(struct mt7603_dev *dev, bool val)
+ 	if (!dev->ed_monitor)
+ 		rxtd_6 |= FIELD_PREP(MT_RXTD_6_CCAED_TH, 0x34);
+ 	else
+-		rxtd_6 |= FIELD_PREP(MT_RXTD_6_CCAED_TH, 0x7d);
++		rxtd_6 |= FIELD_PREP(MT_RXTD_6_CCAED_TH, 0x6c);
+ 
+ 	if (dev->ed_monitor && !dev->ed_strict_mode)
+ 		rxtd_6 |= FIELD_PREP(MT_RXTD_6_ACI_TH, 0x0f);
+-- 
+2.34.1
+

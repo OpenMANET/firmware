@@ -1,0 +1,105 @@
+Index: libiwinfo-2025.11.25~d625cc77/iwinfo_nl80211.c
+===================================================================
+--- libiwinfo-2025.11.25~d625cc77.orig/iwinfo_nl80211.c
++++ libiwinfo-2025.11.25~d625cc77/iwinfo_nl80211.c
+@@ -48,6 +48,11 @@ static enum scanmode {
+ 	SCANMODE_ACTIVE,   /* nl80211 active */
+ };
+ 
++struct nl80211_if_data {
++	int mode;
++	int radio_idx;
++};
++
+ static void nl80211_close(void)
+ {
+ 	if (nls)
+@@ -876,7 +881,7 @@ static char * nl80211_phy2ifname(const c
+ 
+ static int nl80211_get_mode_cb(struct nl_msg *msg, void *arg)
+ {
+-	int *mode = arg;
++	struct nl80211_if_data *data = arg;
+ 	struct nlattr **tb = nl80211_parse(msg);
+ 	const int ifmodes[NL80211_IFTYPE_MAX + 1] = {
+ 		IWINFO_OPMODE_UNKNOWN,		/* unspecified */
+@@ -892,37 +897,57 @@ static int nl80211_get_mode_cb(struct nl
+ 	};
+ 
+ 	if (tb[NL80211_ATTR_IFTYPE])
+-		*mode = ifmodes[nla_get_u32(tb[NL80211_ATTR_IFTYPE])];
++		data->mode = ifmodes[nla_get_u32(tb[NL80211_ATTR_IFTYPE])];
++
++	if (tb[NL80211_ATTR_VIF_RADIO_MASK]) {
++		uint32_t mask = nla_get_u32(tb[NL80211_ATTR_VIF_RADIO_MASK]);
++
++		for (int i = 0; mask && i < 32; i++, mask >>= 1)
++			if (mask & 1)
++				data->radio_idx = i;
++	}
+ 
+ 	return NL_SKIP;
+ }
+ 
+ 
+-static int nl80211_get_mode(const char *ifname, int *buf)
++static int nl80211_get_if_data(const char *ifname, struct nl80211_if_data *data)
+ {
+ 	char *res;
+ 
+-	*buf = IWINFO_OPMODE_UNKNOWN;
+-
+ 	res = nl80211_phy2ifname(ifname);
+ 
++	data->mode = IWINFO_OPMODE_UNKNOWN;
++	data->radio_idx = -1;
+ 	nl80211_request(res ? res : ifname, NL80211_CMD_GET_INTERFACE, 0,
+-	                nl80211_get_mode_cb, buf);
++	                nl80211_get_mode_cb, data);
+ 
+-	return (*buf == IWINFO_OPMODE_UNKNOWN) ? -1 : 0;
++	return (data->mode == IWINFO_OPMODE_UNKNOWN) ? -1 : 0;
++}
++
++static int nl80211_get_mode(const char *ifname, int *buf)
++{
++	struct nl80211_if_data data = {};
++	int ret;
++
++	ret = nl80211_get_if_data(ifname, &data);
++	*buf = data.mode;
++
++	return ret;
+ }
+ 
+ static int __nl80211_hostapd_query(const char *ifname, ...)
+ {
++	struct nl80211_if_data data = {};
+ 	va_list ap, ap_cur;
+ 	char *phy, *search, *dest, *key, *val, buf[128];
+-	int len, mode, found = 0, match = 1;
++	int len, found = 0, match = 1;
+ 	FILE *fp;
+ 
+-	if (nl80211_get_mode(ifname, &mode))
++	if (nl80211_get_if_data(ifname, &data))
+ 		return 0;
+ 
+-	if (mode != IWINFO_OPMODE_MASTER && mode != IWINFO_OPMODE_AP_VLAN)
++	if (data.mode != IWINFO_OPMODE_MASTER && data.mode != IWINFO_OPMODE_AP_VLAN)
+ 		return 0;
+ 
+ 	phy = nl80211_ifname2phy(ifname);
+@@ -930,7 +955,11 @@ static int __nl80211_hostapd_query(const
+ 	if (!phy)
+ 		return 0;
+ 
+-	snprintf(buf, sizeof(buf), "/var/run/hostapd-%s-%s.conf", phy, ifname);
++	if (data.radio_idx >= 0)
++		snprintf(buf, sizeof(buf), "/var/run/hostapd-%s.%d.conf", phy, data.radio_idx);
++	else
++		snprintf(buf, sizeof(buf), "/var/run/hostapd-%s-%s.conf", phy, ifname);
++
+ 	fp = fopen(buf, "r");
+ 
+ 	if (!fp) {

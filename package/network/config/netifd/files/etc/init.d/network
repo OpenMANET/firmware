@@ -10,6 +10,7 @@ init_switch() {
 
 	include /lib/network
 	setup_switch
+	uci show network | grep '^network.@switch' > /var/swconfig.current
 }
 
 start_service() {
@@ -28,7 +29,9 @@ start_service() {
 reload_service() {
 	local rv=0
 
-	init_switch
+	if ! uci show network | grep '^network.@switch' | cmp -s /var/swconfig.current; then
+		init_switch
+	fi
 	ubus call network reload || rv=1
 	return $rv
 }

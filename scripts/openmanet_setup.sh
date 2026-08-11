@@ -215,6 +215,9 @@ if [ -z "$MODE" ] && [ -z "$INITIALIZE" ]; then
 fi
 
 if [ "${INITIALIZE}" ]; then
+    # feeds install never removes existing symlinks, so start from a clean
+    # slate to keep -i idempotent from any prior tree state.
+    ./scripts/feeds uninstall -a
     ./scripts/feeds update -a
     #patch packages if necessary and re-create index files
     patch_feeds_packages "${BOARD:-}"
@@ -250,6 +253,15 @@ case "${MODE}" in
         if [ "${BOARD}" = "common" ] || [ "${BOARD}" = "common_extras" ]; then
             echo "${BOARD} is not a board!"
             usage 1
+        fi
+
+        # busybox's install dir accumulates applet symlinks and is shared
+        # per-arch across boards; rebuild it from scratch whenever the
+        # effective busybox config changes (e.g. switching boards).
+        # Empty when no prior .config exists (fresh/distcleaned tree).
+        busybox_cfg_before=
+        if [ -f .config ]; then
+            busybox_cfg_before=$( { grep '^CONFIG_BUSYBOX_' .config || true; } | sort | md5sum)
         fi
 
         for file in ./boards/"${BOARD}"/*_diffconfig; do
@@ -288,6 +300,12 @@ case "${MODE}" in
 
         echo Make defconfig...
         make defconfig
+
+        if [ -n "$busybox_cfg_before" ] && \
+           [ "$busybox_cfg_before" != "$( { grep '^CONFIG_BUSYBOX_' .config || true; } | sort | md5sum)" ]; then
+            echo "Busybox config changed; cleaning busybox build dir..."
+            make package/busybox/dirclean
+        fi
 
         if [ "${EXT_TOOLCHAIN}" = "1" ]; then
             read -r target subtarget <<<"$(sed -nE 's/^CONFIG_TARGET_([a-z0-9]+)_([a-z0-9]+)=y/\1 \2/p' "boards/${BOARD}/target_diffconfig")"

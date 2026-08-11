@@ -1,0 +1,53 @@
+diff --git a/src/ap/dpp_hostapd.c b/src/ap/dpp_hostapd.c
+index 3b245689a..40cfc7801 100644
+--- a/src/ap/dpp_hostapd.c
++++ b/src/ap/dpp_hostapd.c
+@@ -339,7 +339,7 @@ static int hostapd_dpp_pkex_done(void *ctx, void *conn,
+ 				 struct dpp_bootstrap_info *peer_bi)
+ {
+ 	struct hostapd_data *hapd = ctx;
+-	char cmd[500];
++	char cmd[4096];
+ 	const char *pos;
+ 	u8 allowed_roles = DPP_CAPAB_CONFIGURATOR;
+ 	struct dpp_bootstrap_info *own_bi = NULL;
+@@ -2445,7 +2445,7 @@ hostapd_dpp_rx_pkex_commit_reveal_resp(struct hostapd_data *hapd, const u8 *src,
+ 	int res;
+ 	struct dpp_bootstrap_info *bi;
+ 	struct dpp_pkex *pkex = hapd->dpp_pkex;
+-	char cmd[500];
++	char cmd[4096];
+ 
+ 	eloop_cancel_timeout(hostapd_dpp_pkex_retry_timeout, hapd, NULL);
+ 	wpa_printf(MSG_DEBUG, "DPP: PKEX Commit-Reveal Response from " MACSTR,
+@@ -2514,7 +2514,7 @@ static void hostapd_dpp_pb_pkex_init(struct hostapd_data *hapd,
+ 	struct dpp_pkex *pkex;
+ 	struct wpabuf *msg;
+ 	char ssid_hex[2 * SSID_MAX_LEN + 1], *pass_hex = NULL;
+-	char cmd[300];
++	char cmd[4096];
+ 	const char *password = NULL;
+ #ifdef CONFIG_SAE
+ 	struct sae_password_entry *e;
+diff --git a/wpa_supplicant/dpp_supplicant.c b/wpa_supplicant/dpp_supplicant.c
+index 97e48fc87..5fc8b9310 100644
+--- a/wpa_supplicant/dpp_supplicant.c
++++ b/wpa_supplicant/dpp_supplicant.c
+@@ -3063,7 +3063,7 @@ static int wpas_dpp_pkex_done(void *ctx, void *conn,
+ 			      struct dpp_bootstrap_info *peer_bi)
+ {
+ 	struct wpa_supplicant *wpa_s = ctx;
+-	char cmd[500];
++	char cmd[4096];
+ 	const char *pos;
+ 	u8 allowed_roles = DPP_CAPAB_CONFIGURATOR;
+ 	struct dpp_bootstrap_info *own_bi = NULL;
+@@ -3522,7 +3522,7 @@ wpas_dpp_rx_pkex_commit_reveal_resp(struct wpa_supplicant *wpa_s, const u8 *src,
+ 	int res;
+ 	struct dpp_bootstrap_info *bi;
+ 	struct dpp_pkex *pkex = wpa_s->dpp_pkex;
+-	char cmd[500];
++	char cmd[4096];
+ 
+ 	wpa_printf(MSG_DEBUG, "DPP: PKEX Commit-Reveal Response from " MACSTR,
+ 		   MAC2STR(src));

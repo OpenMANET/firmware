@@ -1,0 +1,621 @@
+From d0688dc2b172d19e20fdb8be8c37930da12aaf88 Mon Sep 17 00:00:00 2001
+From: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Date: Thu, 18 Sep 2025 15:19:11 +1000
+Subject: [PATCH 17/21] wifi: cfg80211: correctly implement and validate S1G
+ chandef
+
+Currently, the S1G channelisation implementation differs from that of
+VHT, which is the PHY that S1G is based on. The major difference between
+the clock rate is 1/10th of VHT. However how their channelisation is
+represented within cfg80211 and mac80211 vastly differ.
+
+To rectify this, remove the use of IEEE80211_CHAN_1/2/4.. flags that were
+previously used to indicate the control channel width, however it should be
+implied that the control channels are 1MHz in the case of S1G. Additionally,
+introduce the invert - being IEEE80211_CHAN_NO_4/8/16MHz - that imply
+the control channel may not be used for a certain bandwidth. With these
+new flags, we can perform regulatory and chandef validation just as we would
+for VHT.
+
+To deal with the notion that S1G PHYs may contain a 2MHz primary channel,
+introduce a new variable, s1g_primary_2mhz, which indicates whether we are
+operating on a 2MHz primary channel. In this case, the chandef::chan points to
+the 1MHz primary channel pointed to by the primary channel location. Alongside
+this, introduce some new helper routines that can extract the sibling 1MHz
+channel. The sibling being the alternate 1MHz primary subchannel within the
+2MHz primary channel that is not pointed to by chandef::chan.
+
+Furthermore, due to unique restrictions imposed on S1G PHYs, introduce
+a new flag, IEEE80211_CHAN_S1G_NO_PRIMARY, which states that the 1MHz channel
+cannot be used as a primary channel. This is assumed to be set by vendors
+as it is hardware and regdom specific, When we validate a 2MHz primary channel,
+we need to ensure both 1MHz subchannels do not contain this flag. If one or
+both of the 1MHz subchannels contain this flag then the 2MHz primary is not
+permitted for use as a primary channel.
+
+Properly integrate S1G channel validation such that it is implemented
+according with other PHY types such as VHT. Additionally, implement a new
+S1G-specific regulatory flag to allow cfg80211 to understand specific
+vendor requirements for S1G PHYs.
+
+Signed-off-by: Arien Judge <arien.judge@morsemicro.com>
+Signed-off-by: Andrew Pope <andrew.pope@morsemicro.com>
+Signed-off-by: Lachlan Hodges <lachlan.hodges@morsemicro.com>
+Link: https://patch.msgid.link/20250918051913.500781-2-lachlan.hodges@morsemicro.com
+[remove redundant NL80211_ATTR_S1G_PRIMARY_2MHZ check]
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ include/net/cfg80211.h       |  95 ++++++++++++++++++++++++++++++++
+ include/uapi/linux/nl80211.h |  15 +++++
+ net/wireless/chan.c          | 103 ++++++++++++++++++++++++-----------
+ net/wireless/nl80211.c       |  37 ++++++++-----
+ net/wireless/reg.c           |  76 ++++++++------------------
+ 5 files changed, 225 insertions(+), 101 deletions(-)
+
+Index: backports-6.12.61/include/net/cfg80211.h
+===================================================================
+--- backports-6.12.61.orig/include/net/cfg80211.h
++++ backports-6.12.61/include/net/cfg80211.h
+@@ -129,6 +129,13 @@ struct wiphy;
+  *	with very low power (VLP), even if otherwise set to NO_IR.
+  * @IEEE80211_CHAN_ALLOW_20MHZ_ACTIVITY: Allow activity on a 20 MHz channel,
+  *	even if otherwise set to NO_IR.
++ * @IEEE80211_CHAN_S1G_NO_PRIMARY: Prevents the channel for use as an S1G
++ *	primary channel. Does not prevent the wider operating channel
++ *	described by the chandef from being used. In order for a 2MHz primary
++ *	to be used, both 1MHz subchannels shall not contain this flag.
++ * @IEEE80211_CHAN_NO_4MHZ: 4 MHz bandwidth is not permitted on this channel.
++ * @IEEE80211_CHAN_NO_8MHZ: 8 MHz bandwidth is not permitted on this channel.
++ * @IEEE80211_CHAN_NO_16MHZ: 16 MHz bandwidth is not permitted on this channel.
+  */
+ enum ieee80211_channel_flags {
+ 	IEEE80211_CHAN_DISABLED			= BIT(0),
+@@ -158,6 +165,10 @@ enum ieee80211_channel_flags {
+ 	IEEE80211_CHAN_CAN_MONITOR		= BIT(24),
+ 	IEEE80211_CHAN_ALLOW_6GHZ_VLP_AP	= BIT(25),
+ 	IEEE80211_CHAN_ALLOW_20MHZ_ACTIVITY     = BIT(26),
++	IEEE80211_CHAN_S1G_NO_PRIMARY		= BIT(27),
++	IEEE80211_CHAN_NO_4MHZ			= BIT(28),
++	IEEE80211_CHAN_NO_8MHZ			= BIT(29),
++	IEEE80211_CHAN_NO_16MHZ			= BIT(30),
+ };
+ 
+ #define IEEE80211_CHAN_NO_HT40 \
+@@ -824,6 +835,9 @@ struct key_params {
+  * @punctured: mask of the punctured 20 MHz subchannels, with
+  *	bits turned on being disabled (punctured); numbered
+  *	from lower to higher frequency (like in the spec)
++ * @s1g_primary_2mhz: Indicates if the control channel pointed to
++ *	by 'chan' exists as a 1MHz primary subchannel within an
++ *	S1G 2MHz primary channel.
+  */
+ struct cfg80211_chan_def {
+ 	struct ieee80211_channel *chan;
+@@ -833,6 +847,7 @@ struct cfg80211_chan_def {
+ 	struct ieee80211_edmg edmg;
+ 	u16 freq1_offset;
+ 	u16 punctured;
++	bool s1g_primary_2mhz;
+ };
+ 
+ /*
+@@ -991,6 +1006,18 @@ cfg80211_chandef_is_edmg(const struct cf
+ }
+ 
+ /**
++ * cfg80211_chandef_is_s1g - check if chandef represents an S1G channel
++ * @chandef: the channel definition
++ *
++ * Return: %true if S1G.
++ */
++static inline bool
++cfg80211_chandef_is_s1g(const struct cfg80211_chan_def *chandef)
++{
++	return chandef->chan->band == NL80211_BAND_S1GHZ;
++}
++
++/**
+  * cfg80211_chandef_compatible - check if two channel definitions are compatible
+  * @chandef1: first channel definition
+  * @chandef2: second channel definition
+@@ -1012,6 +1039,32 @@ cfg80211_chandef_compatible(const struct
+ int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width);
+ 
+ /**
++ * cfg80211_chandef_get_width - get the channel width in MHz
++ * @c: the channel definition from where to get the width
++ *
++ * Return: channel width in MHz
++ * is valid. -1 otherwise.
++ */
++int cfg80211_chandef_get_width(const struct cfg80211_chan_def *c);
++
++/**
++ * cfg80211_s1g_get_primary_sibling - retrieve the sibling 1MHz subchannel
++ *	for an S1G chandef using a 2MHz primary channel.
++ * @wiphy: wiphy the channel belongs to
++ * @chandef: the chandef to use
++ *
++ * When chandef::s1g_primary_2mhz is set to true, we are operating on a 2MHz
++ * primary channel. The 1MHz subchannel designated by the primary channel
++ * location exists within chandef::chan, whilst the 'sibling' is denoted as
++ * being the other 1MHz subchannel that make up the 2MHz primary channel.
++ *
++ * Returns: the sibling 1MHz &struct ieee80211_channel, or %NULL on failure.
++ */
++struct ieee80211_channel *
++cfg80211_s1g_get_primary_sibling(struct wiphy *wiphy,
++				 const struct cfg80211_chan_def *chandef);
++
++/**
+  * cfg80211_chandef_valid - check if a channel definition is valid
+  * @chandef: the channel definition to check
+  * Return: %true if the channel definition is valid. %false otherwise.
+Index: backports-6.12.61/include/uapi/linux/nl80211.h
+===================================================================
+--- backports-6.12.61.orig/include/uapi/linux/nl80211.h
++++ backports-6.12.61/include/uapi/linux/nl80211.h
+@@ -2885,6 +2885,10 @@ enum nl80211_commands {
+  *	required alongside this attribute. Refer to
+  *	@enum nl80211_s1g_short_beacon_attrs for the attribute definitions.
+  *
++ * @NL80211_ATTR_S1G_PRIMARY_2MHZ: flag attribute indicating that the S1G
++ *	primary channel is 2 MHz wide, and the control channel designates
++ *	the 1 MHz primary subchannel within that 2 MHz primary.
++ *
+  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
+  * @NL80211_ATTR_MAX: highest attribute number currently defined
+  * @__NL80211_ATTR_AFTER_LAST: internal use
+@@ -3438,6 +3442,8 @@ enum nl80211_attrs {
+ 	NL80211_ATTR_S1G_LONG_BEACON_PERIOD,
+ 	NL80211_ATTR_S1G_SHORT_BEACON,
+ 
++	NL80211_ATTR_S1G_PRIMARY_2MHZ,
++
+ 	/* add attributes here, update the policy in nl80211.c */
+ 
+ 	__NL80211_ATTR_AFTER_LAST,
+@@ -4318,6 +4324,12 @@ enum nl80211_wmm_rule {
+  *	very low power (VLP) AP, despite being NO_IR.
+  * @NL80211_FREQUENCY_ATTR_ALLOW_20MHZ_ACTIVITY: This channel can be active in
+  *	20 MHz bandwidth, despite being NO_IR.
++ * @NL80211_FREQUENCY_ATTR_NO_4MHZ: 4 MHz operation is not allowed on this
++ *	channel in current regulatory domain.
++ * @NL80211_FREQUENCY_ATTR_NO_8MHZ: 8 MHz operation is not allowed on this
++ *	channel in current regulatory domain.
++ * @NL80211_FREQUENCY_ATTR_NO_16MHZ: 16 MHz operation is not allowed on this
++ *	channel in current regulatory domain.
+  * @NL80211_FREQUENCY_ATTR_MAX: highest frequency attribute number
+  *	currently defined
+  * @__NL80211_FREQUENCY_ATTR_AFTER_LAST: internal use
+@@ -4363,6 +4375,9 @@ enum nl80211_frequency_attr {
+ 	NL80211_FREQUENCY_ATTR_CAN_MONITOR,
+ 	NL80211_FREQUENCY_ATTR_ALLOW_6GHZ_VLP_AP,
+ 	NL80211_FREQUENCY_ATTR_ALLOW_20MHZ_ACTIVITY,
++	NL80211_FREQUENCY_ATTR_NO_4MHZ,
++	NL80211_FREQUENCY_ATTR_NO_8MHZ,
++	NL80211_FREQUENCY_ATTR_NO_16MHZ,
+ 
+ 	/* keep last */
+ 	__NL80211_FREQUENCY_ATTR_AFTER_LAST,
+Index: backports-6.12.61/net/wireless/chan.c
+===================================================================
+--- backports-6.12.61.orig/net/wireless/chan.c
++++ backports-6.12.61/net/wireless/chan.c
+@@ -55,6 +55,11 @@ void cfg80211_chandef_create(struct cfg8
+ }
+ EXPORT_SYMBOL(cfg80211_chandef_create);
+ 
++#define for_each_s1g_subchan(chandef, freq_khz)                   \
++	for (freq_khz = cfg80211_s1g_get_start_freq_khz(chandef); \
++	     freq_khz <= cfg80211_s1g_get_end_freq_khz(chandef);  \
++	     freq_khz += MHZ_TO_KHZ(1))
++
+ struct cfg80211_per_bw_puncturing_values {
+ 	u8 len;
+ 	const u16 *valid_values;
+@@ -258,10 +263,67 @@ int nl80211_chan_width_to_mhz(enum nl802
+ }
+ EXPORT_SYMBOL(nl80211_chan_width_to_mhz);
+ 
+-static int cfg80211_chandef_get_width(const struct cfg80211_chan_def *c)
++int cfg80211_chandef_get_width(const struct cfg80211_chan_def *c)
+ {
+ 	return nl80211_chan_width_to_mhz(c->width);
+ }
++EXPORT_SYMBOL(cfg80211_chandef_get_width);
++
++/**
++ * cfg80211_s1g_get_start_freq_khz - get S1G chandef start frequency
++ * @chandef: the chandef to use
++ *
++ * Return: the chandefs starting frequency in KHz
++ */
++static u32
++cfg80211_s1g_get_start_freq_khz(const struct cfg80211_chan_def *chandef)
++{
++	u32 bw_mhz = cfg80211_chandef_get_width(chandef);
++	u32 center_khz =
++		MHZ_TO_KHZ(chandef->center_freq1) + chandef->freq1_offset;
++	return center_khz - bw_mhz * 500 + 500;
++}
++
++/**
++ * cfg80211_s1g_get_end_freq_khz - get S1G chandef end frequency
++ * @chandef: the chandef to use
++ *
++ * Return: the chandefs ending frequency in KHz
++ */
++static u32
++cfg80211_s1g_get_end_freq_khz(const struct cfg80211_chan_def *chandef)
++{
++	u32 bw_mhz = cfg80211_chandef_get_width(chandef);
++	u32 center_khz =
++		MHZ_TO_KHZ(chandef->center_freq1) + chandef->freq1_offset;
++	return center_khz + bw_mhz * 500 - 500;
++}
++
++struct ieee80211_channel *
++cfg80211_s1g_get_primary_sibling(struct wiphy *wiphy,
++				 const struct cfg80211_chan_def *chandef)
++{
++	int width_mhz = cfg80211_chandef_get_width(chandef);
++	u32 pri_1mhz_khz, sibling_1mhz_khz, op_low_1mhz_khz, pri_index;
++
++	if (!chandef->s1g_primary_2mhz || width_mhz < 2)
++		return NULL;
++
++	pri_1mhz_khz = ieee80211_channel_to_khz(chandef->chan);
++	op_low_1mhz_khz = cfg80211_s1g_get_start_freq_khz(chandef);
++
++	/*
++	 * Compute the index of the primary 1 MHz subchannel within the
++	 * operating channel, relative to the lowest 1 MHz center frequency.
++	 * Flip the least significant bit to select the even/odd sibling,
++	 * then translate that index back into a channel frequency.
++	 */
++	pri_index = (pri_1mhz_khz - op_low_1mhz_khz) / 1000;
++	sibling_1mhz_khz = op_low_1mhz_khz + ((pri_index ^ 1) * 1000);
++
++	return ieee80211_get_channel_khz(wiphy, sibling_1mhz_khz);
++}
++EXPORT_SYMBOL(cfg80211_s1g_get_primary_sibling);
+ 
+ static bool cfg80211_valid_center_freq(u32 center,
+ 				       enum nl80211_chan_width width)
+@@ -296,8 +358,7 @@ static bool cfg80211_valid_center_freq(u
+ 
+ bool cfg80211_chandef_valid(const struct cfg80211_chan_def *chandef)
+ {
+-	u32 control_freq, oper_freq;
+-	int oper_width, control_width;
++	u32 control_freq, control_freq_khz, start_khz, end_khz;
+ 
+ 	if (!chandef->chan)
+ 		return false;
+@@ -323,27 +384,16 @@ bool cfg80211_chandef_valid(const struct
+ 	case NL80211_CHAN_WIDTH_4:
+ 	case NL80211_CHAN_WIDTH_8:
+ 	case NL80211_CHAN_WIDTH_16:
+-		if (chandef->chan->band != NL80211_BAND_S1GHZ)
+-			return false;
+-
+-		control_freq = ieee80211_channel_to_khz(chandef->chan);
+-		oper_freq = ieee80211_chandef_to_khz(chandef);
+-		control_width = nl80211_chan_width_to_mhz(
+-					ieee80211_s1g_channel_width(
+-								chandef->chan));
+-		oper_width = cfg80211_chandef_get_width(chandef);
+-
+-		if (oper_width < 0 || control_width < 0)
++		if (!cfg80211_chandef_is_s1g(chandef))
+ 			return false;
+ 		if (chandef->center_freq2)
+ 			return false;
+ 
+-		if (control_freq + MHZ_TO_KHZ(control_width) / 2 >
+-		    oper_freq + MHZ_TO_KHZ(oper_width) / 2)
+-			return false;
++		control_freq_khz = ieee80211_channel_to_khz(chandef->chan);
++		start_khz = cfg80211_s1g_get_start_freq_khz(chandef);
++		end_khz = cfg80211_s1g_get_end_freq_khz(chandef);
+ 
+-		if (control_freq - MHZ_TO_KHZ(control_width) / 2 <
+-		    oper_freq - MHZ_TO_KHZ(oper_width) / 2)
++		if (control_freq_khz < start_khz || control_freq_khz > end_khz)
+ 			return false;
+ 		break;
+ 	case NL80211_CHAN_WIDTH_80P80:
+@@ -421,6 +471,9 @@ bool cfg80211_chandef_valid(const struct
+ 	    !cfg80211_edmg_chandef_valid(chandef))
+ 		return false;
+ 
++	if (!cfg80211_chandef_is_s1g(chandef) && chandef->s1g_primary_2mhz)
++		return false;
++
+ 	return valid_puncturing_bitmap(chandef);
+ }
+ EXPORT_SYMBOL(cfg80211_chandef_valid);
+@@ -761,6 +814,10 @@ int cfg80211_chandef_dfs_required(struct
+ 	if (WARN_ON(!cfg80211_chandef_valid(chandef)))
+ 		return -EINVAL;
+ 
++	/* DFS is not required for S1G */
++	if (cfg80211_chandef_is_s1g(chandef))
++		return 0;
++
+ 	switch (iftype) {
+ 	case NL80211_IFTYPE_ADHOC:
+ 	case NL80211_IFTYPE_AP:
+@@ -1303,6 +1360,55 @@ static bool cfg80211_edmg_usable(struct
+ 	return true;
+ }
+ 
++static bool cfg80211_s1g_usable(struct wiphy *wiphy,
++				const struct cfg80211_chan_def *chandef)
++{
++	u32 freq_khz;
++	const struct ieee80211_channel *chan;
++	u32 pri_khz = ieee80211_channel_to_khz(chandef->chan);
++	u32 end_khz = cfg80211_s1g_get_end_freq_khz(chandef);
++	u32 start_khz = cfg80211_s1g_get_start_freq_khz(chandef);
++	int width_mhz = cfg80211_chandef_get_width(chandef);
++	u32 prohibited_flags = IEEE80211_CHAN_DISABLED;
++
++	if (width_mhz >= 16)
++		prohibited_flags |= IEEE80211_CHAN_NO_16MHZ;
++	if (width_mhz >= 8)
++		prohibited_flags |= IEEE80211_CHAN_NO_8MHZ;
++	if (width_mhz >= 4)
++		prohibited_flags |= IEEE80211_CHAN_NO_4MHZ;
++
++	if (chandef->chan->flags & IEEE80211_CHAN_S1G_NO_PRIMARY)
++		return false;
++
++	if (pri_khz < start_khz || pri_khz > end_khz)
++		return false;
++
++	for_each_s1g_subchan(chandef, freq_khz) {
++		chan = ieee80211_get_channel_khz(wiphy, freq_khz);
++		if (!chan || (chan->flags & prohibited_flags))
++			return false;
++	}
++
++	if (chandef->s1g_primary_2mhz) {
++		u32 sib_khz;
++		const struct ieee80211_channel *sibling;
++
++		sibling = cfg80211_s1g_get_primary_sibling(wiphy, chandef);
++		if (!sibling)
++			return false;
++
++		if (sibling->flags & IEEE80211_CHAN_S1G_NO_PRIMARY)
++			return false;
++
++		sib_khz = ieee80211_channel_to_khz(sibling);
++		if (sib_khz < start_khz || sib_khz > end_khz)
++			return false;
++	}
++
++	return true;
++}
++
+ bool _cfg80211_chandef_usable(struct wiphy *wiphy,
+ 			      const struct cfg80211_chan_def *chandef,
+ 			      u32 prohibited_flags,
+@@ -1326,6 +1432,9 @@ bool _cfg80211_chandef_usable(struct wip
+ 	ext_nss_cap = __le16_to_cpu(vht_cap->vht_mcs.tx_highest) &
+ 			IEEE80211_VHT_EXT_NSS_BW_CAPABLE;
+ 
++	if (cfg80211_chandef_is_s1g(chandef))
++		return cfg80211_s1g_usable(wiphy, chandef);
++
+ 	if (edmg_cap->channels &&
+ 	    !cfg80211_edmg_usable(wiphy,
+ 				  chandef->edmg.channels,
+@@ -1337,21 +1446,6 @@ bool _cfg80211_chandef_usable(struct wip
+ 	control_freq = chandef->chan->center_freq;
+ 
+ 	switch (chandef->width) {
+-	case NL80211_CHAN_WIDTH_1:
+-		width = 1;
+-		break;
+-	case NL80211_CHAN_WIDTH_2:
+-		width = 2;
+-		break;
+-	case NL80211_CHAN_WIDTH_4:
+-		width = 4;
+-		break;
+-	case NL80211_CHAN_WIDTH_8:
+-		width = 8;
+-		break;
+-	case NL80211_CHAN_WIDTH_16:
+-		width = 16;
+-		break;
+ 	case NL80211_CHAN_WIDTH_5:
+ 		width = 5;
+ 		break;
+Index: backports-6.12.61/net/wireless/nl80211.c
+===================================================================
+--- backports-6.12.61.orig/net/wireless/nl80211.c
++++ backports-6.12.61/net/wireless/nl80211.c
+@@ -846,6 +846,7 @@ static const struct nla_policy nl80211_p
+ 	[NL80211_ATTR_S1G_LONG_BEACON_PERIOD] = NLA_POLICY_MIN(NLA_U8, 2),
+ 	[NL80211_ATTR_S1G_SHORT_BEACON] =
+ 		NLA_POLICY_NESTED(nl80211_s1g_short_beacon),
++	[NL80211_ATTR_S1G_PRIMARY_2MHZ] = { .type = NLA_FLAG },
+ };
+ 
+ /* policy for the key attributes */
+@@ -1234,6 +1235,15 @@ static int nl80211_msg_put_channel(struc
+ 		    nla_put_flag(msg,
+ 				 NL80211_FREQUENCY_ATTR_ALLOW_20MHZ_ACTIVITY))
+ 			goto nla_put_failure;
++		if ((chan->flags & IEEE80211_CHAN_NO_4MHZ) &&
++		    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_NO_4MHZ))
++			goto nla_put_failure;
++		if ((chan->flags & IEEE80211_CHAN_NO_8MHZ) &&
++		    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_NO_8MHZ))
++			goto nla_put_failure;
++		if ((chan->flags & IEEE80211_CHAN_NO_16MHZ) &&
++		    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_NO_16MHZ))
++			goto nla_put_failure;
+ 	}
+ 
+ 	if (nla_put_u32(msg, NL80211_FREQUENCY_ATTR_MAX_TX_POWER,
+@@ -3377,6 +3387,7 @@ static int _nl80211_parse_chandef(struct
+ 	chandef->center_freq1 = KHZ_TO_MHZ(control_freq);
+ 	chandef->freq1_offset = control_freq % 1000;
+ 	chandef->center_freq2 = 0;
++	chandef->s1g_primary_2mhz = false;
+ 
+ 	if (!chandef->chan) {
+ 		NL_SET_ERR_MSG_ATTR(extack, attrs[NL80211_ATTR_WIPHY_FREQ],
+@@ -3420,29 +3431,22 @@ static int _nl80211_parse_chandef(struct
+ 			return -EINVAL;
+ 		}
+ 	} else if (attrs[NL80211_ATTR_CHANNEL_WIDTH]) {
+-		chandef->width =
+-			nla_get_u32(attrs[NL80211_ATTR_CHANNEL_WIDTH]);
+-		if (chandef->chan->band == NL80211_BAND_S1GHZ) {
+-			/* User input error for channel width doesn't match channel  */
+-			if (chandef->width != ieee80211_s1g_channel_width(chandef->chan)) {
+-				NL_SET_ERR_MSG_ATTR(extack,
+-						    attrs[NL80211_ATTR_CHANNEL_WIDTH],
+-						    "bad channel width");
+-				return -EINVAL;
+-			}
+-		}
++		chandef->width = nla_get_u32(attrs[NL80211_ATTR_CHANNEL_WIDTH]);
+ 		if (attrs[NL80211_ATTR_CENTER_FREQ1]) {
+ 			chandef->center_freq1 =
+ 				nla_get_u32(attrs[NL80211_ATTR_CENTER_FREQ1]);
+ 			if (attrs[NL80211_ATTR_CENTER_FREQ1_OFFSET])
+ 				chandef->freq1_offset = nla_get_u32(
+-				      attrs[NL80211_ATTR_CENTER_FREQ1_OFFSET]);
++					attrs[NL80211_ATTR_CENTER_FREQ1_OFFSET]);
+ 			else
+ 				chandef->freq1_offset = 0;
+ 		}
+ 		if (attrs[NL80211_ATTR_CENTER_FREQ2])
+ 			chandef->center_freq2 =
+ 				nla_get_u32(attrs[NL80211_ATTR_CENTER_FREQ2]);
++
++		chandef->s1g_primary_2mhz = nla_get_flag(
++			attrs[NL80211_ATTR_S1G_PRIMARY_2MHZ]);
+ 	}
+ 
+ 	if (info->attrs[NL80211_ATTR_WIPHY_EDMG_CHANNELS]) {
+@@ -9531,8 +9535,9 @@ static int nl80211_trigger_scan(struct s
+ 				goto out_free;
+ 			}
+ 
+-			/* ignore disabled channels */
++			/* Ignore disabled / no primary channels */
+ 			if (chan->flags & IEEE80211_CHAN_DISABLED ||
++			    chan->flags & IEEE80211_CHAN_S1G_NO_PRIMARY ||
+ 			    !cfg80211_wdev_channel_allowed(wdev, chan))
+ 				continue;
+ 
+@@ -9554,6 +9559,8 @@ static int nl80211_trigger_scan(struct s
+ 				chan = &wiphy->bands[band]->channels[j];
+ 
+ 				if (chan->flags & IEEE80211_CHAN_DISABLED ||
++				    chan->flags &
++					    IEEE80211_CHAN_S1G_NO_PRIMARY ||
+ 				    !cfg80211_wdev_channel_allowed(wdev, chan))
+ 					continue;
+ 
+Index: backports-6.12.61/net/wireless/reg.c
+===================================================================
+--- backports-6.12.61.orig/net/wireless/reg.c
++++ backports-6.12.61/net/wireless/reg.c
+@@ -1707,6 +1707,16 @@ static uint32_t reg_rule_to_chan_bw_flag
+ 	if (reg_rule->flags & NL80211_RRF_AUTO_BW)
+ 		max_bandwidth_khz = reg_get_max_bandwidth(regd, reg_rule);
+ 
++	if (is_s1g) {
++		if (max_bandwidth_khz < MHZ_TO_KHZ(16))
++			bw_flags |= IEEE80211_CHAN_NO_16MHZ;
++		if (max_bandwidth_khz < MHZ_TO_KHZ(8))
++			bw_flags |= IEEE80211_CHAN_NO_8MHZ;
++		if (max_bandwidth_khz < MHZ_TO_KHZ(4))
++			bw_flags |= IEEE80211_CHAN_NO_4MHZ;
++		return bw_flags;
++	}
++
+ 	/* If we get a reg_rule we can assume that at least 5Mhz fit */
+ 	if (!cfg80211_does_bw_fit_range(freq_range,
+ 					center_freq_khz,
+@@ -1717,59 +1727,19 @@ static uint32_t reg_rule_to_chan_bw_flag
+ 					MHZ_TO_KHZ(20)))
+ 		bw_flags |= IEEE80211_CHAN_NO_20MHZ;
+ 
+-	if (is_s1g) {
+-		/* S1G is strict about non overlapping channels. We can
+-		 * calculate which bandwidth is allowed per channel by finding
+-		 * the largest bandwidth which cleanly divides the freq_range.
+-		 */
+-		int edge_offset;
+-		int ch_bw = max_bandwidth_khz;
++	if (max_bandwidth_khz < MHZ_TO_KHZ(10))
++		bw_flags |= IEEE80211_CHAN_NO_10MHZ;
++	if (max_bandwidth_khz < MHZ_TO_KHZ(20))
++		bw_flags |= IEEE80211_CHAN_NO_20MHZ;
++	if (max_bandwidth_khz < MHZ_TO_KHZ(40))
++		bw_flags |= IEEE80211_CHAN_NO_HT40;
++	if (max_bandwidth_khz < MHZ_TO_KHZ(80))
++		bw_flags |= IEEE80211_CHAN_NO_80MHZ;
++	if (max_bandwidth_khz < MHZ_TO_KHZ(160))
++		bw_flags |= IEEE80211_CHAN_NO_160MHZ;
++	if (max_bandwidth_khz < MHZ_TO_KHZ(320))
++		bw_flags |= IEEE80211_CHAN_NO_320MHZ;
+ 
+-		while (ch_bw) {
+-			edge_offset = (center_freq_khz - ch_bw / 2) -
+-				      freq_range->start_freq_khz;
+-			if (edge_offset % ch_bw == 0) {
+-				switch (KHZ_TO_MHZ(ch_bw)) {
+-				case 1:
+-					bw_flags |= IEEE80211_CHAN_1MHZ;
+-					break;
+-				case 2:
+-					bw_flags |= IEEE80211_CHAN_2MHZ;
+-					break;
+-				case 4:
+-					bw_flags |= IEEE80211_CHAN_4MHZ;
+-					break;
+-				case 8:
+-					bw_flags |= IEEE80211_CHAN_8MHZ;
+-					break;
+-				case 16:
+-					bw_flags |= IEEE80211_CHAN_16MHZ;
+-					break;
+-				default:
+-					/* If we got here, no bandwidths fit on
+-					 * this frequency, ie. band edge.
+-					 */
+-					bw_flags |= IEEE80211_CHAN_DISABLED;
+-					break;
+-				}
+-				break;
+-			}
+-			ch_bw /= 2;
+-		}
+-	} else {
+-		if (max_bandwidth_khz < MHZ_TO_KHZ(10))
+-			bw_flags |= IEEE80211_CHAN_NO_10MHZ;
+-		if (max_bandwidth_khz < MHZ_TO_KHZ(20))
+-			bw_flags |= IEEE80211_CHAN_NO_20MHZ;
+-		if (max_bandwidth_khz < MHZ_TO_KHZ(40))
+-			bw_flags |= IEEE80211_CHAN_NO_HT40;
+-		if (max_bandwidth_khz < MHZ_TO_KHZ(80))
+-			bw_flags |= IEEE80211_CHAN_NO_80MHZ;
+-		if (max_bandwidth_khz < MHZ_TO_KHZ(160))
+-			bw_flags |= IEEE80211_CHAN_NO_160MHZ;
+-		if (max_bandwidth_khz < MHZ_TO_KHZ(320))
+-			bw_flags |= IEEE80211_CHAN_NO_320MHZ;
+-	}
+ 	return bw_flags;
+ }
+ 
