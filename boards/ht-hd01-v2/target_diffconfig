@@ -84,3 +84,6 @@ CONFIG_PACKAGE_kmod-crypto-michael-mic=y
 CONFIG_PACKAGE_kmod-hwmon-core=y
 CONFIG_PACKAGE_kmod-pps=y
 CONFIG_PACKAGE_kmod-ptp=y
+
+# MAGK mesh node configuration marker
+# This board is used as a MAGK OpenMANET mesh node (HaLow backhaul)
