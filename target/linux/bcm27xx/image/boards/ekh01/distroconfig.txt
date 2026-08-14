@@ -10,8 +10,10 @@
 dtoverlay=disable-bt
 [pi3]
 dtoverlay=disable-bt
+dtparam=i2c1=on
 [pi4]
 dtoverlay=miniuart-bt
+dtparam=i2c1=on
 [cm4]
 # This overlay is used to allow m.2 wifi cards
 dtoverlay=pcie-32bit-dma
