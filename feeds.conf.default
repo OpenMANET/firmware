@@ -1,4 +1,4 @@
-src-git openmanet https://github.com/OpenMANET/packages.git;1.8.0-dev
+src-git openmanet https://github.com/OpenMANET/packages.git;fix/bcm2710-morsechipreset
 src-git morse https://github.com/MorseMicro/morse-feed.git^fc332b01aa2df952e057efe73763de3ff71cb3b0
 src-git gateworks https://github.com/Gateworks/gw-openwrt-packages.git^d1d23cd0059fbee84e8d5087b47d93213d8be587
 src-git packages https://github.com/openwrt/packages.git^953b6d47b4e9f0ad3c39547c6d3f9a828f10e206
