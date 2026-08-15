@@ -14,6 +14,10 @@
 		led-halow = &led2;
 		led-wifi = &led0;
 		led-status = &led1;
+		led-boot = &led1;
+		led-failsafe = &led1;
+		led-running = &led1;
+		led-upgrade = &led1;
 		label-mac-device = &wan;
 	};
 
