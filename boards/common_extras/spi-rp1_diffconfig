@@ -3,10 +3,16 @@
 # Counterpart of spi_diffconfig, which is BCM283x-specific: on the Pi 5 the
 # 40-pin header SPI0 is provided by the RP1 southbridge and is a DesignWare
 # SSI block ("snps,dw-apb-ssi", see rp1_spi0 in the bcm2712 device tree), not
-# the BCM2835 SPI controller. Selecting kmod-spi-bcm2835 here would build a
-# driver that can never bind.
+# the BCM2835 SPI controller.
+#
+# Unlike spi_diffconfig this file selects no kmod-spi-* packages. The SPI
+# drivers the Pi 5 needs - SPI_DESIGNWARE, SPI_DW_MMIO, SPI_DW_DMA plus the
+# DW_AXI_DMAC engine that RP1's SPI DMA channels hang off - are built into
+# the kernel by target/linux/bcm27xx/bcm2712/config-6.6. Selecting the
+# matching kmods here would be a no-op: scripts/kconfig.pl merges the target
+# config in 'm+' mode, where an existing =y beats the package's =m, so no
+# .ko is ever produced. The packages would install as empty stubs, and
+# ModuleAutoLoad (include/kernel.mk) would still drop /etc/modules.d/ entries
+# naming modules that do not exist, making kmodloader log a failure for each
+# one at boot.
 CONFIG_MORSE_SPI=y
-CONFIG_PACKAGE_kmod-spi-dw=y
-CONFIG_PACKAGE_kmod-spi-dw-mmio=y
-CONFIG_PACKAGE_kmod-spi-bitbang=y
-CONFIG_PACKAGE_kmod-spi-gpio=y

@@ -49,7 +49,7 @@ Two deliberate differences from the naive RP1 translation:
 
 --- /dev/null
 +++ b/arch/arm/boot/dts/overlays/mm610x-spi-pi5-overlay.dts
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,76 @@
 +/dts-v1/;
 +/plugin/;
 +
@@ -95,43 +95,33 @@ Two deliberate differences from the naive RP1 translation:
 +		target = <&rp1_gpio>;
 +		__overlay__ {
 +			rp1_morse_cs: rp1_morse_cs {
-+				pin_cs {
-+					function = "gpio";
-+					pins = "gpio8";
-+					bias-pull-up;
-+				};
++				function = "gpio";
++				pins = "gpio8";
++				bias-pull-up;
 +			};
 +
 +			rp1_morse_wake: rp1_morse_wake {
-+				pin_wake {
-+					function = "gpio";
-+					pins = "gpio23";
-+					bias-pull-up;
-+				};
++				function = "gpio";
++				pins = "gpio23";
++				bias-pull-up;
 +			};
 +
 +			rp1_morse_busy: rp1_morse_busy {
-+				pin_busy {
-+					function = "gpio";
-+					pins = "gpio24";
-+					bias-pull-down;
-+				};
++				function = "gpio";
++				pins = "gpio24";
++				bias-pull-down;
 +			};
 +
 +			rp1_morse_irq: rp1_morse_irq {
-+				pin_irq {
-+					function = "gpio";
-+					pins = "gpio5";
-+					bias-pull-up;
-+				};
++				function = "gpio";
++				pins = "gpio5";
++				bias-pull-up;
 +			};
 +
 +			rp1_morse_reset: rp1_morse_reset {
-+				pin_reset {
-+					function = "gpio";
-+					pins = "gpio17";
-+					bias-pull-up;
-+				};
++				function = "gpio";
++				pins = "gpio17";
++				bias-pull-up;
 +			};
 +		};
 +	};
