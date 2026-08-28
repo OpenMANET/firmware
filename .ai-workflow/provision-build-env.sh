@@ -52,6 +52,9 @@ apt-get install -y -qq --no-install-recommends \
     quilt patch diffutils bzip2 xz-utils zstd \
     npm node-typescript \
     procps sudo less nano vim-tiny \
+    libnl-3-dev libnl-genl-3-dev libgps-dev libcap-dev pkg-config \
+    libopus-dev libopusfile-dev portaudio19-dev net-tools \
+    libpcre3-dev libpcre3 upx-ucl golang-go \
   || { log 'Full package set failed; retrying without optional extras'; \
        apt-get install -y -qq --no-install-recommends \
          build-essential clang flex bison g++ gawk gettext git libncurses-dev \
