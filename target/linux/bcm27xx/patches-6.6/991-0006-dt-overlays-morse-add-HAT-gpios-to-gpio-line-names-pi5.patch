@@ -1,0 +1,51 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET Pi 5 port <noreply@openmanet.org>
+Date: Thu, 27 Aug 2026 21:15:00 -0500
+Subject: [PATCH] arm64: dts: bcm2712: Add morse HAT gpios to gpio-line-names
+
+Raspberry Pi 5 counterpart of 991-0005. Same Seeed WM1302 Pi HAT wiring as
+the shipping Pi 4 product - reset GPIO17, wake GPIO23, busy GPIO24 - because
+it is the same HAT on the same 40-pin header.
+
+The Morse userspace locates the chip reset line by gpio-line-name, not by
+number: /morse/scripts/chipreset.sh runs "gpioinfo -s --by-name MM_RESET"
+and aborts the reset when the name is absent, and morse_cli.sh greps
+/sys/kernel/debug/gpio for MM_RESET. Without this patch neither works on a
+Pi 5.
+
+On BCM2712 the 40-pin header GPIOs belong to RP1, not the SoC, so the block
+to patch is the one under &rp1_gpio in the arm64 board DTS rather than the
+&gpio block in the arm one. RP1 registers a single 54-line gpiochip with
+"gpio-ranges = <&rp1_gpio 0 0 54>" (rp1.dtsi) and .base = -1 / .ngpio = 54
+(pinctrl-rp1.c), so the line index equals the BCM GPIO number exactly as it
+does on the Pi 4 and the three renames transplant positionally. The trailing
+"// GPIOn" comments are RP1 style and are kept so the hunk is unambiguous.
+
+bcm2712d0-rpi-5-b.dts needs no change: it #includes this file and overrides
+only &gio and &gio_aon, never &rp1_gpio.
+
+Must apply after 950-1180 (which moves the file to arch/arm64) and after
+950-0870 (which supplies the "GPIOn" names this hunk uses as context);
+the 991-xxxx numbering satisfies both.
+
+---
+ arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+--- a/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
++++ b/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts
+@@ -699,11 +699,11 @@
+ 		"GPIO15", // GPIO15
+ 		"GPIO16", // GPIO16
+-		"GPIO17", // GPIO17
++		"MM_RESET", // GPIO17
+ 		"GPIO18", // GPIO18
+ 		"GPIO19", // GPIO19
+ 		"GPIO20", // GPIO20
+ 		"GPIO21", // GPIO21
+ 		"GPIO22", // GPIO22
+-		"GPIO23", // GPIO23
+-		"GPIO24", // GPIO24
++		"MM_WAKE", // GPIO23
++		"MM_BUSY", // GPIO24
+ 		"GPIO25", // GPIO25

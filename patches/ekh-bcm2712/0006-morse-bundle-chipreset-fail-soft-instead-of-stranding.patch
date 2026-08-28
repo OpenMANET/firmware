@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET Pi 5 port <noreply@openmanet.org>
+Date: Thu, 27 Aug 2026 21:00:00 -0500
+Subject: [PATCH] morse-bundle: chipreset: fail soft instead of stranding the
+ mmc host
+
+/morse/scripts/chipreset.sh runs unconditionally at S09 on every target
+(morse-bundle installs files/etc/init.d/* with no board gate). Its order of
+operations is:
+
+    51  remove_driver
+    57  echo -n "$sdio_device" > "$sdio_driver_path/unbind"
+    60  reset_chip "MM_RESET"
+    63  echo -n "$sdio_device" > "$sdio_driver_path/bind"
+
+and reset_chip() calls "exit 1" when the MM_RESET gpio line name cannot be
+resolved. The mmc host is therefore unbound at line 57 and NEVER REBOUND,
+because the exit at line 22 skips line 63 entirely.
+
+On a Raspberry Pi 5 that is a boot-killing failure rather than a warning.
+The SD/eMMC controller lives in RP1 behind PCIe but still sits under
+/sys/devices/platform (via the axi node), so the "find /sys/devices/platform
+-name mmc_host | head -1" at line 36 does select it, and unbinding it pulls
+the root device out from under the running system. The Pi 4 never hits this
+because 991-0005 renames GPIO17 to MM_RESET in bcm2711-rpi-4-b.dts, so the
+lookup always succeeds there.
+
+The Pi 5 gets the equivalent rename from 991-0006, so the happy path is the
+same on both boards. This patch exists because the failure path is not: if
+the mm610x-spi-pi5 overlay fails to load for any reason during bring-up, the
+board must still boot far enough to be debugged over serial. A missing
+MM_RESET means SPI is unusable, which is worth a loud message, not a
+stranded root filesystem.
+
+Board-scoped to ekh-bcm2712 deliberately: this changes shipping Pi 3 / Pi 4
+product behaviour otherwise, and CLAUDE.md prefers target-specific changes.
+
+--- a/feeds/morse/hardware/morse-bundle/files/morse/scripts/chipreset.sh
++++ b/feeds/morse/hardware/morse-bundle/files/morse/scripts/chipreset.sh
+@@ -19,7 +19,7 @@ reset_chip() {
+     # The '--by-name' option treats the input as a line name, even if it looks like a numeric offset.
+     if ! gpioinfo -s --by-name "$line_name" > /dev/null 2>&1; then
+          2>&1 echo "morsechipreset: unable to reset as $line_name is not in gpio-line-names or is duplicated in device tree"
+-        exit 1
++        return 1
+     fi
+ 
+     #Timing is from reset.c in morse-ctrl

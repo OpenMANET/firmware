@@ -1,0 +1,80 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET Pi 5 port <noreply@openmanet.org>
+Date: Thu, 27 Aug 2026 21:30:00 -0500
+Subject: [PATCH] bsp-bcm271x: gpsboard: make the WM1302 GPS init chip- and
+ spi-path-agnostic
+
+bsp-bcm271x is selected for the Pi 5 image (boards/ekh-bcm2712/target_diffconfig)
+and its Makefile installs files/etc/init.d/* unconditionally, so gpsboard.init
+runs on BCM2712. Two hardcoded BCM2711 assumptions make it a no-op there:
+
+1. "gpioset -c gpiochip0" / "gpioget -c gpiochip0". On BCM2711 the 40-pin
+   header GPIOs are gpiochip0, which is what the comment in the file asserts.
+   On BCM2712 they belong to RP1, which sits behind PCIe and registers its
+   gpio_chip with .base = -1 (pinctrl-rp1.c), while the SoC's two
+   brcm,brcmstb-gpio controllers (&gio, &gio_aon) probe from the platform bus
+   first. gpiochip0 on a Pi 5 is therefore a SoC controller whose line 25 is
+   "BT_CTS" and whose line 12 is unnamed - so the driver would drive the wrong
+   pins entirely. Resolve by gpio-line-name instead: 950-0870 gives both boards
+   identical "GPIO2".."GPIO27" names for header pins, and -s/--strict aborts on
+   an ambiguous name rather than guessing.
+
+2. expected_path="platform/soc/fe204000.spi/spi_master/spi0/spi0.0" is the
+   BCM2711 SPI0 address. On BCM2712 SPI0 is RP1's DesignWare SSI reached
+   through PCIe, so the prefix differs completely and check_morse_section()
+   takes its mismatch branch and "exit 0"s out of boot() before init_gps_gpio()
+   ever runs - the GPS is silently never initialised. Match the suffix instead;
+   what the check is actually asserting is that the morse radio is on SPI0
+   chip-select 0, which is equally true on both boards.
+
+Board-scoped to ekh-bcm2712: the Pi 4 product works with the current file and
+CLAUDE.md prefers target-specific changes. Fold upstream once hardware-verified.
+
+--- a/feeds/openmanet/boards/bsp-bcm271x/files/etc/init.d/gpsboard.init
++++ b/feeds/openmanet/boards/bsp-bcm271x/files/etc/init.d/gpsboard.init
+@@ -29,15 +29,18 @@
+     local gpio="$1"
+     local value="$2"
+     # Use gpioset with daemonize to persist GPIO state
+-    # -c gpiochip0: specify the chip (GPIOs 0-57 are on gpiochip0)
++    # -s --by-name: resolve the header pin by its gpio-line-name across every
++    #   gpiochip, aborting if the name is not unique. "-c gpiochip0" is a
++    #   BCM2711 assumption; on BCM2712 the header pins live on RP1, which
++    #   probes from PCIe with .base = -1 and is not gpiochip0.
+     # -C: set consumer name for identification in gpioinfo
+     # -z: daemonize to keep GPIO state after exit (no & needed)
+-    gpioset -c gpiochip0 -C "gps-wm1302" -z "${gpio}=${value}" 2>/dev/null
++    gpioset -s -C "gps-wm1302" -z --by-name "GPIO${gpio}=${value}" 2>/dev/null
+ }
+ 
+ get_gpio_val() {
+     local gpio="$1"
+-    gpioget -c gpiochip0 "${gpio}" 2>/dev/null || echo "?"
++    gpioget -s --by-name "GPIO${gpio}" 2>/dev/null || echo "?"
+ }
+ 
+ get_gpsd_device() {
+@@ -52,7 +55,11 @@
+ }
+ 
+ check_morse_device() {
+-    local expected_path="platform/soc/fe204000.spi/spi_master/spi0/spi0.0"
++    # A suffix, not a full path. On BCM2711 the radio is at
++    # platform/soc/fe204000.spi/spi_master/spi0/spi0.0; on BCM2712 SPI0 is
++    # RP1's DesignWare SSI behind PCIe, so the prefix differs entirely. The
++    # assertion that matters is "the morse radio is on SPI0 chip-select 0".
++    local expected_path="spi_master/spi0/spi0.0"
+     local found=0
+ 
+     # Iterate through all wifi-device sections
+@@ -74,8 +81,8 @@
+         if [ -z "$device_path" ]; then
+             logger -t "$NAME" "morse wifi-device found but path does not exist"
+             exit 0
+-        elif [ "$device_path" != "$expected_path" ]; then
+-            logger -t "$NAME" "morse wifi-device path does not match: got '$device_path', expected '$expected_path'"
++        elif [ "$device_path" = "${device_path%$expected_path}" ]; then
++            logger -t "$NAME" "morse wifi-device path does not match: got '$device_path', expected '*$expected_path'"
+             exit 0
+         fi
+     fi
