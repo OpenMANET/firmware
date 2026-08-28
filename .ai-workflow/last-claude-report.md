@@ -62,11 +62,13 @@ The image is already copied to Windows at:
 
     C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
 
-(checksum verified against `sha256sums` after the copy)
+sha256 3686d0b3c28a0e7ed7760bb40f1ca6c385030a3cde175d3ddb3bca382e064cea, 53,400,458 bytes
+(verified against the regenerated `sha256sums` after the copy)
 
 1. Flash it to an SD card (Raspberry Pi Imager or `dd`; it is a full disk image).
 2. Fit the card in the Pi 5 with the WM1302 HAT + Wio-WM6108.
-3. Attach a USB serial adapter to GPIO14/15, 115200 8N1.
+3. Plug the Waveshare Pi 5 3-pin UART lead into the dedicated JST-SH debug UART
+   connector between the HDMI ports. Open it at 115200 8N1. No jumper wires needed.
 4. **Cold power cycle** — pull power, do not warm-reboot. The MM6108 first probe
    requires it.
 5. Send me the serial boot log.

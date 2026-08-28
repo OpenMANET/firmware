@@ -169,7 +169,7 @@ symbols are "unreliable here". No action needed.
 
 | | |
 |---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,400,452 bytes, sha256 `8e43ea16c8d016fc2738eb7420d79c3ddbc2382547dfae5f885671b579468603`. Log `~/logs/build-bcm2712-03.log`. |
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,400,458 bytes, sha256 `3686d0b3c28a0e7ed7760bb40f1ca6c385030a3cde175d3ddb3bca382e064cea` (rebuilt at `e55ad37` for the debug-UART console). Log `~/logs/build-bcm2712-03.log`. |
 | `ekh-bcm2711` (Pi 4 regression) | `make -j10` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Log `~/logs/build-bcm2711-02.log`. |
 
 Both built from commit `619022f` of `pi5-wm6108-port`.
@@ -279,21 +279,30 @@ None in software. The port is now blocked on physical hardware access.
 
 ## Next Engineering Action (exact)
 
-OWNER ACTION REQUIRED — one action:
+OWNER ACTION REQUIRED — one action: flash and boot a Pi 5.
 
-Flash `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz` to an SD card, fit
-it in the Pi 5 with the WM1302 HAT + Wio-WM6108, attach a USB serial adapter to
-GPIO14/15 (115200 8N1), and **cold power cycle** — a warm reboot is not sufficient for
-the MM6108's first probe.
-
-The image is inside the WSL distro at
-`~/openmanet/firmware/bin/targets/bcm27xx/bcm2712/`. Copy it to Windows with:
+Image (checksum verified after the copy):
 
 ```
-wsl -d openmanet-build -u builder -- cp ~/openmanet/firmware/bin/targets/bcm27xx/bcm2712/openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz /mnt/c/AI-Projects/OpenMANET-Pi5/
+C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
+sha256 3686d0b3c28a0e7ed7760bb40f1ca6c385030a3cde175d3ddb3bca382e064cea
+53,400,458 bytes
 ```
 
-Then capture the serial boot log. What to look for, in order:
+1. Flash it to an SD card (full disk image).
+2. Fit the card in the Pi 5 with the WM1302 HAT + Wio-WM6108.
+3. Plug the Waveshare Pi 5 3-pin UART lead into the dedicated JST-SH **debug UART
+   connector** between the HDMI ports. No jumper wires, no GPIO14/15 needed.
+4. Open the port at **115200 8N1**.
+5. **Cold power cycle** — pull power. A warm reboot is not sufficient for the MM6108
+   first probe.
+6. Capture the serial log.
+
+The debug connector now carries the bootloader/firmware output *and* the full Linux
+kernel log *and* a login shell (`/dev/console` is ttyAMA10). GPIO14/15 remains a
+115200 fallback if the plug misbehaves.
+
+What to look for, in order:
 
 1. RP1 enumerates over PCIe and `pinctrl-rp1` probes.
 2. `spi-dw-mmio` binds and `spi0` appears — if `DW_AXI_DMAC` were wrong this fails
@@ -309,6 +318,29 @@ and MM6108 probe.
 
 ## Important Technical Decisions
 
+- SERIAL CONSOLE: the Pi 5 hardware-validation console is the dedicated 3-pin JST-SH debug
+  connector (SoC uart10, alias `serial10`, `ttyAMA10`), NOT GPIO14/15. Verified against the
+  built kernel: `pl011_probe_dt_alias()` calls `of_alias_get_id(np, "serial")` so the alias
+  number becomes the tty index, and `UART_NR` is 14 so index 10 is in range and is not folded
+  back to 0 by the guard in `pl011_console_setup()`.
+  `bcm2712-rpi-5-b.dtb` already carries `stdout-path = "serial10:115200n8"`, but that alone is
+  not enough: any `console=` on the kernel command line sets `console_set_on_cmdline`, and
+  `of_console_check()` then declines to register the stdout-path console. So `ttyAMA10` has to
+  be named explicitly, and it is listed LAST so it also becomes `/dev/console` — which is what
+  inittab's `::askconsole` attaches to, giving a login shell and not just a one-way log. HDMI
+  keeps its shell through the separate `tty1::askfirst` entry.
+  Implemented Pi-5-only via the mechanism the image architecture already provides:
+  `Build/boot-rpi5-morse` overwrites `distroconfig.txt` after `Build/boot-common` has run, so
+  it now overwrites `cmdline.txt` the same way from `boards/rpi5/cmdline.txt`. The shared
+  `cmdline.txt` is untouched — verified by extraction: the Pi 4 image's `cmdline.txt` is
+  byte-identical to the shared source, and all three Pi 4 images are byte-size identical across
+  independent builds. `Build/boot-rpi5-morse` is referenced only by `Device/morse_rpi5_base`.
+  All bauds are explicit. `console=serial0` carried no options, which makes
+  `pl011_console_setup()` fall through to `pl011_console_get_options()`; that only derives the
+  rate when `UARTEN` is already set in hardware and otherwise leaves its local default of
+  38400. GPIO14/15 is kept, now pinned to `115200n8`, purely as a first-boot fallback.
+  `uart_2ndstage=1` was deliberately NOT added — the Pi 5 bootloader already talks to this
+  connector natively. Add it only if verbose second-stage firmware logging is wanted.
 - DO NOT MERGE PR #46. It is `mergeable: false` against a pre-1.8.0 merge base (`b2cc177`),
   its own bcm2712 CI job fails, and its `boards/ekh-bcm2712/target_diffconfig` uses dead
   package names (`morse-fw-6108`, `kmod-video-codec-bcm2835`). Its RP1 overlay was reused as
