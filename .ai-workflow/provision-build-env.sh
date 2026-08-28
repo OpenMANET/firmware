@@ -85,6 +85,23 @@ sudo -u "$BUILD_USER" git config --global --add safe.directory "$WIN_REPO"
 sudo -u "$BUILD_USER" git config --global --add safe.directory '*'
 sudo -u "$BUILD_USER" git config --global core.symlinks true
 
+# openmanetd declares its submodules with scp-style SSH URLs
+# (git@github.com:OpenMANET/go-alfred.git). Without a rewrite the submodule
+# clone blocks forever on an SSH credential prompt and the build simply hangs -
+# it does not fail. Mirrors .github/workflows/build-firmware.yml:82-85.
+sudo -u "$BUILD_USER" git config --global --unset-all url."https://github.com/".insteadOf || true
+sudo -u "$BUILD_USER" git config --global --add url."https://github.com/".insteadOf "git@github.com:"
+sudo -u "$BUILD_USER" git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
+sudo -u "$BUILD_USER" git config --global --add url."https://github.com/".insteadOf "git://github.com/"
+
+# Belt and braces: never let a build block on an interactive prompt.
+grep -q GIT_TERMINAL_PROMPT "$BUILD_HOME/.bashrc" || sudo -u "$BUILD_USER" tee -a "$BUILD_HOME/.bashrc" >/dev/null <<'RC'
+
+# Never block a build on an interactive git credential prompt.
+export GIT_TERMINAL_PROMPT=0
+export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=no"
+RC
+
 # --- build tree -------------------------------------------------------------
 # DESIGN NOTE (see CLAUDE.md "Build Rules"):
 #   The Windows repo at C:\AI-Projects\OpenMANET-Pi5\firmware is the SINGLE

@@ -1,0 +1,76 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET Pi 5 port <noreply@openmanet.org>
+Date: Thu, 27 Aug 2026 22:00:00 -0500
+Subject: [PATCH] golang: install a default-version "go" into hostpkg/bin
+
+Every Go package that comes from the "packages" feed fails to build with
+
+    make[3]: go: No such file or directory
+    /bin/sh: 1: go: not found
+    make[3]: *** [Makefile:62: runc] Error 127
+
+This reproduces identically on ekh-bcm2711 and ekh-bcm2712 - it is not a
+Pi 5 regression - and takes out runc, docker, containerd and dockerd, all
+of which boards/common/kitchensink_diffconfig selects as =m.
+
+Cause: the openmanet feed is first in feeds.conf.default, so its golang
+shadows feeds/packages/lang/golang. The two disagree about the host bin
+layout:
+
+  * feeds/packages/lang/golang/golang-compiler.mk:88 GoCompiler/Default/
+    Install/BinLinks links "$(1)/bin/go" -> ../lib/go-<ver>/bin/go, i.e. an
+    unversioned "go" on the hostpkg PATH.
+  * feeds/openmanet/lang/golang/golang-compiler.mk:100 links
+    "$(1)/bin/go$(2)" instead - "go1.26" only, never "go". That is the newer
+    multi-version scheme, and the openmanet golang-package.mk compensates at
+    golang-package.mk:182 with
+        GO_BIN_PATH := PATH=$(STAGING_DIR_HOSTPKG)/lib/go-$(GO_HOST_VERSION)/bin:$(PATH)
+
+Packages inside the openmanet feed (openmanetd, tailscale, mavp2p) include
+that golang-package.mk and are fine. runc and docker live in the packages
+feed and include feeds/packages/lang/golang/golang-package.mk, which has no
+GO_BIN_PATH because it expects hostpkg/bin/go to exist. Nothing creates it,
+so they break.
+
+Fix it where the meaning is unambiguous rather than by patching each Go
+package: "golang" is the dummy package that exists precisely to mean "the
+default Go version" (its own header says so), and it currently has empty
+Host/Compile and Host/Install. Have it link the unversioned names at the
+default version. GO_DEFAULT_VERSION is 1.26 and PKG_VERSION is set from it,
+so the link always tracks whatever the default becomes. $(LN) is "ln -sf",
+so this is idempotent across rebuilds, and the versioned go1.26 / gofmt1.26
+links are untouched - both schemes now work side by side.
+
+PKG_RELEASE bump so the host stamp is invalidated on an existing tree.
+
+--- a/feeds/openmanet/lang/golang/golang/Makefile
++++ b/feeds/openmanet/lang/golang/golang/Makefile
+@@ -9,7 +9,7 @@
+ 
+ PKG_NAME:=golang
+ PKG_VERSION:=$(GO_DEFAULT_VERSION)
+-PKG_RELEASE:=1
++PKG_RELEASE:=2
+ 
+ PKG_MAINTAINER:=George Sapkin <george@sapk.in>
+ 
+@@ -27,7 +27,19 @@
+ define Host/Compile
+ endef
+ 
++# Provide the unversioned "go"/"gofmt" that feeds/packages/lang/golang/
++# golang-package.mk assumes is on the hostpkg PATH. The openmanet golang
++# only installs versioned names (go$(PKG_VERSION)) and adds the real GOROOT
++# bin directory to PATH itself, so packages from other feeds - runc, docker,
++# containerd - would otherwise find no "go" at all.
+ define Host/Install
++	$(INSTALL_DIR) $(STAGING_DIR_HOSTPKG)/bin
++	$(LN) ../lib/go-$(PKG_VERSION)/bin/go $(STAGING_DIR_HOSTPKG)/bin/go
++	$(LN) ../lib/go-$(PKG_VERSION)/bin/gofmt $(STAGING_DIR_HOSTPKG)/bin/gofmt
++endef
++
++define Host/Uninstall
++	rm -f $(STAGING_DIR_HOSTPKG)/bin/go $(STAGING_DIR_HOSTPKG)/bin/gofmt
+ endef
+ 
+ $(eval $(call HostBuild))
