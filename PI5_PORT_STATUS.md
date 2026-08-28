@@ -60,7 +60,7 @@ reset GPIO17 · wake GPIO23 · busy GPIO24 · spi-irq GPIO5 · CS GPIO8 (CE0) ·
   so the Raspberry Pi firmware's automatic per-SoC overlay remapping is unavailable in OpenWrt
   images. Pi 5 overlays must therefore be named and selected explicitly.
 
-### Implementation (committed; build not yet run)
+### Implementation (committed, BUILD VERIFIED)
 
 1. `target/linux/bcm27xx/bcm2712/config-6.6` — the subtarget had NO SPI subsystem at all.
    Added `CONFIG_SPI`, `SPI_MASTER`, `SPI_DYNAMIC`, `SPI_BITBANG`, `SPI_GPIO`,
@@ -82,6 +82,12 @@ reset GPIO17 · wake GPIO23 · busy GPIO24 · spi-irq GPIO5 · CS GPIO8 (CE0) ·
 7. New `patches/ekh-bcm2712/` — the four `ekh-bcm2711` feed patches (notably the
    golang/GCC-15 host fix, without which the openmanetd Go build fails).
 8. New `.github/workflows/build-pr-bcm2712.yml`.
+9. New `patches-6.6/991-0006-...-pi5.patch` — MM_RESET/MM_WAKE/MM_BUSY gpio-line-names
+   on `&rp1_gpio` in the arm64 Pi 5 board DTS. Was a deferred follow-up; now done.
+10. New `patches/ekh-bcm2712/0006` (chipreset fail-soft) and `0007` (gpsboard
+   chip- and spi-path-agnostic) — see Important Technical Decisions.
+11. New `patches/ekh-bcm27{11,12}/0008` (golang `go` symlink) and host-dependency +
+   git-rewrite fixes in `.ai-workflow/provision-build-env.sh` — see Most Recent Build.
 
 ### Independent review outcome (`.ai-workflow/pi5-change-review.md`)
 
@@ -159,33 +165,147 @@ symbols are "unreliable here". No action needed.
 
 ## Most Recent Build
 
-IN PROGRESS. `make -j24` for `ekh-bcm2712`, started 2026-08-27 ~20:30, log
-`~/logs/build-bcm2712-01.log`. This is the FIRST compile of the Pi 5 target — from-scratch
-toolchain, so several hours of wall clock. The `ekh-bcm2711` regression tree is being
-prepared in parallel.
+**BUILD VERIFIED — both targets green.**
+
+| | |
+|---|---|
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,400,452 bytes, sha256 `8e43ea16c8d016fc2738eb7420d79c3ddbc2382547dfae5f885671b579468603`. Log `~/logs/build-bcm2712-03.log`. |
+| `ekh-bcm2711` (Pi 4 regression) | `make -j10` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Log `~/logs/build-bcm2711-02.log`. |
+
+Both built from commit `619022f` of `pi5-wm6108-port`.
+
+### Three build blockers found and fixed — none of them Pi 5 regressions
+
+The Pi 4 board was built in parallel from the start specifically so that "my change
+or the tree?" could be answered by evidence. All three failures reproduced
+identically on the untouched `ekh-bcm2711`.
+
+1. **`runc` / `docker` / `containerd`: `go: not found`.** The `openmanet` feed is
+   first in `feeds.conf.default`, so its golang shadows `feeds/packages/lang/golang`,
+   and the two disagree about the host bin layout. Upstream's
+   `GoCompiler/Default/Install/BinLinks` (`golang-compiler.mk:88`) links an
+   unversioned `hostpkg/bin/go`; openmanet's (`golang-compiler.mk:100`) links only
+   `go1.26` and compensates inside its own `golang-package.mk:182` with
+   `GO_BIN_PATH`. Packages in the openmanet feed (openmanetd, tailscale, mavp2p)
+   include that mk and are fine; runc and docker come from the packages feed and
+   include the upstream mk, which expects a `go` that nothing creates.
+   FIXED by `patches/ekh-bcm27{11,12}/0008`: the `golang` dummy package — which
+   exists precisely to mean "the default Go version" — gets a `Host/Install` that
+   links the unversioned names at `GO_DEFAULT_VERSION`, plus a `Host/Uninstall`.
+   `$(LN)` is `ln -sf`, so it is idempotent and the versioned links are untouched.
+2. **`openmanetd` hung rather than failed.** Its submodules use scp-style
+   `git@github.com:OpenMANET/go-alfred.git` URLs; with no `url.insteadOf` rewrite the
+   clone blocks on an SSH credential prompt indefinitely — the first diagnostic run
+   sat on it for ten minutes with no error output. CI already handles this
+   (`build-firmware.yml:82-85`); the WSL provisioning script did not.
+   FIXED in `provision-build-env.sh`: the same three rewrite rules, plus
+   `GIT_TERMINAL_PROMPT=0` and a `BatchMode` `GIT_SSH_COMMAND` so a missing
+   credential fails fast instead of hanging.
+3. **`openmanetd`: `/usr/bin/ld: cannot find -lnl-3 / -lnl-genl-3 / -lcap`.** Its
+   `Build/Configure` runs `$(MAKE) -C internal/alfred/alfred`, which builds the
+   alfred bindings with the HOST toolchain. CI installs those `-dev` packages
+   (`build-firmware.yml:63-66`); the provisioning script carried only the
+   OpenWrt-documented prerequisite set.
+   FIXED in `provision-build-env.sh`: added libnl-3/libnl-genl-3/gps/cap/pkg-config,
+   opus/opusfile/portaudio, pcre, net-tools, upx-ucl and golang-go.
+
+### Pi 5 image contents verified by extraction, not by inference
+
+The image was gunzipped, its partition table read, the FAT partition listed with
+mtools and the squashfs unpacked with `unsquashfs`.
+
+FAT boot partition:
+
+- `kernel_2712.img` (14,260,232 bytes) and all six Pi 5 DTBs, including
+  `bcm2712d0-rpi-5-b.dtb` for D0 silicon.
+- `overlays/mm610x-spi-pi5.dtbo` present (2,430 bytes).
+- `distroconfig.txt` correctly assembled from `boards/rpi5/distroconfig.txt` +
+  `distroconfig-mm610x-spi.txt` + the generated sysinfo line, ending in
+  `dtparam=spi=on`, `dtoverlay=mm610x-spi-pi5` and
+  `dtoverlay=sysinfo,board-name="bcm2712,mm6108-spi",model="RPI RPI5-MM6108 (SPI)"`.
+  That board-name is what makes the feed's US 900 MHz radio defaults apply.
+
+Root filesystem:
+
+- `/lib/modules/6.6.138/mm6108_sdio.ko` and `/lib/modules/6.6.138/batman-adv.ko`.
+- `/etc/modules.d/mm6108` = `mm6108_sdio country=US enable_ext_xtal_init=1`.
+- `/lib/firmware/morse/mm6108.bin` and `/lib/firmware/morse/bcf_fgh100mhaamd.bin` —
+  the correct BCF for this hardware.
+- `/etc/board.d/03_openmanet_eth` matches `bcm2712,mm6108-spi`.
+- Both feed patches landed: `/morse/scripts/chipreset.sh` has `return 1` at line 22,
+  and `/etc/init.d/gpsboard.init` uses `--by-name` and the suffix `expected_path`.
+- `/usr/bin/openmanetd`, `/sbin/morse_cli`, `hostapd`, `wpa_supplicant`, `alfred`,
+  `gpioset`, `gpioinfo` all present.
+
+### Device tree verified in binary form
+
+- `991-0006` applied to the real tree: `MM_RESET` / `MM_WAKE` / `MM_BUSY` at lines
+  700 / 706 / 707 of the built `bcm2712-rpi-5-b.dts`, and present in BOTH compiled
+  DTBs (`bcm2712-rpi-5-b.dtb` and `bcm2712d0-rpi-5-b.dtb`).
+- `mm610x-spi-pi5.dtbo` decompiled: its `__fixups__` require exactly three external
+  labels — `rp1_spi0`, `rp1_spi0_gpio9`, `rp1_gpio` — and all three resolve in both
+  Pi 5 base DTBs. The firmware rejects an overlay whose labels cannot be resolved,
+  so this is the strongest pre-hardware evidence available that the overlay loads.
+- Final kernel `.config` carries `SPI_DESIGNWARE`, `SPI_DW_MMIO`, `SPI_DW_DMA`,
+  `SPI_MEM` and `DW_AXI_DMAC`.
+- Pi 4 unaffected: `MM_RESET` still present in the built `bcm2711-rpi-4-b.dtb`, and
+  the Pi 4 `distroconfig-mm610x-spi.txt` still selects `mm610x-spi`, not the Pi 5
+  overlay. The extra 2,430-byte `mm610x-spi-pi5.dtbo` sits unreferenced in the Pi 4
+  boot partition.
+
+### Pi 4 vs Pi 5 manifest diff — 507 vs 457 packages, fully accounted for
+
+Only `mm6108-firmware` is Pi-5-only. Everything Pi-4-only falls into a category this
+port deliberately excluded, with no surprises: the camera/VideoCore stack and its
+transitive deps (`kmod-video-*`, `kmod-camera-*`, `libcamera`, `mediamtx`,
+`camera-onvif-server`, `luci-app-camera`, `libdrm`, `libpng`, `libfreetype`,
+`libevent2*`, `rpcd-mod-onvif`); `kmod-mm8108` + `mm8108-firmware` (Pi 5 builds the
+SPI variant only); `kmod-spi-bcm2835{,-aux}`, `kmod-spi-bitbang`, `kmod-spi-gpio`,
+`kmod-i2c-bcm2835` (BCM283x controllers — on Pi 5 the RP1 DesignWare drivers are
+built into the kernel, which is exactly what `spi-rp1_diffconfig` was written for);
+`kmod-r8125`, `kmod-of-mdio`, `kmod-fixed-phy` (EKH01 carrier NIC and the lan78xx
+workaround); and `persistent-vars-storage-bcm2711` (hard-gated to bcm2711 in the
+feed).
 
 ## Hardware Validation
 
 NONE. Nothing below has been demonstrated on real hardware:
-Pi 5 boot · RP1 SPI operation · MM6108 probe · HaLow interface creation · RF · mesh association.
+Pi 5 boot / RP1 SPI operation / MM6108 probe / HaLow interface creation / RF / mesh
+association. Everything above is BUILD VERIFIED only.
 
 ## Blocker
 
-None. (The WSL2 reboot blocker recorded in the previous session is resolved.)
+None in software. The port is now blocked on physical hardware access.
 
 ## Next Engineering Action (exact)
 
-1. Wait out `make -j24` in `~/openmanet/firmware`; on failure, classify, fix in the Windows
-   authoritative tree, `~/sync-from-windows.sh`, rebuild the failing package only.
-2. Once the kernel is unpacked into `build_dir/`, generate the deferred Pi 5
-   `gpio-line-names` patch with `quilt` against the real post-patch
-   `arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts`.
-3. Confirm the produced artefacts under `bin/targets/bcm27xx/bcm2712/`: the sysupgrade image,
-   `mm610x-spi-pi5.dtbo` inside the FAT partition, and `mm6108_sdio.ko` (or built-in) plus the
-   `bcf_fgh100mhaamd.bin` BCF in the rootfs.
-4. Run the `ekh-bcm2711` regression build in `~/openmanet/firmware-bcm2711` and diff its
-   artefact list against the last known-good Pi 4 release.
-5. Only then request the first hardware action (flash an SD card, COLD power cycle).
+OWNER ACTION REQUIRED — one action:
+
+Flash `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz` to an SD card, fit
+it in the Pi 5 with the WM1302 HAT + Wio-WM6108, attach a USB serial adapter to
+GPIO14/15 (115200 8N1), and **cold power cycle** — a warm reboot is not sufficient for
+the MM6108's first probe.
+
+The image is inside the WSL distro at
+`~/openmanet/firmware/bin/targets/bcm27xx/bcm2712/`. Copy it to Windows with:
+
+```
+wsl -d openmanet-build -u builder -- cp ~/openmanet/firmware/bin/targets/bcm27xx/bcm2712/openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz /mnt/c/AI-Projects/OpenMANET-Pi5/
+```
+
+Then capture the serial boot log. What to look for, in order:
+
+1. RP1 enumerates over PCIe and `pinctrl-rp1` probes.
+2. `spi-dw-mmio` binds and `spi0` appears — if `DW_AXI_DMAC` were wrong this fails
+   silently with `-EPROBE_DEFER` and nothing else is reported.
+3. The morse driver probes on `spi0.0` and reads the chip ID.
+4. `bcf_fgh100mhaamd.bin` and `mm6108.bin` load.
+5. A HaLow `wlan` interface is created.
+6. `morsechipreset` at S09 does NOT log "unable to reset as MM_RESET is not in
+   gpio-line-names" — if it does, the overlay did not load.
+
+Two units are needed for the Phase 1 mesh objective; one is enough to prove boot, SPI
+and MM6108 probe.
 
 ## Important Technical Decisions
 
@@ -220,15 +340,13 @@ None. (The WSL2 reboot blocker recorded in the previous session is resolved.)
 - `build-release.yml` is deliberately NOT wired up yet. Adding `build-ekh-bcm2712` to its
   `needs:` lists would make every release fail until the Pi 5 build is green. Wire it up
   after BUILD VERIFIED.
+  STATUS: the Pi 5 build is now green, so this is unblocked and is the next non-hardware
+  task. Not done in this session because CI wiring cannot be validated without pushing.
 
 ## Deferred / Known Follow-ups
 
-- `gpio-line-names` for Pi 5. `991-0005` renames GPIO17/23/24 to `MM_RESET`/`MM_WAKE`/`MM_BUSY`
-  in `bcm2711-rpi-4-b.dts`; Morse userspace (`chipreset.sh`, `gpioinfo --by-name`) looks the
-  reset line up by that name. A matching patch is needed for
-  `arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts`. Deliberately deferred to the build phase
-  so it can be generated with `quilt` against the real post-patch tree rather than hand-written
-  against patch context.
+- DONE (was deferred) `gpio-line-names` for Pi 5 — delivered as `991-0006`, verified present
+  in both compiled Pi 5 DTBs. See Most Recent Build.
 - `persistent-vars-storage-bcm2711` is hard-gated `@TARGET_bcm27xx_bcm2711` in the morse feed.
   Its script only calls `vcgencmd bootloader_config`, which does work on a Pi 5 — relaxing that
   dependency is a reasonable follow-up.
