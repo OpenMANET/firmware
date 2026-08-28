@@ -1,0 +1,138 @@
+From: OpenMANET <matthew.garcia@patriotscraft.com>
+Date: Thu, 27 Aug 2026 00:00:00 +0000
+Subject: [PATCH] dt-overlays: morse: add RP1 (Raspberry Pi 5) MM610x SPI
+ overlay
+
+The Raspberry Pi 5 routes the 40-pin header through the RP1 southbridge,
+so SPI0 and the header GPIOs live under &rp1_spi0 / &rp1_gpio instead of
+the BCM283x &spi0 / &gpio nodes, and RP1 pinctrl uses the generic
+pinctrl bindings (function/pins/bias-*) rather than the BCM283x
+brcm,pins / brcm,function / brcm,pull properties. The existing
+mm610x-spi overlay from 991-0003 therefore cannot be reused as-is.
+
+This is added as a separate -pi5 overlay rather than as extra fragments
+in mm610x-spi: the firmware overlay loader rejects an overlay outright
+if any fragment target label cannot be resolved, so RP1 fragments mixed
+into the shared overlay would break overlay application on Pi 3/Pi 4 and
+the Seeed boards.
+
+Wiring is identical to the Pi 4 WM1302 / Wio-WM6108 mapping in 991-0003:
+  reset   GPIO17
+  power   GPIO23, GPIO24
+  spi-irq GPIO5
+  CS      GPIO8 (CE0), driven as a GPIO chip select
+  SPI0    GPIO9/10/11
+
+SPI clock is set to 25 MHz for bring-up rather than the 50 MHz the Pi 4
+overlay asks for. On BCM2835 a requested 50 MHz is actually rounded down
+to 41.67 MHz (250 MHz core clock, even divisors only), so 50 MHz has
+never really been exercised on this hardware. RP1's DW-SSI is fed from
+clk_sys at 200 MHz, also even-divisors-only, so 50 MHz would be a true
+50 MHz - 20 percent faster than the Pi 4 has ever run - and there are
+field reports of MM6108-on-RP1 links being unstable at that rate.
+200/8 = 25 MHz is exact. Raise this to 33.3 or 50 MHz once a two-node
+link has been validated on real hardware.
+
+Two deliberate differences from the naive RP1 translation:
+
+  * spidev@0 / spidev@1 are explicitly disabled. bcm2712-rpi.dtsi
+    declares both spidev nodes under &spi0 (== &rp1_spi0) with no
+    status property, so they are enabled as soon as the controller is,
+    and spidev@0 would claim CE0 alongside the MM6108.
+
+  * chip select uses a dedicated rp1_morse_cs group that muxes GPIO8 to
+    function "gpio" instead of reusing rp1_spi0_cs_gpio7, which muxes
+    GPIO7+GPIO8 to the hardware "spi0" chip-select function. The Morse
+    driver drives CS as a GPIO descriptor (cs-gpios, see 991-0007), and
+    this mirrors what 991-0003 does on BCM283x, where spi0_cs_pins is
+    overridden to BCM2835_FSEL_GPIO_OUT for the same reason.
+
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/mm610x-spi-pi5-overlay.dts
+@@ -0,0 +1,86 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	compatible = "brcm,bcm2712";
++
++	fragment@0 {
++		target = <&rp1_spi0>;
++		frag0: __overlay__ {
++			pinctrl-names = "default";
++			pinctrl-0 = <&rp1_spi0_gpio9 &rp1_morse_cs
++			             &rp1_morse_wake &rp1_morse_busy
++			             &rp1_morse_irq &rp1_morse_reset>;
++			cs-gpios = <&rp1_gpio 8 1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "okay";
++
++			mm6108: mm6108@0 {
++				compatible = "morse,mm610x-spi";
++				reg = <0>; /* CE0 */
++				reset-gpios = <&rp1_gpio 17 0>;
++				power-gpios = <&rp1_gpio 23 0>,
++				              <&rp1_gpio 24 0>;
++				spi-irq-gpios = <&rp1_gpio 5 0>;
++				spi-max-frequency = <25000000>;
++				status = "okay";
++			};
++
++			spidev0: spidev@0 {
++				reg = <0>; /* CE0 */
++				status = "disabled";
++			};
++
++			spidev1: spidev@1 {
++				reg = <1>; /* CE1 */
++				status = "disabled";
++			};
++		};
++	};
++
++	fragment@1 {
++		target = <&rp1_gpio>;
++		__overlay__ {
++			rp1_morse_cs: rp1_morse_cs {
++				pin_cs {
++					function = "gpio";
++					pins = "gpio8";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_wake: rp1_morse_wake {
++				pin_wake {
++					function = "gpio";
++					pins = "gpio23";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_busy: rp1_morse_busy {
++				pin_busy {
++					function = "gpio";
++					pins = "gpio24";
++					bias-pull-down;
++				};
++			};
++
++			rp1_morse_irq: rp1_morse_irq {
++				pin_irq {
++					function = "gpio";
++					pins = "gpio5";
++					bias-pull-up;
++				};
++			};
++
++			rp1_morse_reset: rp1_morse_reset {
++				pin_reset {
++					function = "gpio";
++					pins = "gpio17";
++					bias-pull-up;
++				};
++			};
++		};
++	};
++};

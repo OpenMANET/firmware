@@ -1,0 +1,12 @@
+# SPI extras for RP1-based boards (Raspberry Pi 5 / BCM2712).
+#
+# Counterpart of spi_diffconfig, which is BCM283x-specific: on the Pi 5 the
+# 40-pin header SPI0 is provided by the RP1 southbridge and is a DesignWare
+# SSI block ("snps,dw-apb-ssi", see rp1_spi0 in the bcm2712 device tree), not
+# the BCM2835 SPI controller. Selecting kmod-spi-bcm2835 here would build a
+# driver that can never bind.
+CONFIG_MORSE_SPI=y
+CONFIG_PACKAGE_kmod-spi-dw=y
+CONFIG_PACKAGE_kmod-spi-dw-mmio=y
+CONFIG_PACKAGE_kmod-spi-bitbang=y
+CONFIG_PACKAGE_kmod-spi-gpio=y

@@ -1,0 +1,49 @@
+################################################################################
+# Bootloader configuration - distroconfig.txt (Raspberry Pi 5 / BCM2712)
+################################################################################
+#
+# Pi 5 counterpart of boards/ekh01/distroconfig.txt. It is deliberately a
+# separate file rather than a [pi5] section in the ekh01 one, so that the
+# shipping Pi 3 / Pi 4 images cannot be affected by Pi 5 bring-up changes.
+#
+# Differences from the ekh01 (BCM283x) config and why:
+#   * no "dtoverlay=uart5"      - the BCM283x AUX UARTs do not exist on BCM2712;
+#                                 the Pi 5 header UART is RP1 uart0 (ttyAMA0).
+#   * no "gpu_mem_*"            - VideoCore memory split is not used on BCM2712.
+#   * no "dtoverlay=miniuart-bt"/"disable-bt" - the Pi 5 Bluetooth UART is not
+#                                 shared with the header UART, so no swap is
+#                                 needed.
+#   * "dtoverlay=ramoops-pi4"   - upstream maps ramoops -> ramoops-pi4 for
+#                                 BCM2712 in overlay_map.dts (950-1288), but
+#                                 Build/boot-common only copies *.dtbo into the
+#                                 boot partition, never overlay_map.dtb, so the
+#                                 firmware cannot do that remap for us. Name the
+#                                 working overlay directly.
+#   * "camera_auto_detect=0"    - the Pi 5 camera path is RP1 CFE / PiSP, which
+#                                 has no kmod package in this tree yet. Camera
+#                                 support is explicitly out of scope for the
+#                                 Pi 5 port (see CLAUDE.md "Deferred Scope").
+
+[all]
+# Disable overscan assuming the display supports displaying the full resolution
+disable_overscan=1
+
+# Serial console on the 40-pin header (GPIO14/15 -> RP1 uart0 -> ttyAMA0).
+# Load-bearing for bring-up: cmdline.txt boots with console=serial0.
+# On BCM2712, serial0 is aliased to the RP1 uart0 on GPIO14/15 (ttyAMA0) -
+# the same physical header pins as on the Pi 4 - while the dedicated 3-pin
+# debug connector is serial10/ttyAMA10 and holds stdout-path. cmdline.txt
+# boots with console=serial0, so uart0 is what has to come up. enable_uart=1
+# alone targets the debug UART on this SoC, so ask for uart0 explicitly too.
+enable_uart=1
+dtparam=uart0=on
+
+# disable SD activity LED by default
+#(we configure it for HaLow later in userspace)
+dtparam=act_led_trigger=none
+
+# adds ramoops device tree overlay (BCM2712 uses the "-pi4" variant)
+dtoverlay=ramoops-pi4
+
+# Pi 5 camera stack (RP1 CFE) is not built yet - do not probe for sensors.
+camera_auto_detect=0

@@ -1,0 +1,51 @@
+CONFIG_TARGET_MULTI_PROFILE=y
+
+# Per-device rootfs: every image starts from the shared rootfs (all =y
+# packages), then that device's TARGET_DEVICE_PACKAGES list (below) is
+# applied on top during image assembly.
+CONFIG_TARGET_PER_DEVICE_ROOTFS=y
+CONFIG_TARGET_bcm27xx=y
+CONFIG_TARGET_bcm27xx_bcm2712=y
+CONFIG_TARGET_DEVICE_bcm27xx_bcm2712_DEVICE_bcm2712_mm6108-spi=y
+
+# Only the MM6108-over-SPI variant is built for the Pi 5. That is the
+# production OpenMANET path (Seeed WM1302 HAT + Wio-WM6108, US 900 MHz).
+# The SDIO and MM8108/USB variants that bcm2711 also ships are deliberately
+# out of scope here; adding one later means a new Device/ block in
+# target/linux/bcm27xx/image/Makefile, a matching -pi5 overlay, and a
+# CONFIG_TARGET_DEVICE_... line here.
+CONFIG_PACKAGE_kmod-mm6108=y
+CONFIG_PACKAGE_mm6108-firmware=y
+
+# Inherited from the upstream rpi-5 profile's DEVICE_PACKAGES, and dropped
+# for the same reason as on bcm2711: wpad-basic-mbedtls clashes with
+# wpad-openssl (both ship /usr/sbin/hostapd et al).
+CONFIG_TARGET_DEVICE_PACKAGES_bcm27xx_bcm2712_DEVICE_bcm2712_mm6108-spi="-wpad-basic-mbedtls"
+
+CONFIG_VERSION_MANUFACTURER="Raspberry Pi"
+CONFIG_VERSION_PRODUCT="BCM2712"
+
+CONFIG_PACKAGE_bsp-bcm271x=y
+CONFIG_PACKAGE_mavp2p=m
+
+CONFIG_TARGET_ROOTFS_PARTSIZE=4092
+
+# Deliberately NOT carried over from boards/ekh-bcm2711/target_diffconfig:
+#
+#  * persistent-vars-storage-bcm2711 - hard-gated to @TARGET_bcm27xx_bcm2711
+#    in the morse feed, so it cannot even be selected here. Its script only
+#    shells out to `vcgencmd bootloader_config`, which does work on a Pi 5,
+#    so relaxing that dependency is a reasonable follow-up once the base
+#    image boots.
+#  * kmod-r8125 - the 2.5Gb RTL8125 is an EKH01-carrier part. The Pi 5's
+#    Ethernet is the Cadence/macb MAC in RP1. Note bcm2712 sets
+#    FEATURES+=pci pcie, so unlike on bcm2711 (where it is silently dropped
+#    for want of PCI_SUPPORT) this package would actually be built here.
+#  * kmod-video-core / kmod-codec-bcm2835 - the BCM2835 VideoCore codec does
+#    not exist on BCM2712; the Pi 5 uses RP1 CFE + PiSP, which has no kmod
+#    package in this tree yet. Camera is deferred scope (see CLAUDE.md).
+#  * kmod-of-mdio - a workaround for a lan78xx packaging bug specific to the
+#    rpi-4 profile. lan78xx is not in the rpi-5 profile.
+
+# Disable ext4 image creation.
+CONFIG_TARGET_ROOTFS_EXT4FS=n

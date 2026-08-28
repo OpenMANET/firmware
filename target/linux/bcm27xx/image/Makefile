@@ -81,6 +81,18 @@ define Build/boot-ekh01
 
 endef
 
+define Build/boot-rpi5-morse
+	# Pi 5 equivalent of Build/boot-ekh01. Same sysinfo-overlay mechanism
+	# (see 992-0001), but reads from boards/rpi5/ because the ekh01
+	# distroconfig is written for BCM283x: it sets dtoverlay=uart5 and the
+	# gpu_mem_* / [pi4] miniuart-bt knobs, none of which exist on BCM2712.
+	# Keeping a separate directory means the Pi 5 product config can evolve
+	# without any risk to the shipping Pi 3 / Pi 4 images.
+
+	echo -e '\ndtoverlay=sysinfo,board-name="$(SYSINFO_BOARD_NAME)",model="$(SYSINFO_MODEL)"' | cat boards/rpi5/distroconfig.txt boards/rpi5/distroconfig-$(DISTROCONFIG_EXTRA).txt - | mcopy -o -i $@.boot - ::/distroconfig.txt
+
+endef
+
 define Build/sdcard-img
 	SIGNATURE="$(IMG_PART_SIGNATURE)" \
 	./gen_rpi_sdcard_img.sh $@ $@.boot $(IMAGE_ROOTFS) \
@@ -371,6 +383,38 @@ define Device/bcm2710_mm6108-sdio
 endef
 ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm6108-sdio
+endif
+
+define Device/morse_rpi5_base
+  $(Device/rpi-5)
+  SYSINFO_BOARD_NAME := $(subst _,$(comma),$(1))
+  SUPPORTED_DEVICES := $$(SYSINFO_BOARD_NAME)
+  DEVICE_VENDOR := RPI
+  # remove the factory image (causes confusion)
+  IMAGES := sysupgrade.img.gz
+  # Simplify by removing board and OpenWRT version.
+  IMAGE_PREFIX = $$(VERSION_DIST_SANITIZED)-$$(IMG_PREFIX_VERCODE)$$(IMG_PREFIX_EXTRA)$$(call sanitize,$$(DEVICE_MODEL)-$$(DEVICE_VARIANT))
+  DEVICE_IMG_NAME = $$(IMAGE_PREFIX)-$$(1)-$$(2)
+  # No boot-2711 stage: the Pi 5 boots from its onboard SPI EEPROM bootloader
+  # and never reads start4.elf/fixup4.dat off the FAT partition. The boot
+  # partition only needs config.txt, cmdline.txt, kernel_2712.img, the dtbs
+  # and the overlays, all of which boot-common already places there.
+  IMAGE/sysupgrade.img.gz := boot-common | boot-rpi5-morse | sdcard-img | gzip | append-metadata
+  IMAGE/factory.img.gz := boot-common | boot-rpi5-morse | sdcard-img | gzip
+endef
+
+define Device/bcm2712_mm6108-spi
+  $(Device/morse_rpi5_base)
+  DEVICE_MODEL := RPI5-MM6108
+  DEVICE_VARIANT := SPI
+  SYSINFO_MODEL := $$(DEVICE_VENDOR) $$(DEVICE_MODEL) ($$(DEVICE_VARIANT))
+  DEVICE_PACKAGES += \
+	kmod-mm6108 netifd-morse mm6108-firmware
+  SUPPORTED_DEVICES += bcm2712,mm6108-spi
+  DISTROCONFIG_EXTRA := mm610x-spi
+endef
+ifeq ($(SUBTARGET),bcm2712)
+  TARGET_DEVICES += bcm2712_mm6108-spi
 endif
 
 $(eval $(call BuildImage))
