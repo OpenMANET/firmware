@@ -89,6 +89,31 @@ define Build/boot-rpi5-morse
 	# Keeping a separate directory means the Pi 5 product config can evolve
 	# without any risk to the shipping Pi 3 / Pi 4 images.
 
+	# Pi-5-only cmdline. Build/boot-common has already written the shared
+	# target/linux/bcm27xx/image/cmdline.txt into the FAT partition; overwrite it
+	# here, exactly the way distroconfig.txt is overwritten below, so that Pi 3 and
+	# Pi 4 keep the shared file untouched.
+	#
+	# The Pi 5 serial console is not the same UART as on BCM283x:
+	#   * "serial0" is RP1 uart0 on GPIO14/15 (pinctrl group rp1_uart0_14_15);
+	#   * the dedicated 3-pin JST-SH debug connector is the SoC uart10, aliased
+	#     "serial10", which pl011_probe_dt_alias() -> of_alias_get_id(np, "serial")
+	#     turns into ttyAMA10. UART_NR is 14, so index 10 is in range and is not
+	#     silently folded back to 0 by the guard in pl011_console_setup().
+	#
+	# bcm2712-rpi-5-b.dtb already sets stdout-path = "serial10:115200n8", but any
+	# console= on the kernel command line sets console_set_on_cmdline, and
+	# of_console_check() then refuses to register the stdout-path console. So
+	# ttyAMA10 must be named explicitly or the debug connector gets firmware
+	# output and no kernel log at all. It is listed LAST so it also becomes
+	# /dev/console, which is what inittab ::askconsole attaches its shell to.
+	#
+	# Every serial baud is explicit: "console=serial0" with no options makes
+	# pl011_console_setup() fall through to pl011_console_get_options(), which
+	# only derives the rate when UARTEN is already set in hardware and otherwise
+	# leaves its local default of 38400. GPIO14/15 is kept as a 115200 fallback.
+	sed -e 's#@ROOT@#PARTUUID=$(IMG_PART_SIGNATURE)-02#g' boards/rpi5/cmdline.txt | mcopy -o -i $@.boot - ::cmdline.txt
+
 	echo -e '\ndtoverlay=sysinfo,board-name="$(SYSINFO_BOARD_NAME)",model="$(SYSINFO_MODEL)"' | cat boards/rpi5/distroconfig.txt boards/rpi5/distroconfig-$(DISTROCONFIG_EXTRA).txt - | mcopy -o -i $@.boot - ::/distroconfig.txt
 
 endef
