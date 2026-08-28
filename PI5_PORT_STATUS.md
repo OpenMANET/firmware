@@ -114,30 +114,55 @@ networking comes from the openmanet feed's `03_openmanet_eth`.
 
 ## Build Environment
 
-BUILD NOT YET ATTEMPTED. OpenWrt cannot build on Windows.
+**READY. The WSL2 blocker is cleared.** The machine was rebooted (2026-08-27 20:05),
+`.ai-workflow/setup-wsl-build-env.ps1` ran successfully, and the build environment is live.
 
-WSL2 was NOT installed on this machine. It is now staged and ready:
+| | |
+|---|---|
+| WSL distro | `openmanet-build` (Ubuntu 24.04, WSL2, imported to `C:\AI-Projects\OpenMANET-Pi5\wsl-openmanet`) |
+| Resources | 24 processors / 47 GB RAM / 16 GB swap (`~/.wslconfig`), 953 GB free on ext4 |
+| Build user | `builder` |
+| Pi 5 build tree | `~/openmanet/firmware` — git mirror, remote `winrepo` -> `/mnt/c/AI-Projects/OpenMANET-Pi5/firmware`, at `ac924bb`, symlinks intact |
+| Pi 4 regression tree | `~/openmanet/firmware-bcm2711` — separate `--shared` clone of the mirror, own `dl/`, so both boards can build concurrently without `.config` collisions |
+| Logs | `~/logs/*.log` inside the distro |
 
-- `VirtualMachinePlatform` and `Microsoft-Windows-Subsystem-Linux` optional components ENABLED
-  (via DISM; both reported success, exit code 3010 = reboot required).
-- WSL runtime 2.7.12 INSTALLED at `C:\Program Files\WSL\wsl.exe` (`wsl --version` works).
-- Ubuntu 24.04 WSL rootfs downloaded to
-  `C:\AI-Projects\OpenMANET-Pi5\wsl-stage\ubuntu-noble-rootfs.tar.gz` (340 MB).
-- `wsl --status` reports "WSL2 is unable to start since virtualization is not enabled" —
-  this is purely the pending reboot. The CPU is an AMD Ryzen 9 9950X3D with
-  `VirtualizationFirmwareEnabled: True`, 16C/32T, 61.6 GB RAM, 613 GB free on C:.
+Toolchain deps verified present: gcc, g++, make, git, python3, rsync, unzip, wget, quilt,
+gawk, bison, flex, perl, swig, ccache. `subversion` is absent and not needed.
 
-Build tree design (per CLAUDE.md "Build Rules"): the Windows repo remains the single
-authoritative source tree. The WSL distro gets a BUILD MIRROR clone whose `winrepo` remote
-points back at `/mnt/c/AI-Projects/OpenMANET-Pi5/firmware`. Building in WSL ext4 is required
-because the Windows checkout has `core.symlinks=false` (so `boards/*/spi_diffconfig` and
-friends are plain text files there, and `scripts/openmanet_setup.sh:267` ABORTS if they are
-not symlinks) and because OpenWrt needs a case-sensitive filesystem. Never commit from the
-mirror.
+`~/rsync-from-windows.sh` was hardened: the Windows checkout has `core.symlinks=false`, so a
+plain `rsync -a` would overwrite the mirror's real symlinks with the Windows text files and
+`scripts/openmanet_setup.sh:267` would then abort. The script now restores every mode-120000
+path from the git index after syncing. Prefer `~/sync-from-windows.sh` (git-based) anyway.
+
+### Configuration verified after `openmanet_setup.sh -i -b ekh-bcm2712`
+
+Exit 0. `.config` resolves to exactly the intended product:
+
+```
+CONFIG_TARGET_bcm27xx=y
+CONFIG_TARGET_bcm27xx_bcm2712=y
+CONFIG_TARGET_DEVICE_bcm27xx_bcm2712_DEVICE_bcm2712_mm6108-spi=y
+CONFIG_PACKAGE_kmod-mm6108=y
+CONFIG_PACKAGE_mm6108-firmware=y
+```
+
+The `alsa/openvlm` kconfig "recursive dependency detected" warning is pre-existing and
+target-independent; `make defconfig` still completes and writes `.config`.
+
+NOTE — `CONFIG_MORSE_SPI=y` from `boards/common_extras/spi-rp1_diffconfig` is dropped by
+`make defconfig`. This is EXPECTED and harmless, and happens identically on `ekh-bcm2711`:
+the symbol is declared in `feeds/openmanet/morse-micro/mm6108-driver/Config.in` as
+`depends on PACKAGE_kmod-morse`, and this product selects `kmod-mm6108`, not `kmod-morse`.
+SPI support is compiled in regardless — `mm6108-driver/Makefile:88` hardcodes
+`CONFIG_MORSE_SPI=y` into `MORSE_MAKEDEFS` and comments that the OpenWrt `CONFIG_MORSE_*`
+symbols are "unreliable here". No action needed.
 
 ## Most Recent Build
 
-None. No build has been run — see Blocker.
+IN PROGRESS. `make -j24` for `ekh-bcm2712`, started 2026-08-27 ~20:30, log
+`~/logs/build-bcm2712-01.log`. This is the FIRST compile of the Pi 5 target — from-scratch
+toolchain, so several hours of wall clock. The `ekh-bcm2711` regression tree is being
+prepared in parallel.
 
 ## Hardware Validation
 
@@ -146,21 +171,21 @@ Pi 5 boot · RP1 SPI operation · MM6108 probe · HaLow interface creation · RF
 
 ## Blocker
 
-A single Windows reboot is required to activate the WSL2 optional components.
-Everything else for the build environment is already installed and staged.
+None. (The WSL2 reboot blocker recorded in the previous session is resolved.)
 
 ## Next Engineering Action (exact)
 
-1. Owner reboots the machine.
-2. From an elevated PowerShell in the repo root, run:
-   `powershell -ExecutionPolicy Bypass -File .ai-workflow\setup-wsl-build-env.ps1`
-   (idempotent; imports the `openmanet-build` distro, writes a `~/.wslconfig` sized for
-   16C/32T + 61 GB RAM, provisions the OpenWrt build dependencies, creates the `builder`
-   user and clones the build mirror).
-3. `wsl -d openmanet-build -u builder`
-4. `cd ~/openmanet/firmware && ./scripts/openmanet_setup.sh -i -b ekh-bcm2712`
-5. `make -j$(nproc)` — then iterate on failures per CLAUDE.md "Build Rules".
-6. Regression build: `./scripts/openmanet_setup.sh -i -b ekh-bcm2711 && make -j$(nproc)`.
+1. Wait out `make -j24` in `~/openmanet/firmware`; on failure, classify, fix in the Windows
+   authoritative tree, `~/sync-from-windows.sh`, rebuild the failing package only.
+2. Once the kernel is unpacked into `build_dir/`, generate the deferred Pi 5
+   `gpio-line-names` patch with `quilt` against the real post-patch
+   `arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dts`.
+3. Confirm the produced artefacts under `bin/targets/bcm27xx/bcm2712/`: the sysupgrade image,
+   `mm610x-spi-pi5.dtbo` inside the FAT partition, and `mm6108_sdio.ko` (or built-in) plus the
+   `bcf_fgh100mhaamd.bin` BCF in the rootfs.
+4. Run the `ekh-bcm2711` regression build in `~/openmanet/firmware-bcm2711` and diff its
+   artefact list against the last known-good Pi 4 release.
+5. Only then request the first hardware action (flash an SD card, COLD power cycle).
 
 ## Important Technical Decisions
 
