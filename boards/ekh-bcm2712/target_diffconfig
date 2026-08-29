@@ -32,11 +32,6 @@ CONFIG_TARGET_ROOTFS_PARTSIZE=4092
 
 # Deliberately NOT carried over from boards/ekh-bcm2711/target_diffconfig:
 #
-#  * persistent-vars-storage-bcm2711 - hard-gated to @TARGET_bcm27xx_bcm2711
-#    in the morse feed, so it cannot even be selected here. Its script only
-#    shells out to `vcgencmd bootloader_config`, which does work on a Pi 5,
-#    so relaxing that dependency is a reasonable follow-up once the base
-#    image boots.
 #  * kmod-r8125 - the 2.5Gb RTL8125 is an EKH01-carrier part. The Pi 5's
 #    Ethernet is the Cadence/macb MAC in RP1. Note bcm2712 sets
 #    FEATURES+=pci pcie, so unlike on bcm2711 (where it is silently dropped
@@ -49,3 +44,17 @@ CONFIG_TARGET_ROOTFS_PARTSIZE=4092
 
 # Disable ext4 image creation.
 CONFIG_TARGET_ROOTFS_EXT4FS=n
+
+# Provides /sbin/persistent_vars_storage.sh. Ten installed scripts call it,
+# most notably /morse/scripts/morse-wireless-defaults, which logs
+# "persistent_vars_storage.sh: not found" twice per boot without it.
+# Upstream gates the package @TARGET_bcm27xx_bcm2711; patches/ekh-bcm2712/0009
+# relaxes that to bcm2711||bcm2712. Its only hardware dependency is vcgencmd
+# from bcm27xx-userland, already in the Pi 5 image.
+#
+# NOT a functional fix: with the package installed the script still exits 1
+# with empty stdout, because it runs under `set -eu` and greps
+# `vcgencmd bootloader_config` for keys that are absent on stock hardware -
+# which is exactly what happens on the Pi 4 today. This restores parity and
+# silences the boot noise; it does not change any resulting configuration.
+CONFIG_PACKAGE_persistent-vars-storage-bcm2711=y

@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET Pi 5 port <noreply@openmanet.org>
+Date: Fri, 28 Aug 2026 20:00:00 -0500
+Subject: [PATCH] persistent-vars-storage: allow bcm2712 as well as bcm2711
+
+On the Pi 5 every boot logs:
+
+    /morse/scripts/morse-wireless-defaults: line 19: persistent_vars_storage.sh: not found
+    /morse/scripts/morse-wireless-defaults: line 24: persistent_vars_storage.sh: not found
+
+because `persistent-vars-storage-bcm2711` is gated `@TARGET_bcm27xx_bcm2711`,
+so nothing installs /sbin/persistent_vars_storage.sh on a BCM2712 image and
+nothing PROVIDES the virtual `persistent-vars-storage`.
+
+The gate is wrong rather than protective. The script is not BCM2711-specific:
+its only hardware dependency is `vcgencmd bootloader_config`, from
+`bcm27xx-userland`, which it already declares as a dependency and which is
+present in the Pi 5 image (/usr/bin/vcgencmd verified in the built rootfs).
+Its WRITE/ERASE operations are unimplemented on both boards, and READ just
+greps the bootloader config for a key.
+
+Relax the gate to bcm2711 OR bcm2712. The package name still says bcm2711;
+renaming it would churn every DEPENDS in the morse feed for no functional
+gain, and this is a port, not a redesign.
+
+Applied only to the ekh-bcm2712 board build, so the shipping Pi 4 product
+resolves this package exactly as before.
+
+--- a/feeds/morse/hardware/persistent-vars-storage-bcm2711/Makefile
++++ b/feeds/morse/hardware/persistent-vars-storage-bcm2711/Makefile
+@@ -21,7 +21,7 @@
+   SUBMENU:=Hardware
+ 	PROVIDES:=persistent-vars-storage
+ 	TITLE:=Reads (or maybe writes in future) key-value pairs from(/into) the RPi 4 EEPROM memory
+-	DEPENDS:= +bcm27xx-userland @TARGET_bcm27xx_bcm2711
++	DEPENDS:= +bcm27xx-userland @(TARGET_bcm27xx_bcm2711||TARGET_bcm27xx_bcm2712)
+ endef
+ 
+ define Build/Compile

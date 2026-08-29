@@ -1,0 +1,96 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET Pi 5 port <noreply@openmanet.org>
+Date: Fri, 28 Aug 2026 20:30:00 -0500
+Subject: [PATCH] openmanetd: recognise bcm2712,mm6108-spi as a supported board
+
+Adds a package patch to the openmanetd feed package, the same way
+0002-APP-4789-collectd adds one to collectd.
+
+openmanetd reads /etc/board.json and gates three capabilities on
+board.Model.ID in internal/util/board/supported_features.go:
+GNSSsupoorted(), BLOSsupported() and CommsSupported(). Every one of those
+switch statements ends in `default: return false`, and internal/util/board/
+board_type.go has no bcm2712 constant. The Pi 5 product reports
+"bcm2712,mm6108-spi", so it falls to the default branch and all three
+features are silently reported unsupported.
+
+That is wrong on this hardware: the Pi 5 product carries the same Seeed
+WM1302 HAT and the same Morse Micro MM6108 over SPI as bcm2711,mm6108-spi -
+including the same Quectel GPS on the HAT - so the capability answers must
+match the Pi 4 SPI board exactly. The patch adds BCM2712_MM6108_SPI and
+lists it beside BCM2711_MM6108_SPI in all three switches.
+
+This is NOT related to the missing batman-adv interface, which is
+operator-provisioned state (see PI5_PORT_STATUS.md). It is a separate port
+gap found while tracing that question, and it is what would have made the
+WM1302 GPS look broken later for a non-obvious reason.
+
+Only the bcm2712,mm6108-spi variant is added - the SDIO and MM8108 Pi 5
+variants are not built by this product, and listing boards we do not ship
+would be a claim we have not tested.
+
+Board-scoped to ekh-bcm2712, so the shipping Pi 4 product builds openmanetd
+from unmodified upstream source.
+
+--- /dev/null
++++ b/feeds/openmanet/openmanetd/patches/001-board-add-bcm2712-mm6108-spi.patch
+@@ -0,0 +1,59 @@
++From: OpenMANET Pi 5 port <noreply@openmanet.org>
++Subject: [PATCH] board: recognise bcm2712,mm6108-spi
++
++openmanetd gates GNSS, BLOS and Comms on board.Model.ID read from
++/etc/board.json, and every one of those switches ends in `default: return
++false`. The Raspberry Pi 5 product reports "bcm2712,mm6108-spi", which is
++absent from the board_type constants, so all three features are silently
++reported unsupported on hardware that does support them.
++
++The Pi 5 product is the same Seeed WM1302 HAT and the same Morse Micro
++MM6108 over SPI as bcm2711,mm6108-spi - only the host SoC differs - so the
++capability answers must be identical. Add the constant and list it alongside
++BCM2711_MM6108_SPI in all three switches.
++
++ExecutionProfileFor() is deliberately left alone: unlisted boards get the
++zero profile, which is the correct "no runtime override" answer for a
++4-core Cortex-A76.
++--- a/internal/util/board/board_type.go
+++++ b/internal/util/board/board_type.go
++@@ -6,6 +6,9 @@
++ 	BCM2711_MM6108_SDIO string = "bcm2711,mm6108-sdio"
++ 	BCM2711_MM8108_USB  string = "bcm2711,mm8108-usb"
++ 
+++	// BCM2712
+++	BCM2712_MM6108_SPI string = "bcm2712,mm6108-spi"
+++
++ 	// BCM2710
++ 	BCM2710_MM6108_SPI  string = "bcm2710,mm6108-spi"
++ 	BCM2710_MM6108_SDIO string = "bcm2710,mm6108-sdio"
++--- a/internal/util/board/supported_features.go
+++++ b/internal/util/board/supported_features.go
++@@ -35,7 +35,8 @@
++ 	switch boardConfigInfo.Model.ID {
++ 	case BCM2711_MM6108_SPI,
++ 		BCM2711_MM6108_SDIO,
++-		BCM2711_MM8108_USB:
+++		BCM2711_MM8108_USB,
+++		BCM2712_MM6108_SPI:
++ 		return true
++ 	case BCM2710_MM6108_SPI, BCM2710_MM6108_SDIO:
++ 		return true
++@@ -81,7 +82,8 @@
++ 	switch boardConfigInfo.Model.ID {
++ 	case BCM2711_MM6108_SPI,
++ 		BCM2711_MM6108_SDIO,
++-		BCM2711_MM8108_USB:
+++		BCM2711_MM8108_USB,
+++		BCM2712_MM6108_SPI:
++ 		return true
++ 	case BCM2710_MM6108_SPI, BCM2710_MM6108_SDIO:
++ 		return false
++@@ -133,6 +135,7 @@
++ 	case BCM2711_MM6108_SPI,
++ 		BCM2711_MM6108_SDIO,
++ 		BCM2711_MM8108_USB,
+++		BCM2712_MM6108_SPI,
++ 		BCM2710_MM6108_SPI,
++ 		BCM2710_MM6108_SDIO,
++ 		HalowLink2,
