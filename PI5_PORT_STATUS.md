@@ -175,7 +175,7 @@ symbols are "unreliable here". No action needed.
 
 | | |
 |---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,401,122 bytes, sha256 `1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837` (rebuilt at `a3b80a1`; earlier images at `e55ad37` and `619022f` are superseded). Log `~/logs/build-2712-v4.log`. |
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,146 bytes, sha256 `6d97eb9a3502c30916a00775141e51b1c03e654e2eb4bb5f8243d469d3bc20bd` (rebuilt at `a7ed9bc`; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
 | `ekh-bcm2711` (Pi 4 regression) | `make -j12` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Last run at `a3b80a1`, log `~/logs/build-2711-v2.log`. |
 
 Both built from commit `619022f` of `pi5-wm6108-port`.
@@ -447,8 +447,8 @@ reason that has nothing to do with the GPS.
 
 ```
 C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
-sha256 1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837
-53,401,122 bytes
+sha256 6d97eb9a3502c30916a00775141e51b1c03e654e2eb4bb5f8243d469d3bc20bd
+53,560,146 bytes
 ```
 
 Contains `a3b80a1`: `patches/ekh-bcm2712/0010` (openmanetd recognises
@@ -609,3 +609,49 @@ rebuilding `ekh-bcm2711` at `a3b80a1` and comparing against the images built at
 The `.img.gz` sha256 values therefore differ between builds, but that is build
 non-determinism in one LuCI template, not a functional change. Recorded here so a
 future session does not mistake a checksum delta for a regression.
+
+## USB Wi-Fi AC adapter — driver baked in (commit `a7ed9bc`)
+
+USB ID `0bda:b812` enumerated on the Pi 5 but produced no wireless interface: the
+image contained no matching driver.
+
+**Chipset mapping (verified in source, not from the marketing name).** The adapter is
+sold as "RTL8812BU USB3.0 802.11ac 1200M", but `0xb812` is the FIRST entry of
+`rtw_8822bu_id_table[]` in `backports-6.12.61/drivers/net/wireless/realtek/rtw88/
+rtw8822bu.c:12`, bound to `rtw8822b_hw_spec`. It is rtw88's 8822b family. It is NOT
+`rtl8812au-ct`, which is the 8812AU (`0bda:8812`), a different part that this tree
+does also build. No out-of-tree 88x2bu driver is needed — OpenWrt 24.10 builds
+mac80211 from backports-6.12.61, which has rtw88 USB support in-tree.
+
+**Not missing, mis-selected.** `boards/common/kmods_diffconfig:245` already set
+`kmod-rtw88-8822bu=m`, so the .ipk was built for every board and installed into none.
+The Pi 4 product has the identical gap — no board in the tree selects any rtw88 `=y`.
+Not a Pi 5 regression.
+
+**Fix:** two lines in `boards/ekh-bcm2712/target_diffconfig` (Pi-5-only; no shared
+file touched, so Pi 3 / Pi 4 images are unchanged by construction):
+
+```
+CONFIG_PACKAGE_kmod-rtw88-8822bu=y
+CONFIG_PACKAGE_rtl8822be-firmware=y
+```
+
+`openmanet_setup.sh:279-288` concatenates `boards/common/*` then `boards/<board>/*`
+into `.config` and kconfig takes the last occurrence, so the board `=y` overrides the
+shared `=m`. `kmod-rtw88`, `kmod-rtw88-usb`, `kmod-rtw88-8822b` are `HIDDEN:=1` and
+resolve through DEPENDS; `rtl8822be-firmware` is named explicitly because it is
+selectable and carries the blob. Confirmed with `make defconfig` that the whole chain
+lands `=y` with nothing left at `=m`.
+
+**Verified inside the built image:** `rtw88_core.ko`, `rtw88_usb.ko`, `rtw88_8822b.ko`,
+`rtw88_8822bu.ko`, `/lib/firmware/rtw88/rtw8822b_fw.bin` (150,984 B), and the four
+`/etc/modules.d/rtw88*` autoload entries. The driver requests exactly
+`"rtw88/rtw8822b_fw.bin"` (`rtw8822b.c:2495`) — filename matches the installed path.
+
+NOTE on how it loads: `CONFIG_MODULE_STRIPPED=y` is set tree-wide, so shipped modules
+carry no `alias=usb:v0BDApB812` entries and there is no udev alias-based demand load.
+That is normal here — the proven-working `mm6108_sdio.ko` has zero aliases too. The
+load path is `/etc/modules.d/rtw88-8822bu` -> kmodloader at boot -> the driver
+registers with USB core -> USB core binds by the in-driver id_table whenever the
+adapter is present, plugged before or after boot. Functionally this is still
+flash -> boot -> plug -> interface appears.
