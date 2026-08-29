@@ -1,0 +1,83 @@
+From: OpenMANET Pi 5 port <noreply@openmanet.org>
+Subject: [PATCH] wifi: rtw88: usb: DIAGNOSTIC - rx_burst_size override and RX urb error logging
+
+NOT AN UPSTREAM PATCH. Diagnostic instrumentation for the RTL8822BU
+(0bda:b812) SuperSpeed failure on Raspberry Pi 5 / RP1 xHCI, where an active
+scan dies with "failed to do USB write, ret=-19" (-ENODEV) followed by an
+xHCI port reset, while the identical adapter scans fine at High Speed on the
+same host.
+
+After excluding the probe-time USB2->USB3 mode switch and rtw_usb_dynamic_rx_
+agg_v2() (which is 8821A/8812A only - 8822B uses _v1, which is NOT speed
+dependent), exactly ONE speed-dependent register setting remains for this chip:
+
+  rtw_usb_init_burst_pkt_len()  usb.c
+    USB_SPEED_SUPER -> BIT_DMA_BURST_SIZE_1024
+    USB_SPEED_HIGH  -> BIT_DMA_BURST_SIZE_512
+  written to REG_RXDMA_MODE (0x0290) bits 5:4.
+
+Comparing High Speed against SuperSpeed varies both the link speed and this
+burst size at once. The rx_burst_size parameter lets the burst size be varied
+ALONE, at SuperSpeed, which is the controlled experiment:
+
+  rtw88_usb.rx_burst_size=512   at SuperSpeed
+
+If that is stable, the 1024-byte RX DMA burst is implicated and the link speed
+is not. If it still fails, the burst size is exonerated.
+
+The second hunk exists because the RX urb error path is silent: every status
+in the case list (including -EOVERFLOW, i.e. babble, and -EPROTO) falls
+through to a bare break with no log line, and rtw_usb_rx_resubmit() is called
+only on the success path and from rtw_usb_setup_rx(). So RTW_USB_RXCB_NUM (4)
+transient RX errors permanently retire RX with nothing whatsoever in dmesg -
+which is very likely why the first fault is invisible today and only the
+downstream -ENODEV writes are seen. This hunk only logs; it deliberately does
+NOT change the resubmit behaviour, since that would be a behavioural change
+rather than a diagnostic.
+
+Revert both hunks once the cause is identified.
+
+--- a/drivers/net/wireless/realtek/rtw88/usb.c
++++ b/drivers/net/wireless/realtek/rtw88/usb.c
+@@ -19,6 +19,11 @@
+ MODULE_PARM_DESC(switch_usb_mode,
+ 		 "Set to N to disable switching to USB 3 mode to avoid potential interference in the 2.4 GHz band (default: Y)");
+ 
++static int rtw_rx_burst_size = -1;
++module_param_named(rx_burst_size, rtw_rx_burst_size, int, 0644);
++MODULE_PARM_DESC(rx_burst_size,
++		 "DIAGNOSTIC: force the RX DMA burst size (1024, 512 or 64). -1 (default) picks it from the USB link speed, as before.");
++
+ #define RTW_USB_MAX_RXQ_LEN	512
+ 
+ struct rtw_usb_txcb {
+@@ -724,6 +729,14 @@
+ 			rtw_err(rtwdev, "status %d\n", urb->status);
+ 			break;
+ 		}
++		/* DIAGNOSTIC: the cases above are otherwise swallowed with no log
++		 * line, and the URB is never resubmitted - rtw_usb_rx_resubmit() is
++		 * called only on the success path and from rtw_usb_setup_rx(). So
++		 * RTW_USB_RXCB_NUM (4) transient RX errors silently retire RX for
++		 * good. Make them visible. Behaviour is otherwise unchanged.
++		 */
++		rtw_err(rtwdev, "rx urb error, status=%d actual_length=%u\n",
++			urb->status, urb->actual_length);
+ 		if (skb)
+ 			dev_kfree_skb_any(skb);
+ 	}
+@@ -804,7 +817,13 @@
+ 
+ 	rxdma = BIT_DMA_BURST_CNT | BIT_DMA_MODE;
+ 
+-	if (speed == USB_SPEED_SUPER)
++	if (rtw_rx_burst_size == 1024)
++		burst_size = BIT_DMA_BURST_SIZE_1024;
++	else if (rtw_rx_burst_size == 512)
++		burst_size = BIT_DMA_BURST_SIZE_512;
++	else if (rtw_rx_burst_size == 64)
++		burst_size = BIT_DMA_BURST_SIZE_64;
++	else if (speed == USB_SPEED_SUPER)
+ 		burst_size = BIT_DMA_BURST_SIZE_1024;
+ 	else if (speed == USB_SPEED_HIGH)
+ 		burst_size = BIT_DMA_BURST_SIZE_512;
