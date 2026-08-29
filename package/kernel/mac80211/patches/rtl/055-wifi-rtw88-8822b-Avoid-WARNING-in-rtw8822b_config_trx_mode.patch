@@ -1,0 +1,37 @@
+From 44d1f624bbdd2d60319374ba85f7195a28d00c90 Mon Sep 17 00:00:00 2001
+From: Bitterblue Smith <rtl8821cerfe2@gmail.com>
+Date: Sun, 30 Nov 2025 16:50:31 +0200
+Subject: [PATCH] wifi: rtw88: 8822b: Avoid WARNING in rtw8822b_config_trx_mode()
+
+Upstream commit 44d1f624bbdd2d60319374ba85f7195a28d00c90. Not in the 6.12
+stable series, so absent from this tree's backports-6.12.61 pin. Verified: it
+was fetched from git.kernel.org, RTW_FLAG_POWERON already exists in this tree
+(main.h), and it applies with an offset of one line.
+
+This is the "write RF mode table fail" WARNING at rtw8822b.c:824 seen on the
+Raspberry Pi 5 during AP startup with the RTL8822BU. rtw8822b_set_antenna()
+can be called from userspace while the chip is powered off; reading the RF
+registers then returns an unexpected value and the readback poll in
+rtw8822b_config_trx_mode() exhausts its 100 attempts. OpenWrt's
+/lib/netifd/wireless/mac80211.sh manages txantenna/rxantenna (defaulting to
+0xffffffff) during bring-up, which is what invokes that path here.
+
+The fix is a pure guard - call rtw8822b_config_trx_mode() only when
+RTW_FLAG_POWERON is set - so it can only ever skip a call that was invalid
+anyway. It does not touch the USB, RX or PHY paths and therefore cannot
+affect the validated USB 3 SuperSpeed behaviour.
+
+diff --git a/drivers/net/wireless/realtek/rtw88/rtw8822b.c b/drivers/net/wireless/realtek/rtw88/rtw8822b.c
+index 89b6485b229a8..4d88cc2f41485 100644
+--- a/drivers/net/wireless/realtek/rtw88/rtw8822b.c
++++ b/drivers/net/wireless/realtek/rtw88/rtw8822b.c
+@@ -1005,7 +1005,8 @@ static int rtw8822b_set_antenna(struct rtw_dev *rtwdev,
+ 	hal->antenna_tx = antenna_tx;
+ 	hal->antenna_rx = antenna_rx;
+ 
+-	rtw8822b_config_trx_mode(rtwdev, antenna_tx, antenna_rx, false);
++	if (test_bit(RTW_FLAG_POWERON, rtwdev->flags))
++		rtw8822b_config_trx_mode(rtwdev, antenna_tx, antenna_rx, false);
+ 
+ 	return 0;
+ }
