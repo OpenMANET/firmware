@@ -175,7 +175,7 @@ symbols are "unreliable here". No action needed.
 
 | | |
 |---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,600 bytes, sha256 `3fb3cc97bad8780a5d6024669a451ccc3ac5050c4aaac033b15938368ae186eb` (rebuilt at `c94fb65`; DIAGNOSTIC build, see below; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,860 bytes, sha256 `c2a0dac994c8e81694602753a231946a4371826acc1d4eca99119e1e0d6d3281` (rebuilt at `14caf12`; carries the 054 USB PHY backport plus the 053 diagnostics; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
 | `ekh-bcm2711` (Pi 4 regression) | `make -j12` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Last run at `a3b80a1`, log `~/logs/build-2711-v2.log`. |
 
 Both built from commit `619022f` of `pi5-wm6108-port`.
@@ -447,8 +447,8 @@ reason that has nothing to do with the GPS.
 
 ```
 C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
-sha256 3fb3cc97bad8780a5d6024669a451ccc3ac5050c4aaac033b15938368ae186eb
-53,560,600 bytes
+sha256 c2a0dac994c8e81694602753a231946a4371826acc1d4eca99119e1e0d6d3281
+53,560,860 bytes
 ```
 
 Contains `a3b80a1`: `patches/ekh-bcm2712/0010` (openmanetd recognises
@@ -796,3 +796,55 @@ a USB3-capable adapter and is meant to run at USB 3.
 `cfg80211.ko`, `mac80211.ko`, `mm6108_sdio.ko`, `batman-adv.ko` and
 `brcmfmac.ko` all byte-identical to the previous build; the only differences
 are opkg `SourceDateEpoch` metadata and the LuCI cache-busting token.
+
+## USB3 SuperSpeed: candidate fix backported (commit `14caf12`)
+
+`patches/rtl/054-wifi-rtw88-Add-USB-PHY-configuration.patch` — upstream
+`5b1b9545262b5126a3c2776e7e64ff29765cbe6e`, first released in v6.14, not in the
+6.12 stable series and therefore absent from the `backports-6.12.61` pin.
+
+Its upstream commit message describes our exact symptom: an RTL8822BU
+(TP-Link Archer T3U — same chip as `0bda:b812`) "in USB 3 mode was randomly
+disconnecting from USB", with repeated SuperSpeed disconnect / re-enumerate
+cycles.
+
+Verified before backporting, not assumed:
+
+- fetched from git.kernel.org and applies to this tree with offsets only;
+- every prerequisite already exists in 6.12.61 — `struct rtw_intf_phy_para`,
+  `chip->intf_table`, the `usb3_para` member, and `usb3_param_8822b[]` in
+  `rtw8822b.c` — so it is a pure addition to `usb.c` and `reg.h`;
+- the whole `patches/rtl/` series (052, 053, 054 included) applies cleanly to a
+  pristine `backports-6.12.61` extraction with zero failures.
+
+### CUT-GATED — candidate, not a confirmed cure
+
+`usb3_param_8822b[]` holds exactly one real entry,
+`{0x0001, 0xA841, RTW_IP_SEL_PHY, RTW_INTF_PHY_CUT_D}`, and
+`rtw_usb_phy_cfg()` skips entries whose `cut_mask` does not match
+`BIT(rtwdev->hal.cut_version)`. `RTW_INTF_PHY_CUT_D` is `BIT(3)`, so this only
+acts on a cut-D part (`cut_version == 3`). On any other cut it is a no-op and
+will NOT fix the disconnects.
+
+`patches/rtl/053` was extended to log this at probe:
+
+```
+DIAG: usb speed=%d cut_version=%u rxdma=0x%02x
+```
+
+First check after flashing is therefore `dmesg | grep "DIAG: usb speed"`:
+
+- `cut_version=3` → the PHY tuning is active; retry the SuperSpeed scan. If
+  stable, that is the fix and `053` can be reverted.
+- anything else → `054` is inert for this part; fall back to the
+  `rx_burst_size=512` controlled experiment in `053`.
+
+### Ruled out along the way
+
+`xhci-hcd.quirks=` cannot disable USB3 LPM — it is applied as `quirks |= …`
+(OR-only), so a bit can be added but never cleared.
+
+### Pi 4 regression for `14caf12` — clean
+
+`cfg80211.ko`, `mac80211.ko`, `mm6108_sdio.ko`, `batman-adv.ko`,
+`brcmfmac.ko` all byte-identical; no non-metadata differences at all.
