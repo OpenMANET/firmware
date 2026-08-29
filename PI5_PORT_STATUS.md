@@ -4,9 +4,15 @@ Authoritative current-state file. Read this after CLAUDE.md at the start of ever
 
 ## Current Objective
 
-Add a Raspberry Pi 5 / BCM2712 OpenMANET product target (`bcm2712_mm6108-spi`)
-— Seeed WM1302 HAT + Wio-WM6108 / Morse Micro MM6108 over SPI, US 900 MHz —
-while preserving the shipping Raspberry Pi 4 (bcm2711) and Pi 3 (bcm2710) support.
+**PHASE 1 COMPLETE — HARDWARE VERIFIED (2026-08-28).**
+
+The Raspberry Pi 5 / BCM2712 OpenMANET product target (`bcm2712_mm6108-spi`) —
+Seeed WM1302 HAT + Wio-WM6108 / Morse Micro MM6108 over SPI, US 900 MHz — is
+delivered and demonstrated on physical hardware end to end, with the shipping
+Raspberry Pi 4 (bcm2711) and Pi 3 (bcm2710) support preserved and regression-verified.
+
+Current objective is now Phase 2 hardware validation: WM1302 GPS, then the external
+USB Wi-Fi AC dongle. NVMe stays deferred. See Next Engineering Action.
 
 ## Repository State
 
@@ -169,8 +175,8 @@ symbols are "unreliable here". No action needed.
 
 | | |
 |---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,401,122 bytes, sha256 `1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837` (rebuilt at `a3b80a1`; earlier images at `e55ad37` and `619022f` are superseded). Log `~/logs/build-bcm2712-03.log`. |
-| `ekh-bcm2711` (Pi 4 regression) | `make -j10` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Log `~/logs/build-bcm2711-02.log`. |
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,401,122 bytes, sha256 `1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837` (rebuilt at `a3b80a1`; earlier images at `e55ad37` and `619022f` are superseded). Log `~/logs/build-2712-v4.log`. |
+| `ekh-bcm2711` (Pi 4 regression) | `make -j12` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Last run at `a3b80a1`, log `~/logs/build-2711-v2.log`. |
 
 Both built from commit `619022f` of `pi5-wm6108-port`.
 
@@ -269,29 +275,107 @@ feed).
 
 ## Hardware Validation
 
-**HARDWARE VERIFIED on a physical Raspberry Pi 5 + WM1302 HAT + Wio-WM6108 (2026-08-28):**
+# PHASE 1: HARDWARE VERIFIED — COMPLETE (2026-08-28)
 
-- Pi 5 boots.
-- Serial console works on the dedicated 3-pin JST-SH debug UART as `ttyAMA10` at
-  115200 — the `boards/rpi5/cmdline.txt` change is confirmed correct on hardware.
+The Raspberry Pi 5 OpenMANET port is **HARDWARE VERIFIED, not merely BUILD VERIFIED.**
+The complete physical path has been demonstrated on real hardware:
+
+```
+Pi 5 -> RP1 -> SPI -> MM6108 -> 923 MHz Wi-Fi HaLow -> 802.11s -> BATMAN-adv -> Pi 4
+```
+
+### Platform bring-up
+
+- Raspberry Pi 5 boots OpenMANET.
+- The dedicated Pi 5 3-pin JST-SH UART provides bootloader, kernel AND interactive
+  console at 115200 — the `boards/rpi5/cmdline.txt` / `ttyAMA10` work is confirmed
+  correct on hardware, including the login shell via `/dev/console`.
 - RP1 initialises.
-- DW AXI DMA initialises — the `CONFIG_DW_AXI_DMAC=y` review finding is vindicated;
-  without it the SPI controller would have failed to probe silently.
-- MM6108 probes on `spi0.0`. GPIO reset succeeds. MM6108 firmware loads.
-- Correct US BCF loads: `bcf_fgh100mhaamd.bin`. Radio reports `country=US`.
-- `wlh0` exists, UP/LOWER_UP, and the radio comes up as an AP bridged to `br-lan`.
+- SPI/DW-SSI and DW AXI DMA initialise — the `CONFIG_DW_AXI_DMAC=y` review finding is
+  vindicated. Without it the SPI controller would have failed to probe silently and
+  the MM6108 would never have enumerated.
 
-That closes items 1-6 of the CLAUDE.md engineering priority list: BCM2712 target,
-firmware build, Pi 5 boot, RP1/SPI/GPIO, WM1302 + Wio-WM6108 init, and the Morse
-MM6108 stack.
+### Radio
 
-**NOT yet hardware validated:** OpenMANET mesh services, 802.11s/batman-adv
-association, two-node HaLow link, BATMAN path, IP traffic across the mesh.
+- Wio-WM6108 / MM6108 probes successfully on `spi0.0`.
+- GPIO reset works (`991-0006` `MM_RESET` line naming confirmed good).
+- MM6108 firmware loads.
+- US BCF loads: `bcf_fgh100mhaamd.bin`. Country = US.
+- HaLow interface `wlh0` comes up.
 
-## BATMAN-adv: why there is no `bat0` (root cause, 2026-08-28)
+### Mesh — the Phase 1 objective
 
-**The device is un-provisioned. This is expected first-boot state, not a Pi 5 port
-defect.** Two independent investigations of the repo and every feed agree.
+OpenMANET provisioning creates the intended topology exactly as designed:
+
+```
+wlh0 -> batmesh0 -> bat0 -> br-ahwlan
+```
+
+- BATMAN algorithm = `BATMAN_V`.
+- Pi 5 provisioned as **Mesh Point**; Pi 4 provisioned as **Mesh Gate**.
+- Both: Mesh ID `openmanet`, width 2 MHz, channel 42 / 923 MHz.
+- A real 802.11s HaLow peer connection was established between Pi 5 and Pi 4.
+
+Pi 5 station dump:
+
+| | |
+|---|---|
+| mesh plink | ESTAB |
+| authorized / authenticated / associated | yes / yes / yes |
+| signal | ~ -46 dBm |
+| expected throughput | ~ 7.52 Mbps |
+
+BATMAN neighbour on Pi 5: `a8:dd:9f:4d:c0:e3` via `wlh0`, throughput ~7.2.
+The BATMAN originator table showed the Pi 4.
+
+End-to-end IP ping, Pi 5 -> Pi 4: **4/4 replies, 0% packet loss,
+min/avg/max 3.620 / 3.892 / 4.105 ms**.
+
+### CLAUDE.md "Phase 1 Definition of Done" — status
+
+| Item | Status |
+|---|---|
+| Raspberry Pi 5 BCM2712 target | DONE |
+| Successful OpenMANET firmware build | DONE |
+| Bootable Pi 5 image | DONE |
+| Pi 4 support preserved | DONE — regression-verified by content, not checksum |
+| Pi 5 WM1302 / Wio-WM6108 SPI support | HARDWARE VERIFIED |
+| Morse Micro MM6108 driver | HARDWARE VERIFIED |
+| Required MM6108 firmware | HARDWARE VERIFIED |
+| Correct BCF | HARDWARE VERIFIED (`bcf_fgh100mhaamd.bin`, US) |
+| openmanetd | HARDWARE VERIFIED (provisioning applied) |
+| batman-adv | HARDWARE VERIFIED (`BATMAN_V`) |
+| Mesh functionality | HARDWARE VERIFIED (802.11s, plink ESTAB) |
+| Pi 5 hardware boot | HARDWARE VERIFIED |
+| HaLow interface initialisation | HARDWARE VERIFIED (`wlh0`) |
+| Two-node mesh association | HARDWARE VERIFIED (Pi 5 point <-> Pi 4 gate) |
+| BATMAN path | HARDWARE VERIFIED (neighbour + originator table) |
+| IP traffic across mesh | HARDWARE VERIFIED (4/4 ping, 0% loss) |
+
+**Phase 1 is complete.**
+
+### Not yet hardware validated (Phase 2 scope)
+
+- WM1302 HAT GPS/GNSS.
+- External USB Wi-Fi AC dongle for local high-speed EUD/ATAK access.
+- NVMe.
+
+## BATMAN-adv provisioning — RESOLVED (root cause recorded 2026-08-28)
+
+**Resolved by provisioning. The missing `bat0` before provisioning was expected
+factory/unprovisioned behaviour, NOT a defect.** Once the mesh was provisioned the
+intended topology came up exactly as designed and Phase 1 passed end to end (see
+Hardware Validation above).
+
+**Operational note that cost real time — record for the next unit:** on the Pi 4,
+running **Quick Config alone was NOT sufficient** to rebuild the BATMAN topology.
+Running the **full 802.11s mesh wizard** corrected it. Quick Config does not exercise
+`wizard.js:1214 save()` -> `uci.js:444-518`, which is the only path that creates
+`bat0` / `batmesh0` / `batmesh1` and appends `bat0` to `br-ahwlan`. If a node comes up
+without `bat0` after a flash, run the full wizard, not Quick Config.
+
+The original analysis follows, because it explains *why* no `bat0` exists on a freshly
+flashed unit and should stop a future session re-investigating it.
 
 Nothing in the image — on Pi 4 or Pi 5 — creates a batman-adv device at boot. Only
 three things in the entire tree ever write `proto 'batadv'`:
@@ -344,73 +428,62 @@ installed scripts call missing is a real packaging gap.
 
 ## Blocker
 
-None. The SPI/MM6108 path is hardware verified; the mesh is an operator
-provisioning step, not a defect (see above).
+None. Phase 1 is complete and hardware verified. The only prerequisite for the next
+phase is flashing the current image (it carries the openmanetd BCM2712 board-capability
+support that GPS validation depends on) - see Next Engineering Action.
 
 ## Next Engineering Action (exact)
 
-**No re-flash is required to proceed.** The mesh is provisioned by an operator action
-on the running device; the image already on the Pi has every asset needed
-(`batadv.sh`, `batadv_hardif.sh`, `batman-adv.ko`, `batctl-full`, `alfred`,
-`openmanetd`, `wizard.js`).
+Phase 1 is complete. The next hardware-validation areas, in order:
 
-### 1. Provision the mesh on the running Pi 5
+### 1. Flash the current image first — required before GPS validation
 
-Browse to LuCI — the LAN IP is `10.41.254.1/16` (`/etc/board.d/99-lan-ip`), uhttpd
-listens on 80/443 — and run the wizard. The homepage is already pointed at it by
-`/etc/uci-defaults/10_luci-app-ekhwizards` (`luci.main.homepage='admin/morse/landing'`):
+The unit that completed Phase 1 is running an image built BEFORE commit `a3b80a1`.
+It therefore does NOT contain the openmanetd BCM2712 board-capability support, so
+`GNSSsupoorted()` still returns false on it and the WM1302 GPS will look broken for a
+reason that has nothing to do with the GPS.
 
-```
-http://10.41.254.1/            ->  Wizards  (admin/ekhwizards)
-```
-
-Completing it runs `wizard.js:1214 save()` -> `uci.js:444-518`, which sets the HaLow
-iface to `mode=mesh` on `network=batmesh0` and creates `bat0` (`proto batadv`,
-`routing_algo BATMAN_V`, `bridge_loop_avoidance 1`), `batmesh0`/`batmesh1`
-(`proto batadv_hardif`, `master bat0`), and appends `bat0` to the `br-ahwlan` bridge.
-
-### 2. Confirm the resulting topology
-
-```sh
-batctl if                       # expect wlh0 (via batmesh0) listed as active
-ip -d link show type batadv     # expect bat0
-ip -d link show bat0
-uci show network | grep -E 'batadv|bat0|batmesh'
-uci show wireless | grep -E 'mode|network|mesh_id'
-logread | grep -iE 'batman|batadv|openmanetd'
-```
-
-Expected correct topology after provisioning:
-
-```
-wlh0            HaLow, mode=mesh, network=batmesh0
-batmesh0        proto batadv_hardif, master bat0     <- HaLow rides here
-batmesh1        proto batadv_hardif, master bat0     <- 2.4 GHz, MT7915/MT7916 only, idle here
-bat0            proto batadv, routing_algo BATMAN_V
-br-ahwlan       bridge, ports [eth0..., bat0]
-```
-
-### 3. Two-node mesh (the actual Phase 1 objective)
-
-Repeat on a second unit with the same mesh profile, then:
-
-```sh
-batctl n                        # neighbours
-batctl o                        # originators
-ping <peer bat0 IP>
-```
-
-### 4. Re-flash at your convenience (not required for the above)
-
-The image below carries two fixes that are unrelated to the mesh question. Flash it
-whenever convenient — before the GPS work at the latest, since fix 0010 is what makes
-the WM1302 GPS visible to openmanetd.
+**Flash this before starting GPS work:**
 
 ```
 C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
 sha256 1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837
 53,401,122 bytes
 ```
+
+Contains `a3b80a1`: `patches/ekh-bcm2712/0010` (openmanetd recognises
+`bcm2712,mm6108-spi`, so GNSS/BLOS/Comms report supported) and `0009`
+(`persistent_vars_storage.sh` present, boot-log noise gone).
+
+After flashing, re-provision the mesh (see the note below on Quick Config) and
+re-confirm the Phase 1 path still comes up before moving on.
+
+### 2. WM1302 HAT GPS / GNSS
+
+`patches/ekh-bcm2712/0007` already made `gpsboard.init` chip- and SPI-path-agnostic
+for BCM2712: it resolves GPS_RST/GPS_WAKE by gpio-line-name with `--strict` instead of
+assuming `gpiochip0` (which on a Pi 5 is a SoC brcmstb controller, not RP1), and
+suffix-matches `spi_master/spi0/spi0.0` instead of the literal BCM2711 SPI0 address.
+Neither half of that has been exercised on hardware yet.
+
+Expected checks: `gpioinfo --by-name GPIO25` / `GPIO12` resolve on RP1; `gpsboard.init`
+does not `exit 0` early; `gpsd` gets a fix; openmanetd reports GNSS supported and
+publishes position over alfred/CoT.
+
+### 3. External USB Wi-Fi AC dongle
+
+For local high-speed Wi-Fi / EUD / ATAK access, per the architecture intent. The
+HaLow mesh stays the MANET transport; this is a separate access interface. Do NOT
+redesign around Pi 5 onboard Wi-Fi.
+
+### 4. NVMe — deferred
+
+Explicitly deferred until the core radio / GPS / USB-Wi-Fi stack is validated.
+
+### 5. Wire `build-ekh-bcm2712` into `build-release.yml`
+
+Unblocked since the Pi 5 build went green; still not done because CI wiring cannot be
+validated without pushing the branch.
 
 ## Important Technical Decisions
 
@@ -475,14 +548,19 @@ sha256 1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837
 
 - DONE (was deferred) `gpio-line-names` for Pi 5 — delivered as `991-0006`, verified present
   in both compiled Pi 5 DTBs. See Most Recent Build.
-- `persistent-vars-storage-bcm2711` is hard-gated `@TARGET_bcm27xx_bcm2711` in the morse feed.
-  Its script only calls `vcgencmd bootloader_config`, which does work on a Pi 5 — relaxing that
-  dependency is a reasonable follow-up.
+- DONE (was deferred) `persistent-vars-storage-bcm2711` gating — relaxed to bcm2711||bcm2712 by
+  `patches/ekh-bcm2712/0009` and selected in the board diffconfig. See Post-hardware-validation
+  fixes below.
 - Pi 5 camera (RP1 CFE / PiSP) has no kmod package in `target/linux/bcm27xx/modules/video.mk`.
 - `base-files/etc/board.d/01_leds` HaLow ACT-LED case matches only `morse,ekh01*` — it does not
   cover `bcm2711,mm6108-spi` either, so this is a pre-existing gap, not a Pi 5 regression.
 - A COLD POWER CYCLE (not a warm reboot) is required for the MM6108 first probe. Any hardware
   test plan must account for this.
+- NVMe on the Pi 5 — DEFERRED until the core radio / GPS / USB-Wi-Fi stack is validated.
+  Not started, not investigated. Revisit after Phase 2.
+- USB Wi-Fi AC dongle for local EUD/ATAK access — Phase 2, deferred until after GPS.
+  Architecture intent: the MM6108 HaLow interface carries the MANET/BATMAN mesh; the
+  dongle is a separate local access interface. Do NOT redesign around Pi 5 onboard Wi-Fi.
 
 ## Post-hardware-validation fixes (commit `a3b80a1`)
 
