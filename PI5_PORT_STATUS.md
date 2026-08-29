@@ -175,7 +175,7 @@ symbols are "unreliable here". No action needed.
 
 | | |
 |---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,136 bytes, sha256 `ab8f0efe9b78499e91ab2b5fe8472796423a01548091642d334fb840a1d86924` (rebuilt at `e89a5a7`; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,600 bytes, sha256 `3fb3cc97bad8780a5d6024669a451ccc3ac5050c4aaac033b15938368ae186eb` (rebuilt at `c94fb65`; DIAGNOSTIC build, see below; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
 | `ekh-bcm2711` (Pi 4 regression) | `make -j12` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Last run at `a3b80a1`, log `~/logs/build-2711-v2.log`. |
 
 Both built from commit `619022f` of `pi5-wm6108-port`.
@@ -447,8 +447,8 @@ reason that has nothing to do with the GPS.
 
 ```
 C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
-sha256 ab8f0efe9b78499e91ab2b5fe8472796423a01548091642d334fb840a1d86924
-53,560,136 bytes
+sha256 3fb3cc97bad8780a5d6024669a451ccc3ac5050c4aaac033b15938368ae186eb
+53,560,600 bytes
 ```
 
 Contains `a3b80a1`: `patches/ekh-bcm2712/0010` (openmanetd recognises
@@ -730,3 +730,69 @@ reported failure. Two things remain unexplained: whether the `rtw8822b.c:824`
 WARN is fatal or merely cosmetic, and why the device re-enumerates. The next
 step is a STA-mode test on hardware — if the WARN fires in STA mode too it is a
 power-on fault unrelated to AP, and `052` will not be sufficient.
+
+## USB Wi-Fi AC: SuperSpeed failure isolated (open; diagnostic build `c94fb65`)
+
+Hardware result: RTL8822BU `0bda:b812` **scans fine at USB 2 High Speed (480)**
+and **fails at USB 3 SuperSpeed (5000)** on BOTH Pi 5 USB3 ports, in STA mode
+(so not AP-specific). Failure is `failed to do USB write, ret=-19` (-ENODEV) +
+`failed to send h2c packet`, then an xHCI port reset ~1.7 s later and firmware
+reload. No over-current / undervoltage logged. `-ENODEV` means the USB core
+already considered the device gone, so the device leaves the bus FIRST and the
+write failures and reset are consequences.
+
+### The SuperSpeed delta is one register
+
+Excluded from source: the probe-time USB2->USB3 mode switch (runs once, returns
+early when already SuperSpeed); `rtw_usb_dynamic_rx_agg_v2()` (has the
+SuperSpeed 0x6/0x1a branch but is selected only for 8821A/8812A — 8822B uses
+`_v1`, which is NOT speed dependent); and patch `048` (only added 8812A, 8822B
+was already covered).
+
+What remains, and it is the ONLY speed-dependent setting for this chip:
+
+```
+rtw_usb_init_burst_pkt_len()   usb.c:799
+  USB_SPEED_SUPER -> BIT_DMA_BURST_SIZE_1024   (REG_RXDMA_MODE 0x0290, bits 5:4 = 0)
+  USB_SPEED_HIGH  -> BIT_DMA_BURST_SIZE_512    (bits 5:4 = 1)
+```
+
+### Why no root-cause evidence appears in dmesg
+
+`rtw_usb_read_port_complete()` swallows every RX urb error — `-EPIPE`,
+`-EPROTO`, `-EOVERFLOW` (xHCI babble) and others all hit a bare `break` with NO
+log line — and `rtw_usb_rx_resubmit()` is called only on the success path and
+from `rtw_usb_setup_rx()`. So `RTW_USB_RXCB_NUM` (4) transient RX errors
+permanently retire RX with nothing in dmesg. Verified unchanged in backports
+6.12.96.
+
+### Diagnostic build `c94fb65` — `patches/rtl/053`, REVERT WHEN DONE
+
+1. `rtw88_usb.rx_burst_size` (int, 0644, default -1 = existing behaviour).
+   Confirmed present in the shipped module (`parmtype=rx_burst_size:int`).
+2. Logs the otherwise-silent RX urb errors with status and `actual_length`.
+   Logging only — resubmit behaviour deliberately NOT changed.
+
+The controlled experiment (HS-vs-SS varies link speed AND burst size together;
+this varies the burst size alone, at SuperSpeed):
+
+```sh
+echo 512 > /sys/module/rtw88_usb/parameters/rx_burst_size   # then replug
+iw phy<N> interface add sta0 type managed && ip link set sta0 up
+iw dev sta0 scan | head
+dmesg | grep -iE "rtw|rx urb error|usb|reset"
+```
+
+Stable at 512/SuperSpeed => the 1024-byte RX DMA burst is implicated and link
+speed is exonerated; the real fix is then a targeted quirk plus an upstream
+report. Still failing => burst size exonerated, and the new `rx urb error`
+lines should expose the first fault rather than its aftermath.
+
+USB 2.0 High Speed is a WORKAROUND ONLY, not the intended final state — this is
+a USB3-capable adapter and is meant to run at USB 3.
+
+### Pi 4 regression for `c94fb65` — clean
+
+`cfg80211.ko`, `mac80211.ko`, `mm6108_sdio.ko`, `batman-adv.ko` and
+`brcmfmac.ko` all byte-identical to the previous build; the only differences
+are opkg `SourceDateEpoch` metadata and the LuCI cache-busting token.
