@@ -1,0 +1,40 @@
+From: Bitterblue Smith <rtl8821cerfe2@gmail.com>
+Subject: [PATCH] wifi: rtw88: Fix the unaligned 32-bit access to REG_TXPAUSE
+
+Backported from OpenWrt backports 6.12.96 (this tree pins 6.12.61, which
+predates it). Verified by extracting backports-6.12.96.tar.zst and diffing
+rtw_core_enable_beacon(); the result of this patch is byte-identical to the
+6.12.96 source.
+
+REG_TXPAUSE is 0x0522 and is a single byte, but rtw_core_enable_beacon() used
+rtw_write32_set()/rtw_write32_clr() on it. Those are read-modify-write helpers,
+so a 32-bit access at 0x0522 spans 0x0522..0x0525 and therefore also reads back
+and rewrites REG_RD_CTRL (0x0524) as collateral on every beacon enable/disable.
+
+On PCIe hosts this is additionally an unaligned MMIO access, which faults on
+ARM64. On USB it does not fault - the address is passed to the device in the
+vendor control request - but the collateral read-modify-write of REG_RD_CTRL
+still happens, which is a real functional bug.
+
+This matters for the Raspberry Pi 5 USB Wi-Fi AC path specifically:
+rtw_core_enable_beacon() is AP-only ("if (!rtwdev->ap_active) return;") and is
+called from the scan / channel-switch C2H handler in fw.c, i.e. exactly during
+the HT_SCAN phase of hostapd AP bring-up.
+
+Use the 8-bit accessors so only REG_TXPAUSE is touched.
+
+--- a/drivers/net/wireless/realtek/rtw88/main.c
++++ b/drivers/net/wireless/realtek/rtw88/main.c
+@@ -2433,10 +2433,10 @@
+ 
+ 	if (enable) {
+ 		rtw_write32_set(rtwdev, REG_BCN_CTRL, BIT_EN_BCN_FUNCTION);
+-		rtw_write32_clr(rtwdev, REG_TXPAUSE, BIT_HIGH_QUEUE);
++		rtw_write8_clr(rtwdev, REG_TXPAUSE, BIT_HIGH_QUEUE);
+ 	} else {
+ 		rtw_write32_clr(rtwdev, REG_BCN_CTRL, BIT_EN_BCN_FUNCTION);
+-		rtw_write32_set(rtwdev, REG_TXPAUSE, BIT_HIGH_QUEUE);
++		rtw_write8_set(rtwdev, REG_TXPAUSE, BIT_HIGH_QUEUE);
+ 	}
+ }
+ 
