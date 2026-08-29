@@ -169,7 +169,7 @@ symbols are "unreliable here". No action needed.
 
 | | |
 |---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,400,458 bytes, sha256 `3686d0b3c28a0e7ed7760bb40f1ca6c385030a3cde175d3ddb3bca382e064cea` (rebuilt at `e55ad37` for the debug-UART console). Log `~/logs/build-bcm2712-03.log`. |
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,401,122 bytes, sha256 `1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837` (rebuilt at `a3b80a1`; earlier images at `e55ad37` and `619022f` are superseded). Log `~/logs/build-bcm2712-03.log`. |
 | `ekh-bcm2711` (Pi 4 regression) | `make -j10` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Log `~/logs/build-bcm2711-02.log`. |
 
 Both built from commit `619022f` of `pi5-wm6108-port`.
@@ -269,52 +269,148 @@ feed).
 
 ## Hardware Validation
 
-NONE. Nothing below has been demonstrated on real hardware:
-Pi 5 boot / RP1 SPI operation / MM6108 probe / HaLow interface creation / RF / mesh
-association. Everything above is BUILD VERIFIED only.
+**HARDWARE VERIFIED on a physical Raspberry Pi 5 + WM1302 HAT + Wio-WM6108 (2026-08-28):**
+
+- Pi 5 boots.
+- Serial console works on the dedicated 3-pin JST-SH debug UART as `ttyAMA10` at
+  115200 — the `boards/rpi5/cmdline.txt` change is confirmed correct on hardware.
+- RP1 initialises.
+- DW AXI DMA initialises — the `CONFIG_DW_AXI_DMAC=y` review finding is vindicated;
+  without it the SPI controller would have failed to probe silently.
+- MM6108 probes on `spi0.0`. GPIO reset succeeds. MM6108 firmware loads.
+- Correct US BCF loads: `bcf_fgh100mhaamd.bin`. Radio reports `country=US`.
+- `wlh0` exists, UP/LOWER_UP, and the radio comes up as an AP bridged to `br-lan`.
+
+That closes items 1-6 of the CLAUDE.md engineering priority list: BCM2712 target,
+firmware build, Pi 5 boot, RP1/SPI/GPIO, WM1302 + Wio-WM6108 init, and the Morse
+MM6108 stack.
+
+**NOT yet hardware validated:** OpenMANET mesh services, 802.11s/batman-adv
+association, two-node HaLow link, BATMAN path, IP traffic across the mesh.
+
+## BATMAN-adv: why there is no `bat0` (root cause, 2026-08-28)
+
+**The device is un-provisioned. This is expected first-boot state, not a Pi 5 port
+defect.** Two independent investigations of the repo and every feed agree.
+
+Nothing in the image — on Pi 4 or Pi 5 — creates a batman-adv device at boot. Only
+three things in the entire tree ever write `proto 'batadv'`:
+
+1. `feeds/openmanet/luci/luci-app-morseconfig/htdocs/luci-static/resources/tools/morse/uci.js:444-518`
+   (`setupBatmanDeviceOnNetwork` → `bat0`, `batmesh0`, `batmesh1`, then appends
+   `bat0` to the `br-ahwlan` bridge), called only from `wizard.js:1214` `save()`.
+2. openmanetd `ApplySetup` RPC phase 10 —
+   `internal/openmanet/server/handlers/setup_phases.go:1150-1181` `runBatmanAdv()`.
+   There is no first-boot auto-apply; `ManagementConfig.Start()` (`mgmt.go:95-112`)
+   only sets MTU, multicast, forceflood and the MT7915-only `batmesh1` helper.
+3. `/etc/uci-defaults/99-migrate-batadv_hardif` — dead code. Its whole body is gated
+   on `[ -f /etc/config/batman-adv ]`, and no package ships that file.
+
+No `board.d` script, no `uci-defaults` script and no package ships an
+`/etc/config/network` containing batman. `/etc/config/network` is generated at first
+boot by `/bin/config_generate` from `/etc/board.json`, and the only OpenMANET board.d
+contribution is `03_openmanet_eth`, which sets `lan = eth0` and nothing else.
+
+The observed wireless state — `mode='ap'`, `network='lan'`, `encryption='sae'`,
+`ssid='BCM2712-3f76'` — is the correct factory default, byte-for-byte the output of
+`netifd-morse/lib/wifi/morse.sh:90-97` plus `morse-wireless-defaults:153-157`. The
+SSID is `$DEVICE_PRODUCT-$MAC4`, and `DEVICE_PRODUCT` is `CONFIG_VERSION_PRODUCT`
+= `BCM2712`. A fresh Pi 4 produces the identical thing with a `BCM2711-` prefix.
+
+**The `config interface 'bat0'` / `option multicast_mode '0'` stub is a red herring,
+not a half-built mesh.** openmanetd runs `configureBatmanForceflood` on every start
+(`mgmt.go:105`); with forceflood defaulting false (`config.go:27`) it writes
+`multicast_mode='0'` to section `bat0` through `uci_network.go:238`, which calls
+`AddSection()` unconditionally and never sets `proto`. netifd ignores a proto-less
+section entirely. This is upstream openmanetd behaviour, identical on Pi 4, and was
+deliberately NOT changed — this is a port, and changing it would alter Pi 4.
+
+CAVEAT worth confirming: if production Pi 4 units genuinely arrive mesh-ready, that
+provisioning happens outside this repository (factory step, a `files/` overlay in a
+CI job, or a golden config). It is not in this tree.
+
+### `persistent_vars_storage.sh` — NOT causal
+
+`morse-wireless-defaults` has no `set -e`; lines 19 and 24 are plain command
+substitutions, so a missing binary yields `""` and the script continues on its normal
+path (line 20 is an explicit random-key fallback). Decisively: on Pi 4 the script
+exists but runs under `set -eu` and greps `vcgencmd bootloader_config` for keys that
+are absent on stock hardware, so it **exits 1 with empty stdout there too**. Both
+boards get identical empty values; the delta is two stderr lines. The script contains
+no network, mesh or batman logic at all.
+
+Fixed anyway for parity (see 0009 below), because leaving a package that ten
+installed scripts call missing is a real packaging gap.
 
 ## Blocker
 
-None in software. The port is now blocked on physical hardware access.
+None. The SPI/MM6108 path is hardware verified; the mesh is an operator
+provisioning step, not a defect (see above).
 
 ## Next Engineering Action (exact)
 
-OWNER ACTION REQUIRED — one action: flash and boot a Pi 5.
+**No re-flash is required to proceed.** The mesh is provisioned by an operator action
+on the running device; the image already on the Pi has every asset needed
+(`batadv.sh`, `batadv_hardif.sh`, `batman-adv.ko`, `batctl-full`, `alfred`,
+`openmanetd`, `wizard.js`).
 
-Image (checksum verified after the copy):
+### 1. Provision the mesh on the running Pi 5
+
+Browse to LuCI — the LAN IP is `10.41.254.1/16` (`/etc/board.d/99-lan-ip`), uhttpd
+listens on 80/443 — and run the wizard. The homepage is already pointed at it by
+`/etc/uci-defaults/10_luci-app-ekhwizards` (`luci.main.homepage='admin/morse/landing'`):
+
+```
+http://10.41.254.1/            ->  Wizards  (admin/ekhwizards)
+```
+
+Completing it runs `wizard.js:1214 save()` -> `uci.js:444-518`, which sets the HaLow
+iface to `mode=mesh` on `network=batmesh0` and creates `bat0` (`proto batadv`,
+`routing_algo BATMAN_V`, `bridge_loop_avoidance 1`), `batmesh0`/`batmesh1`
+(`proto batadv_hardif`, `master bat0`), and appends `bat0` to the `br-ahwlan` bridge.
+
+### 2. Confirm the resulting topology
+
+```sh
+batctl if                       # expect wlh0 (via batmesh0) listed as active
+ip -d link show type batadv     # expect bat0
+ip -d link show bat0
+uci show network | grep -E 'batadv|bat0|batmesh'
+uci show wireless | grep -E 'mode|network|mesh_id'
+logread | grep -iE 'batman|batadv|openmanetd'
+```
+
+Expected correct topology after provisioning:
+
+```
+wlh0            HaLow, mode=mesh, network=batmesh0
+batmesh0        proto batadv_hardif, master bat0     <- HaLow rides here
+batmesh1        proto batadv_hardif, master bat0     <- 2.4 GHz, MT7915/MT7916 only, idle here
+bat0            proto batadv, routing_algo BATMAN_V
+br-ahwlan       bridge, ports [eth0..., bat0]
+```
+
+### 3. Two-node mesh (the actual Phase 1 objective)
+
+Repeat on a second unit with the same mesh profile, then:
+
+```sh
+batctl n                        # neighbours
+batctl o                        # originators
+ping <peer bat0 IP>
+```
+
+### 4. Re-flash at your convenience (not required for the above)
+
+The image below carries two fixes that are unrelated to the mesh question. Flash it
+whenever convenient — before the GPS work at the latest, since fix 0010 is what makes
+the WM1302 GPS visible to openmanetd.
 
 ```
 C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
-sha256 3686d0b3c28a0e7ed7760bb40f1ca6c385030a3cde175d3ddb3bca382e064cea
-53,400,458 bytes
+sha256 1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837
+53,401,122 bytes
 ```
-
-1. Flash it to an SD card (full disk image).
-2. Fit the card in the Pi 5 with the WM1302 HAT + Wio-WM6108.
-3. Plug the Waveshare Pi 5 3-pin UART lead into the dedicated JST-SH **debug UART
-   connector** between the HDMI ports. No jumper wires, no GPIO14/15 needed.
-4. Open the port at **115200 8N1**.
-5. **Cold power cycle** — pull power. A warm reboot is not sufficient for the MM6108
-   first probe.
-6. Capture the serial log.
-
-The debug connector now carries the bootloader/firmware output *and* the full Linux
-kernel log *and* a login shell (`/dev/console` is ttyAMA10). GPIO14/15 remains a
-115200 fallback if the plug misbehaves.
-
-What to look for, in order:
-
-1. RP1 enumerates over PCIe and `pinctrl-rp1` probes.
-2. `spi-dw-mmio` binds and `spi0` appears — if `DW_AXI_DMAC` were wrong this fails
-   silently with `-EPROBE_DEFER` and nothing else is reported.
-3. The morse driver probes on `spi0.0` and reads the chip ID.
-4. `bcf_fgh100mhaamd.bin` and `mm6108.bin` load.
-5. A HaLow `wlan` interface is created.
-6. `morsechipreset` at S09 does NOT log "unable to reset as MM_RESET is not in
-   gpio-line-names" — if it does, the overlay did not load.
-
-Two units are needed for the Phase 1 mesh objective; one is enough to prove boot, SPI
-and MM6108 probe.
 
 ## Important Technical Decisions
 
@@ -387,3 +483,51 @@ and MM6108 probe.
   cover `bcm2711,mm6108-spi` either, so this is a pre-existing gap, not a Pi 5 regression.
 - A COLD POWER CYCLE (not a warm reboot) is required for the MM6108 first probe. Any hardware
   test plan must account for this.
+
+## Post-hardware-validation fixes (commit `a3b80a1`)
+
+Both found while tracing the missing `bat0`; neither is its cause. Both are
+board-scoped to `ekh-bcm2712`, so the shipping Pi 4 product is untouched by
+construction — no shared file was modified.
+
+- `patches/ekh-bcm2712/0009` — relaxes `persistent-vars-storage-bcm2711`'s
+  `@TARGET_bcm27xx_bcm2711` gate to `bcm2711||bcm2712`, and the board diffconfig now
+  selects it. The gate was packaging, not hardware: the script's only dependency is
+  `vcgencmd bootloader_config` from `bcm27xx-userland`, and `/usr/bin/vcgencmd` was
+  already in the Pi 5 rootfs. Ten installed scripts call it. Parity/log-noise fix
+  only — see the "NOT causal" note above; it changes no resulting configuration.
+- `patches/ekh-bcm2712/0010` — adds a package patch inside the openmanetd feed
+  package (same mechanism `0002` uses for collectd) adding `BCM2712_MM6108_SPI` to
+  `internal/util/board/board_type.go` and listing it beside `BCM2711_MM6108_SPI` in
+  `GNSSsupoorted()`, `BLOSsupported()` and `CommsSupported()`. All three switches end
+  in `default: return false`, so the Pi 5 was silently reporting GNSS, BLOS and Comms
+  unsupported on hardware that supports them — this is what would have made the
+  WM1302 GPS look broken later for a non-obvious reason. `ExecutionProfileFor()` is
+  deliberately left alone; the zero profile is right for a 4-core Cortex-A76.
+
+Verified in the built rootfs, not inferred: `/sbin/persistent_vars_storage.sh` is
+present, and `strings usr/bin/openmanetd` contains `bcm2712,mm6108-spi` exactly once,
+the same count as `bcm2711,mm6108-spi`.
+
+Deliberately NOT changed: openmanetd's `configureBatmanForceflood` creating a
+proto-less `bat0` section (`uci_network.go:238`). It is misleading during diagnosis
+but is upstream behaviour identical on Pi 4, and this is a port, not a redesign.
+Worth raising upstream.
+
+### Pi 4 regression evidence for `a3b80a1`
+
+No shared file was modified — the whole change set lives in `patches/ekh-bcm2712/`
+and `boards/ekh-bcm2712/` — so Pi 4 is unaffected by construction. Verified anyway by
+rebuilding `ekh-bcm2711` at `a3b80a1` and comparing against the images built at
+`a6da409`:
+
+- `make -j12` exit 0, all three shipping images produced.
+- Boot partition: `cmdline.txt` and `distroconfig.txt` byte-identical.
+- Root filesystem: unsquashed both and ran `diff -rq --no-dereference`. **Exactly one
+  file differs** — `usr/share/ucode/luci/template/header.ut`, and only in LuCI's
+  cache-busting query string (`?v=9aqZQSU2PzNSg` vs `?v=Hu1kSpomZM1EO`), a token
+  regenerated on every build. Everything else is identical.
+
+The `.img.gz` sha256 values therefore differ between builds, but that is build
+non-determinism in one LuCI template, not a functional change. Recorded here so a
+future session does not mistake a checksum delta for a regression.

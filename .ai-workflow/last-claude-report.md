@@ -1,90 +1,85 @@
-# Last Claude Report — Raspberry Pi 5 Port, Session 2
+# Last Claude Report — Raspberry Pi 5 Port, Session 3
 
-Date: 2026-08-27
-Branch: `pi5-wm6108-port` · Head: `619022f` · Baseline: `365b276`
+Date: 2026-08-28
+Branch: `pi5-wm6108-port` · Head: `a3b80a1` · Baseline: `365b276`
 
 ## COMPLETED
 
-**BUILD VERIFIED — both targets green.**
+### HARDWARE VERIFIED — the Pi 5 MM6108-over-SPI path works on real hardware
 
-| Target | Result |
-|---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,400,452 bytes. |
-| `ekh-bcm2711` (Pi 4 regression) | `make -j10` exit 0. All three shipping images built: mm6108-spi, mm6108-sdio, mm8108-usb. |
+Pi 5 boots; serial console on the dedicated 3-pin JST-SH debug UART as `ttyAMA10` at
+115200; RP1 initialises; DW AXI DMA initialises; MM6108 probes on `spi0.0`; GPIO
+reset succeeds; MM6108 firmware loads; correct US BCF `bcf_fgh100mhaamd.bin` loads;
+radio reports `country=US`; `wlh0` UP/LOWER_UP.
 
-The WSL2 reboot blocker from session 1 was cleared, the environment provisioned, and
-both boards built from the same commit.
+That closes items 1-6 of the CLAUDE.md priority list. It also vindicates two
+pre-hardware calls: the `CONFIG_DW_AXI_DMAC=y` blocker (without it the SPI controller
+would have failed to probe silently) and the `ttyAMA10` console routing.
 
-**The Pi 5 image was verified by extraction, not inference.** Gunzipped, partition
-table read, FAT listed with mtools, squashfs unpacked. It contains `kernel_2712.img`,
-all six Pi 5 DTBs, `overlays/mm610x-spi-pi5.dtbo`, a correctly assembled
-`distroconfig.txt` ending in `dtoverlay=mm610x-spi-pi5` and
-`dtoverlay=sysinfo,board-name="bcm2712,mm6108-spi"`, plus `mm6108_sdio.ko`,
-`batman-adv.ko`, `mm6108.bin`, `bcf_fgh100mhaamd.bin`, `openmanetd`, `morse_cli`,
-hostapd/wpa_supplicant/alfred/gpiod.
+### Root cause of "no batman-adv": the device is un-provisioned, not defective
 
-**Device tree verified in binary form.** The new `991-0006` puts MM_RESET/MM_WAKE/
-MM_BUSY into both compiled Pi 5 DTBs (including D0 silicon). The Pi 5 overlay
-decompiles to exactly three external label fixups — `rp1_spi0`, `rp1_spi0_gpio9`,
-`rp1_gpio` — and all three resolve in both base DTBs. Since the firmware rejects an
-overlay whose labels are unresolvable, that is the strongest evidence available
-short of hardware that the overlay will load.
+Two independent investigations of the repo and every feed agree. Nothing in the image
+— on Pi 4 or Pi 5 — creates `bat0` at boot. Only three things in the whole tree write
+`proto 'batadv'`: the LuCI wizard JS (`tools/morse/uci.js:444-518`, called from
+`wizard.js:1214 save()`), openmanetd's `ApplySetup` RPC phase 10
+(`setup_phases.go:1150-1181`), and a migration script that is dead code (gated on
+`/etc/config/batman-adv`, which no package ships).
 
-**Three real defects fixed from the gpio helper's audit** (commit `4750f24`):
-`991-0006` gpio-line-names; a chipreset.sh path that would unbind the Pi 5's SD
-controller and never rebind it if the overlay failed to load; and a gpsboard.init
-that hardcodes `gpiochip0` and the BCM2711 SPI0 sysfs path.
+The observed wireless state is the correct factory default, byte-for-byte the output
+of `netifd-morse/lib/wifi/morse.sh:90-97` plus `morse-wireless-defaults:153-157`. A
+fresh Pi 4 produces the identical thing with a `BCM2711-` SSID prefix.
 
-**Three build blockers fixed — none were Pi 5 regressions** (commits `b7eb941`,
-`619022f`). Every one reproduced identically on the untouched Pi 4 board, which is
-why it was built in parallel from the start: a golang `go`-symlink mismatch between
-the openmanet and packages feeds that broke runc/docker/containerd; openmanetd
-*hanging* (not failing) on scp-style SSH submodule URLs with no `url.insteadOf`
-rewrite; and missing host `-dev` libraries for the alfred bindings, which build with
-the host toolchain. The last two were gaps between the WSL provisioning script and
-what CI installs; `provision-build-env.sh` now matches CI.
+The `config interface 'bat0'` / `multicast_mode '0'` stub is a red herring:
+openmanetd's `configureBatmanForceflood` (`mgmt.go:105`) writes it through
+`uci_network.go:238`, which calls `AddSection()` unconditionally and never sets
+`proto`. netifd ignores a proto-less section. Upstream behaviour, identical on Pi 4;
+deliberately not changed.
 
-**Pi 4 preserved.** Its build is green, `MM_RESET` is still in the built
-`bcm2711-rpi-4-b.dtb`, its distroconfig still selects `mm610x-spi`, and the 507-vs-457
-package manifest diff is fully accounted for — camera stack, mm8108 variant, BCM283x
-SPI/I2C kmods, EKH01 carrier NIC, and the bcm2711-gated persistent-vars package.
+`persistent_vars_storage.sh` is **not** causal. `morse-wireless-defaults` has no
+`set -e` and lines 19/24 are plain command substitutions, so a missing binary yields
+`""` and the script continues on its designed fallback path. On Pi 4 the script
+exists but runs under `set -eu` and greps `vcgencmd bootloader_config` for keys absent
+on stock hardware, so it exits 1 with empty stdout there too — both boards get
+identical values.
+
+### Two genuine port gaps found while proving that, and fixed (`a3b80a1`)
+
+Both board-scoped to `ekh-bcm2712`; no shared file touched.
+
+- `0009` — relaxes `persistent-vars-storage-bcm2711`'s `@TARGET_bcm27xx_bcm2711` gate
+  to `bcm2711||bcm2712` and selects it. Parity and boot-log noise only.
+- `0010` — adds `bcm2712,mm6108-spi` to openmanetd's board enum. All three capability
+  switches (`GNSSsupoorted`, `BLOSsupported`, `CommsSupported`) end in
+  `default: return false`, so the Pi 5 was silently reporting them unsupported. This
+  is what would have made the WM1302 GPS look broken later.
+
+Verified in the built rootfs, not inferred: `/sbin/persistent_vars_storage.sh` present,
+and `strings usr/bin/openmanetd` contains `bcm2712,mm6108-spi` exactly once — the same
+count as `bcm2711,mm6108-spi`.
 
 ## CURRENT
 
-Software work for Phase 1 is complete and BUILD VERIFIED. It is emphatically **NOT
-HARDWARE VERIFIED**: nothing has run on a Pi 5.
+Mesh services, batman association and the two-node link remain NOT hardware
+validated. Everything needed is on the device already.
 
-## OWNER ACTION REQUIRED
+## OWNER ACTION — no re-flash needed for this
 
-**One action: flash and boot a Pi 5.**
+1. Browse to `http://10.41.254.1/` and run **Wizards** (the homepage is already
+   `admin/morse/landing`). That creates `bat0`, `batmesh0`/`batmesh1` and wires the
+   HaLow interface into the mesh.
+2. Confirm with `batctl if`, `ip -d link show type batadv`, `uci show network`.
+3. Repeat on a second unit, then `batctl n` / `batctl o` / ping across.
 
-The image is already copied to Windows at:
+Re-flash at your convenience — required only before the GPS work:
 
-    C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
-
-sha256 3686d0b3c28a0e7ed7760bb40f1ca6c385030a3cde175d3ddb3bca382e064cea, 53,400,458 bytes
-(verified against the regenerated `sha256sums` after the copy)
-
-1. Flash it to an SD card (Raspberry Pi Imager or `dd`; it is a full disk image).
-2. Fit the card in the Pi 5 with the WM1302 HAT + Wio-WM6108.
-3. Plug the Waveshare Pi 5 3-pin UART lead into the dedicated JST-SH debug UART
-   connector between the HDMI ports. Open it at 115200 8N1. No jumper wires needed.
-4. **Cold power cycle** — pull power, do not warm-reboot. The MM6108 first probe
-   requires it.
-5. Send me the serial boot log.
-
-What the log needs to show, in order: RP1 enumerating over PCIe and `pinctrl-rp1`
-probing; `spi-dw-mmio` binding and `spi0` appearing; the morse driver probing on
-`spi0.0`; `bcf_fgh100mhaamd.bin` and `mm6108.bin` loading; a HaLow interface
-appearing. Also watch for `morsechipreset` logging "unable to reset as MM_RESET is
-not in gpio-line-names" — that would mean the overlay did not load.
-
-One unit proves boot, SPI and MM6108 probe. Two are needed for the Phase 1 mesh
-objective.
+```
+C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
+sha256 1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837
+53,401,122 bytes
+```
 
 ## NEXT
 
-Nothing further can be verified without hardware. The one remaining non-hardware
-task is wiring `build-ekh-bcm2712` into `build-release.yml`, which was deliberately
-left until the Pi 5 build went green — it is now unblocked, but CI wiring cannot be
-validated without pushing, so it waits for a decision to push the branch.
+Two-node HaLow mesh association and IP traffic across BATMAN — the remaining Phase 1
+items. After that: WM1302 GPS (unblocked by `0010`) and the USB Wi-Fi AC dongle for
+local EUD/ATAK access, both previously deferred.
