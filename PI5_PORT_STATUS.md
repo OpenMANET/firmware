@@ -175,7 +175,7 @@ symbols are "unreliable here". No action needed.
 
 | | |
 |---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,146 bytes, sha256 `6d97eb9a3502c30916a00775141e51b1c03e654e2eb4bb5f8243d469d3bc20bd` (rebuilt at `a7ed9bc`; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,136 bytes, sha256 `ab8f0efe9b78499e91ab2b5fe8472796423a01548091642d334fb840a1d86924` (rebuilt at `e89a5a7`; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
 | `ekh-bcm2711` (Pi 4 regression) | `make -j12` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Last run at `a3b80a1`, log `~/logs/build-2711-v2.log`. |
 
 Both built from commit `619022f` of `pi5-wm6108-port`.
@@ -447,8 +447,8 @@ reason that has nothing to do with the GPS.
 
 ```
 C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
-sha256 6d97eb9a3502c30916a00775141e51b1c03e654e2eb4bb5f8243d469d3bc20bd
-53,560,146 bytes
+sha256 ab8f0efe9b78499e91ab2b5fe8472796423a01548091642d334fb840a1d86924
+53,560,136 bytes
 ```
 
 Contains `a3b80a1`: `patches/ekh-bcm2712/0010` (openmanetd recognises
@@ -655,3 +655,78 @@ load path is `/etc/modules.d/rtw88-8822bu` -> kmodloader at boot -> the driver
 registers with USB core -> USB core binds by the in-driver id_table whenever the
 adapter is present, plugged before or after boot. Functionally this is still
 flash -> boot -> plug -> interface appears.
+
+## USB Wi-Fi AC AP-mode failure — investigation and partial fix (commit `e89a5a7`)
+
+With the driver installed (`a7ed9bc`) the adapter binds and loads firmware
+("Firmware version 27.2.0, H2C version 13"), but AP mode fails with
+`write RF mode table fail` / `WARNING ... rtw8822b.c:824`, then the netdev
+unregisters and hostapd reports `No such device`.
+
+### What the source establishes
+
+- **`rtw8822b.c:824`** is a 100-iteration RF LUT readback poll in
+  `rtw8822b_config_trx_mode()`: it writes LUT address `0x00001` and reads RF reg
+  `0x33` back expecting `0x00001`. `rf_base_addr = {0x2800, 0x2c00}` with
+  `.read_rf = rtw_phy_read_rf` (direct window), so on USB that readback is a
+  vendor control read at MAC address `0x28CC`. On failure the function returns
+  early, skipping LUT programming, `toggle_igi`, `set_channel_cca` and
+  `set_channel_rfe`.
+- **It is NOT AP-specific.** `config_trx_mode` <- `rtw8822b_phy_set_param()` <-
+  `rtw_power_on()` (`main.c:1412`), i.e. device power-on, independent of
+  interface mode. Channel / VHT80 / 5 GHz therefore cannot be the cause — the
+  loop touches no channel state and runs before any channel is programmed.
+- **RFE type is NOT the cause.** `config_trx_mode` has a separate guard at
+  line 747 (`WARN(efuse->rfe_option >= ARRAY_SIZE(...))`) which did not fire.
+- **No competing driver.** The image ships only `rtw88_{core,usb,8822b,8822bu}`;
+  `rtl8812au-ct` is `=m` and absent (it is the 8812AU, `0bda:8812`, anyway).
+- **AP is supported on USB by design.** `main.c:2221` sets
+  `sta_mode_only = (hci.type == RTW_HCI_TYPE_SDIO)` — only SDIO is STA-only.
+- **The netdev unregister is a re-enumeration.** `usb_reset_device()` occurs
+  once, in `rtw_usb_disconnect()` (`usb.c:1233`), corroborated by the phy index
+  advancing 3 -> 5. hostapd's `No such device` is a consequence, not a cause.
+  THIS REMAINS UNEXPLAINED.
+
+### The fix that was applied
+
+`patches/rtl/052-wifi-rtw88-Fix-unaligned-32-bit-access-to-REG_TXPAUSE.patch`.
+
+`REG_TXPAUSE` is `0x0522` and one byte wide, but `rtw_core_enable_beacon()`
+used `rtw_write32_set/clr()` on it. Those are read-modify-write helpers, so a
+32-bit access spans `0x0522..0x0525` and rewrites `REG_RD_CTRL` (`0x0524`) as
+collateral on every beacon enable/disable. `rtw_core_enable_beacon()` is
+AP-only (`if (!rtwdev->ap_active) return;`) and is called from the scan /
+channel-switch C2H handler in `fw.c` — exactly the HT_SCAN phase where the
+observed failure occurs.
+
+Backported from OpenWrt backports 6.12.96 and verified, not assumed: the
+6.12.96 tarball was downloaded (its sha256 matches the upstream openwrt-24.10
+`PKG_HASH`) and `rtw_core_enable_beacon()` diffed; applying this patch yields a
+function byte-identical to 6.12.96.
+
+### The backports version bump was explicitly REJECTED
+
+Research recommended bumping mac80211 6.12.61 -> 6.12.96 for a commit claimed to
+"Avoid WARNING in rtw8822b_config_trx_mode()". Verified against the actual
+6.12.96 source: **that WARN is still present, same line 824, same text.** The
+bump would not fix it. It also rewrites **37 of 86 `net/mac80211`** and **19 of
+43 `net/wireless`** source files — precisely the files this tree's ~30 Morse
+S1G/HaLow patches modify — putting the hardware-verified Phase 1 MM6108 mesh at
+risk for no gain. The mac80211 pin is deliberate (see `86bb3cc revert pkg
+version`, `aad60e4 revert OpenWRT to 24.10.2`).
+
+### Pi 4 regression for `e89a5a7` — clean
+
+`patches/rtl/` is shared, so `ekh-bcm2711` was rebuilt and compared by content.
+Only 19 files differ: 18 `usr/lib/opkg/info/*.control` differing solely in
+`SourceDateEpoch:`, plus the known LuCI cache-busting token in `header.ut`.
+**`cfg80211.ko`, `mac80211.ko`, `brcmfmac.ko`, `mm6108_sdio.ko` and
+`batman-adv.ko` are all byte-identical.** Phase 1 is provably unaffected.
+
+### Still open
+
+The `052` fix is correct on its own merits but is NOT proven to cure the
+reported failure. Two things remain unexplained: whether the `rtw8822b.c:824`
+WARN is fatal or merely cosmetic, and why the device re-enumerates. The next
+step is a STA-mode test on hardware — if the WARN fires in STA mode too it is a
+power-on fault unrelated to AP, and `052` will not be sufficient.
