@@ -58,3 +58,26 @@ CONFIG_TARGET_ROOTFS_EXT4FS=n
 # which is exactly what happens on the Pi 4 today. This restores parity and
 # silences the boot noise; it does not change any resulting configuration.
 CONFIG_PACKAGE_persistent-vars-storage-bcm2711=y
+
+# USB Wi-Fi AC adapter (required hardware for local EUD/ATAK access).
+#
+# USB ID 0bda:b812 - marketed as "Realtek RTL8812BU / USB3.0 802.11ac 1200M".
+# The silicon is driven by rtw88's 8822b family, not by rtl8812au-ct (which is
+# the 8812AU, USB ID 0bda:8812, a different part). Confirmed in the shipped
+# backports source: rtw8822bu.c's rtw_8822bu_id_table[] lists 0xb812 as its
+# FIRST entry, bound to rtw8822b_hw_spec.
+#
+# boards/common/kmods_diffconfig:245 already sets kmod-rtw88-8822bu=m, so the
+# .ipk is built for every board but installed into none. openmanet_setup.sh
+# concatenates boards/common/* then boards/<board>/*, and kconfig takes the last
+# occurrence, so this =y overrides that =m for the Pi 5 image only.
+#
+# kmod-rtw88-usb, kmod-rtw88-8822b and kmod-rtw88 are HIDDEN:=1 and are pulled in
+# automatically by the dependency chain. rtl8822be-firmware is named explicitly
+# because it is a normal (selectable) package and it carries the blob the driver
+# requests at probe time, /lib/firmware/rtw88/rtw8822b_fw.bin.
+#
+# AUTOLOAD:=$(call AutoProbe,rtw88_8822bu) gives hotplug binding, so the
+# interface appears when the adapter is present without any manual modprobe.
+CONFIG_PACKAGE_kmod-rtw88-8822bu=y
+CONFIG_PACKAGE_rtl8822be-firmware=y
