@@ -848,3 +848,79 @@ First check after flashing is therefore `dmesg | grep "DIAG: usb speed"`:
 
 `cfg80211.ko`, `mac80211.ko`, `mm6108_sdio.ko`, `batman-adv.ko`,
 `brcmfmac.ko` all byte-identical; no non-metadata differences at all.
+
+## USB3: SuperSpeed + forced 512 result — analysis (no rebuild)
+
+Hardware: `DIAG: usb speed=5 cut_version=3 rxdma=0x1e`, twice, during the scan.
+Device stayed on the bus, scan completed and returned a real BSS, but RX was
+badly corrupted (`unused phy status page`, `Rate marked as a VHT rate but data
+is invalid`, `invalid wl info c2h length`, repeated `mac80211/rx.c:808` and
+`rx.c:5445` WARNINGs, `rtw_rx_query_rx_desc` traces from the rtw88_usb RX wq).
+
+### 1. What `rxdma=0x1e` confirms
+
+`REG_RXDMA_MODE` base is `BIT_DMA_BURST_CNT | BIT_DMA_MODE` = 0x0E, with burst
+size in bits 5:4. Decoded: 1024 -> 0x0e, **512 -> 0x1e**, 64 -> 0x2e. So the
+override took effect and the part really ran at SuperSpeed with a 512-byte RX
+DMA burst. `cut_version=3` is `RTW_INTF_PHY_CUT_D` (`BIT(3)`), so **patch 054's
+USB PHY tuning does apply to this adapter** — it is not a no-op here.
+
+### 2. Why SuperSpeed + 512 survives but corrupts RX
+
+512 at SuperSpeed is wrong by construction, and the corruption is the expected
+consequence rather than a new bug:
+
+- SuperSpeed bulk endpoints have a fixed max packet size of 1024 bytes.
+- `BIT_DMA_BURST_SIZE` controls how the chip pushes RX data into the USB FIFO.
+  Forcing 512 makes it emit 512-byte chunks on a 1024-MPS endpoint.
+- A bulk IN transfer terminates on any short packet, and the driver sets no
+  `URB_SHORT_NOT_OK` on RX URBs (only TX uses `URB_ZERO_PACKET`).
+- So every 512-byte burst ends the transfer early. The driver receives
+  truncated fragments and parses a partial aggregated block as if complete —
+  producing exactly the observed garbage descriptors and rate/PHY-status
+  warnings.
+
+Smaller per-transfer sizes also plainly avoid whatever overruns the link at
+1024, which is why the device no longer disappears.
+
+### 3. Buffer sizing / aggregation vs link stability
+
+Not a buffer-size bug. `RTW_USB_MAX_RECVBUF_SZ` is 32768 and is identical at
+both speeds; RX aggregation for 8822B is `_v1`, which is NOT speed dependent;
+and the driver never reads the endpoint max packet size at all — it infers the
+burst purely from link speed. Mainline `rtw_usb_init_burst_pkt_len()` is
+byte-identical to ours, so upstream still regards 1024 as correct at
+SuperSpeed. The evidence points at the DMA-burst / USB-packet-size interaction
+at 1024, not at RX buffer sizing.
+
+### 4. Later upstream RX fixes (verified against git.kernel.org)
+
+- `aa7d92e83811a0b557b75f7a0ce85315f4358bf2` "Add more validation for the RX
+  descriptor" — discards frames whose PHY status size is not 0 or 4, whose size
+  is <= 4 or > 11454, or whose rate exceeds 4SS MCS9. This would SUPPRESS the
+  warnings seen at 512. **Deliberately NOT applied**: it masks the diagnostic
+  signal we are currently relying on. Revisit as hardening once the cause is
+  settled.
+- `6b964941bbfe6e0f18b1a5e008486dbb62df440a` "usb: fix memory leaks on USB
+  write failures" — relevant, since the failing path leaks on every `-ENODEV`
+  write and we hit that repeatedly. Candidate for later.
+- Mainline burst-size selection is unchanged, so there is no upstream fix that
+  alters the 1024 choice.
+
+### 5. Next step — no rebuild required
+
+The 512 run changed TWO variables at once: patch 054 became active AND the
+burst was forced. **SuperSpeed at the correct 1024 burst with 054 active has
+never been tested** — the earlier `-ENODEV` failures were all on the pre-054
+image. Forcing 512 may simply have masked the fix.
+
+```sh
+echo -1 > /sys/module/rtw88_usb/parameters/rx_burst_size   # restore default
+# replug the adapter (read at probe), then rescan
+dmesg | grep -E "DIAG: usb speed|rx urb error|reset SuperSpeed"
+```
+
+Expect `rxdma=0x0e`. If the scan is then clean, 054 is the fix and both the
+burst override and 053 as a whole can be reverted. If it disconnects again,
+054 alone is insufficient and the DMA-burst/MPS interaction at 1024 is the
+real fault.
