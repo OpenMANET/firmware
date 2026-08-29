@@ -1,0 +1,141 @@
+From 5b1b9545262b5126a3c2776e7e64ff29765cbe6e Mon Sep 17 00:00:00 2001
+From: Bitterblue Smith <rtl8821cerfe2@gmail.com>
+Date: Wed, 1 Jan 2025 18:16:32 +0200
+Subject: [PATCH] wifi: rtw88: Add USB PHY configuration
+
+Upstream commit 5b1b9545262b5126a3c2776e7e64ff29765cbe6e, first released in
+v6.14. This tree pins mac80211 at backports-6.12.61 and the commit is not in
+the 6.12 stable series, so it is backported here.
+
+Verified before backporting: the commit was fetched from git.kernel.org and
+applies to this tree with offsets only, and every prerequisite it needs is
+already present in 6.12.61 - struct rtw_intf_phy_para, chip->intf_table, the
+usb3_para member, and the usb3_param_8822b[] array in rtw8822b.c. The patch is
+a pure addition to usb.c and reg.h; it adds no new data.
+
+Relevance to the Raspberry Pi 5 USB Wi-Fi AC failure: the upstream commit
+message describes our exact symptom - an RTL8822BU (TP-Link Archer T3U) "in
+USB 3 mode was randomly disconnecting from USB", with repeated SuperSpeed
+disconnect / re-enumerate cycles. Our adapter (0bda:b812) scans fine at USB 2
+High Speed and dies at SuperSpeed on both Pi 5 USB3 ports with -ENODEV on USB
+writes followed by an xHCI port reset.
+
+IMPORTANT - this is gated on the chip cut. usb3_param_8822b[] in rtw8822b.c
+contains exactly one real entry, {0x0001, 0xA841, RTW_IP_SEL_PHY,
+RTW_INTF_PHY_CUT_D}, and rtw_usb_phy_cfg() skips any entry whose cut_mask does
+not match BIT(rtwdev->hal.cut_version). RTW_INTF_PHY_CUT_D is BIT(3), so this
+only does anything on a cut-D part (cut_version == 3). On any other cut it is
+a no-op and will NOT fix the disconnects. patches/rtl/053 logs the cut version
+at probe so this can be confirmed on the hardware.
+
+Original commit message follows.
+
+---
+diff --git a/drivers/net/wireless/realtek/rtw88/reg.h b/drivers/net/wireless/realtek/rtw88/reg.h
+index e4d506cf9c331..95a39ae74cd3e 100644
+--- a/drivers/net/wireless/realtek/rtw88/reg.h
++++ b/drivers/net/wireless/realtek/rtw88/reg.h
+@@ -871,7 +871,17 @@
+ 
+ #define REG_USB_MOD	0xf008
+ #define REG_USB3_RXITV	0xf050
++#define REG_USB2_PHY_ADR	0xfe40
++#define REG_USB2_PHY_DAT	0xfe41
++#define REG_USB2_PHY_CMD	0xfe42
++#define BIT_USB2_PHY_CMD_TRG	0x81
+ #define REG_USB_HRPWM	0xfe58
++#define REG_USB3_PHY_ADR	0xff0c
++#define REG_USB3_PHY_DAT_L	0xff0d
++#define REG_USB3_PHY_DAT_H	0xff0e
++#define BIT_USB3_PHY_ADR_WR	BIT(7)
++#define BIT_USB3_PHY_ADR_RD	BIT(6)
++#define BIT_USB3_PHY_ADR_MASK	GENMASK(5, 0)
+ 
+ #define RF_MODE		0x00
+ #define RF_MODOPT	0x01
+diff --git a/drivers/net/wireless/realtek/rtw88/usb.c b/drivers/net/wireless/realtek/rtw88/usb.c
+index 1572b61cf8773..c4908db4ff0e8 100644
+--- a/drivers/net/wireless/realtek/rtw88/usb.c
++++ b/drivers/net/wireless/realtek/rtw88/usb.c
+@@ -1128,6 +1128,71 @@ static int rtw_usb_switch_mode(struct rtw_dev *rtwdev)
+ 		return rtw_usb_switch_mode_new(rtwdev);
+ }
+ 
++#define USB_REG_PAGE	0xf4
++#define USB_PHY_PAGE0	0x9b
++#define USB_PHY_PAGE1	0xbb
++
++static void rtw_usb_phy_write(struct rtw_dev *rtwdev, u8 addr, u16 data,
++			      enum usb_device_speed speed)
++{
++	if (speed == USB_SPEED_SUPER) {
++		rtw_write8(rtwdev, REG_USB3_PHY_DAT_L, data & 0xff);
++		rtw_write8(rtwdev, REG_USB3_PHY_DAT_H, data >> 8);
++		rtw_write8(rtwdev, REG_USB3_PHY_ADR, addr | BIT_USB3_PHY_ADR_WR);
++	} else if (speed == USB_SPEED_HIGH) {
++		rtw_write8(rtwdev, REG_USB2_PHY_DAT, data);
++		rtw_write8(rtwdev, REG_USB2_PHY_ADR, addr);
++		rtw_write8(rtwdev, REG_USB2_PHY_CMD, BIT_USB2_PHY_CMD_TRG);
++	}
++}
++
++static void rtw_usb_page_switch(struct rtw_dev *rtwdev,
++				enum usb_device_speed speed, u8 page)
++{
++	if (speed == USB_SPEED_SUPER)
++		return;
++
++	rtw_usb_phy_write(rtwdev, USB_REG_PAGE, page, speed);
++}
++
++static void rtw_usb_phy_cfg(struct rtw_dev *rtwdev,
++			    enum usb_device_speed speed)
++{
++	const struct rtw_intf_phy_para *para = NULL;
++	u16 offset;
++
++	if (!rtwdev->chip->intf_table)
++		return;
++
++	if (speed == USB_SPEED_SUPER)
++		para = rtwdev->chip->intf_table->usb3_para;
++	else if (speed == USB_SPEED_HIGH)
++		para = rtwdev->chip->intf_table->usb2_para;
++
++	if (!para)
++		return;
++
++	for ( ; para->offset != 0xffff; para++) {
++		if (!(para->cut_mask & BIT(rtwdev->hal.cut_version)))
++			continue;
++
++		offset = para->offset;
++
++		if (para->ip_sel == RTW_IP_SEL_MAC) {
++			rtw_write8(rtwdev, offset, para->value);
++		} else {
++			if (offset > 0x100)
++				rtw_usb_page_switch(rtwdev, speed, USB_PHY_PAGE1);
++			else
++				rtw_usb_page_switch(rtwdev, speed, USB_PHY_PAGE0);
++
++			offset &= 0xff;
++
++			rtw_usb_phy_write(rtwdev, offset, para->value, speed);
++		}
++	}
++}
++
+ int rtw_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
+ {
+ 	struct rtw_dev *rtwdev;
+@@ -1183,6 +1248,9 @@ int rtw_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
+ 		goto err_destroy_rxwq;
+ 	}
+ 
++	rtw_usb_phy_cfg(rtwdev, USB_SPEED_HIGH);
++	rtw_usb_phy_cfg(rtwdev, USB_SPEED_SUPER);
++
+ 	ret = rtw_usb_switch_mode(rtwdev);
+ 	if (ret) {
+ 		/* Not a fail, but we do need to skip rtw_register_hw. */

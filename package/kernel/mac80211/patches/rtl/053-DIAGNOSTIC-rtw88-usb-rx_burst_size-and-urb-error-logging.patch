@@ -81,3 +81,16 @@ Revert both hunks once the cause is identified.
  		burst_size = BIT_DMA_BURST_SIZE_1024;
  	else if (speed == USB_SPEED_HIGH)
  		burst_size = BIT_DMA_BURST_SIZE_512;
+@@ -813,6 +832,12 @@
+ 
+ 	u8p_replace_bits(&rxdma, burst_size, BIT_DMA_BURST_SIZE);
+ 
++	/* DIAGNOSTIC: report the USB link speed, the chip cut version (the
++	 * usb3_param_8822b PHY tuning is gated on RTW_INTF_PHY_CUT_D) and the
++	 * burst size actually programmed.
++	 */
++	rtw_err(rtwdev, "DIAG: usb speed=%d cut_version=%u rxdma=0x%02x\n",
++		speed, rtwdev->hal.cut_version, rxdma);
+ 	rtw_write8(rtwdev, REG_RXDMA_MODE, rxdma);
+ 	rtw_write16_set(rtwdev, REG_TXDMA_OFFSET_CHK, BIT_DROP_DATA_EN);
+ }
