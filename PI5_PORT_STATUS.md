@@ -175,7 +175,7 @@ symbols are "unreliable here". No action needed.
 
 | | |
 |---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,860 bytes, sha256 `c2a0dac994c8e81694602753a231946a4371826acc1d4eca99119e1e0d6d3281` (rebuilt at `14caf12`; carries the 054 USB PHY backport plus the 053 diagnostics; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,352 bytes, sha256 `c215d08a3be6b83d63f6d351052263489f33fb235cd4617712dd3d267c156c6d` (rebuilt at `80c8396`; PRODUCTION - diagnostics removed; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
 | `ekh-bcm2711` (Pi 4 regression) | `make -j12` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Last run at `a3b80a1`, log `~/logs/build-2711-v2.log`. |
 
 Both built from commit `619022f` of `pi5-wm6108-port`.
@@ -447,8 +447,8 @@ reason that has nothing to do with the GPS.
 
 ```
 C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
-sha256 c2a0dac994c8e81694602753a231946a4371826acc1d4eca99119e1e0d6d3281
-53,560,860 bytes
+sha256 c215d08a3be6b83d63f6d351052263489f33fb235cd4617712dd3d267c156c6d
+53,560,352 bytes
 ```
 
 Contains `a3b80a1`: `patches/ekh-bcm2712/0010` (openmanetd recognises
@@ -924,3 +924,85 @@ Expect `rxdma=0x0e`. If the scan is then clean, 054 is the fix and both the
 burst override and 053 as a whole can be reverted. If it disconnects again,
 054 alone is insufficient and the DMA-burst/MPS interaction at 1024 is the
 real fault.
+
+## USB 3 SuperSpeed: VALIDATED — production build `80c8396`
+
+**Patch `054` is the fix.** Validated on the physical Pi 5 + RTL8822BU
+(`0bda:b812`), blue USB 3 port, SuperSpeed, `cut_version=3` (cut D), default
+burst (`rxdma=0x0e`):
+
+- STA: active scan completed normally, no RX corruption, no reset, no
+  disconnect, no `-ENODEV`, no failed writes or H2C.
+- AP: `phy7-ap0` created, joined `br-lan`, forwarding, SSID up.
+- Real client: associated/authenticated/authorized, 66,905 B RX / 46,979 B TX,
+  **0 TX retries, 0 TX failed**, 351 Mbit/s VHT-MCS 4 80 MHz NSS 2.
+
+### Production patch set (all upstream, no local invention)
+
+| Patch | Upstream | Purpose |
+|---|---|---|
+| `052` | 6.12.96 | `REG_TXPAUSE` unaligned 32-bit RMW clobbering `REG_RD_CTRL` |
+| `054` | `5b1b9545262b` (v6.14) | **USB PHY configuration — the USB 3 fix** |
+| `055` | `44d1f624bbdd` | `rtw8822b_config_trx_mode()` WARNING |
+
+`053` was **removed in full**. It was diagnostic-only, and all of it had served
+its purpose: the `rx_burst_size` override (forcing 512 at SuperSpeed is wrong by
+construction and caused the RX corruption), the `DIAG` probe log (answered:
+cut D), and the RX urb error logging (would spam on every normal unplug/ifdown,
+since it logged `-ENODEV`/`-ESHUTDOWN`/`-ENOENT` too).
+
+Verified in the shipped module: `rx_burst_size` is **gone** (only
+`switch_usb_mode` remains).
+
+### `rtw8822b.c:824` "write RF mode table fail" — fixed by `055`
+
+`rtw8822b_set_antenna()` can be called from userspace while the chip is powered
+off; reading RF registers then returns an unexpected value and the readback
+poll exhausts. `/lib/netifd/wireless/mac80211.sh:1249` runs
+`iw phy $phy set antenna` during bring-up, which is exactly that trigger.
+`055` guards the call with `RTW_FLAG_POWERON`. Pure guard — it touches no USB,
+RX or PHY path, so it cannot affect the validated SuperSpeed behaviour. The
+warning was already non-fatal (AP and client traffic worked through it).
+
+### Radio-path bookkeeping — NO source change needed
+
+Traced the full chain:
+
+- At High Speed the driver **does not register a phy** — `rtw_usb_probe()`
+  skips `rtw_register_hw()` when the USB2->USB3 mode switch fires
+  ("Not a fail, but we do need to skip rtw_register_hw"). So no HS-path radio
+  can ever be created.
+- `/etc/hotplug.d/ieee80211/10-wifi-detect` runs `/sbin/wifi config` on phy add;
+  that runs `wifi-detect.uc`, which rewrites `/etc/board.json`'s `wlan` section
+  (pruning stale entries), then `mac80211.uc`, which creates a radio for any
+  phy not already matched.
+- `mac80211.uc radio_exists()` matches on `macaddr` FIRST, then `phy`, then a
+  `path` suffix. netifd's `find_phy()` supports `phy`, `path` and `macaddr`.
+
+So on a clean flash exactly ONE phy appears — at the SuperSpeed path — and
+exactly one radio is created with the correct path. **The stale `radio2` and the
+accumulated disabled radios were artifacts of this session's testing** (two
+different blue ports = two different USB paths, plus the pre-054 image's
+repeated re-enumeration), not a boot-time defect.
+
+Residual exposure, which is upstream OpenWrt behaviour and identical on Pi 4:
+nothing ever deletes stale `wifi-device` sections, so moving the dongle to a
+different physical USB port creates a new radio and leaves the old one behind.
+
+Narrowest hardening IF that is ever wanted — one UCI option, no source change,
+no script:
+
+```sh
+uci set wireless.<radio>.macaddr="$(cat /sys/class/ieee80211/<phy>/macaddress)"
+uci -q delete wireless.<radio>.path
+uci commit wireless
+```
+
+`radio_exists()` checks `macaddr` before `path`, and `find_phy()` falls back to
+it, so the radio then survives any re-enumeration or port change. A cleanup
+script was deliberately NOT added — that would be redesigning networking.
+
+### Pi 4 regression for `80c8396` — clean
+
+`cfg80211.ko`, `mac80211.ko`, `mm6108_sdio.ko`, `batman-adv.ko`,
+`brcmfmac.ko` all byte-identical; no non-metadata differences at all.
