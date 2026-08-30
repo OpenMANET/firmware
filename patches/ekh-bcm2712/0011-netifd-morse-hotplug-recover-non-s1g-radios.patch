@@ -1,0 +1,86 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenMANET Pi 5 port <noreply@openmanet.org>
+Date: Sat, 29 Aug 2026 04:00:00 -0500
+Subject: [PATCH] netifd-morse: let the ieee80211 hotplug handler recover
+ non-s1g radios
+
+Fixes a real production boot-order race on the Pi 5 with the RTL8822BU USB
+Wi-Fi AC adapter. Reproduced after `rm /etc/config/wireless; wifi config` and
+a full reboot, so it is not stale UCI or netifd state.
+
+Sequence:
+  1. RTL8822BU probes on USB 2.
+  2. rtw88 performs its deliberate USB2->USB3 mode switch (rtw_usb_probe()
+     skips rtw_register_hw() for the High Speed instance).
+  3. The SuperSpeed instance re-enumerates at usb4/4-1 and becomes phy3.
+  4. netifd has already tried radio1 by then, and mac80211.sh:1206 does
+       find_phy || { echo "Could not find PHY..."; wireless_set_retry 0; }
+     so netifd logs "setup failed, retry=0" and sets retry_setup_failed.
+  5. The ieee80211 hotplug add for phy3 arrives afterwards.
+  6. This handler was the only installed re-enable path, and it skipped every
+     non-s1g radio, so radio1 was never retried even though UCI held the
+     correct SuperSpeed path and a working phy now existed.
+
+Why the fix belongs here and not in netifd: the retry=0 is deliberate upstream
+behaviour. Retrying a missing phy on a timer accomplishes nothing, so
+mac80211.sh tells netifd not to waste retries and leaves recovery to hotplug.
+Confirmed in netifd's wireless.c: wireless_device_set_up() returns early while
+retry_setup_failed is set, and only wireless_device_set_down() (i.e. the down
+half of `wifi up`) clears it. Raising netifd's retry count would just be a
+blind timer, and stock OpenWrt has no generic late-phy handler at all -
+/etc/hotplug.d/ieee80211/10-wifi-detect only runs `wifi config`, which writes
+UCI and never brings a radio up.
+
+The removed restriction was explicitly not technical. Its own comment read
+"This code should work in the generic case, but currently it's in netifd-morse
+so let's only try to deal with Morse wifi chips."
+
+Safety - every existing safeguard is untouched and still applies:
+  * the radio is acted on only when its configured path matches this event's
+    DEVPATH, so one hotplug event can still only affect one radio;
+  * "pending" still prevents bouncing a radio that is mid-reconfiguration;
+  * "autostart" still means a radio brought down with `wifi down` is left
+    alone - verified in netifd: autostart is cleared only by
+    wireless_device_set_down(), never by a failed setup;
+  * the netifd-not-up early exit, the migration path and the single-match
+    `exit 0` are unchanged.
+
+s1g behaviour is unchanged: the gate only ever excluded non-s1g radios, so
+MM6108/HaLow takes exactly the same path as before.
+
+No loop risk: this handler fires on ieee80211 phy add/remove, and `wifi up`
+creates netdevs, not phys.
+
+Board-scoped to ekh-bcm2712 so the shipping Pi 3 / Pi 4 products are untouched.
+
+--- a/feeds/openmanet/morse-micro/netifd-morse/etc/hotplug.d/ieee80211/15-morse-wifi-re-enable
++++ b/feeds/openmanet/morse-micro/netifd-morse/etc/hotplug.d/ieee80211/15-morse-wifi-re-enable
+@@ -83,11 +83,23 @@
+ 		path="$uci_path"
+ 	fi
+ 
+-	if [ "$band" != "s1g" ]; then
+-		# This code should work in the generic case, but currently it's in netifd-morse
+-		# so let's only try to deal with Morse wifi chips.
+-		continue
+-	fi
++	# The s1g-only restriction that used to be here has been lifted for this board.
++	# Its own comment said "This code should work in the generic case, but currently
++	# it's in netifd-morse so let's only try to deal with Morse wifi chips" - i.e. the
++	# restriction was about which package owns the script, not a technical limit.
++	#
++	# It is needed generically on the Pi 5: the RTL8822BU probes on USB 2, rtw88
++	# deliberately switches it to USB 3, and the SuperSpeed phy therefore appears
++	# AFTER netifd has already tried and failed to set the radio up. mac80211.sh
++	# calls "wireless_set_retry 0" on find_phy failure (deliberately - retrying a
++	# missing phy on a timer is pointless), which sets retry_setup_failed, and
++	# wireless_device_set_up() then returns early forever. Only a hotplug-driven
++	# "wifi up" clears it, which is exactly what this handler does.
++	#
++	# Every safeguard below still applies unchanged: the radio is only touched when
++	# its configured path matches this event's DEVPATH, "pending" still prevents
++	# bouncing a radio mid-reconfiguration, and "autostart" still means a radio
++	# brought down with "wifi down" is left alone.
+ 
+ 	if [ -z "$path" ]; then
+ 		# The radio may be identified by MAC address rather than path in UCI which means that
