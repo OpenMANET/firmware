@@ -428,12 +428,9 @@ installed scripts call missing is a real packaging gap.
 
 ## Blocker
 
-**Active (2026-08-30, physical only):** GNSS validation is complete on the software
-side but no satellite fix has been obtained — the receiver reports zero satellites
-tracked. This requires an antenna placement / seating action, not a code change.
-See "WM1302 GNSS validation" at the end of this file.
-
-No software blockers. The §14 blocker (the 802.11s mesh SAE passphrase) was resolved
+None. GNSS validation is now COMPLETE including a real satellite fix — see
+"WM1302 GNSS — SATELLITE FIX OBTAINED" at the end of this file. Patches 0007 and
+0010 are both verified on Pi 5 hardware, and no software change was needed. The §14 blocker (the 802.11s mesh SAE passphrase) was resolved
 by the owner on 2026-08-30, and Phase 1 has been re-verified end to end on the
 current image —
 Pi4<->Pi5 HaLow mesh, BATMAN_V, 4/4 ping at 3.950 ms average, with the RTL8822BU
@@ -1505,3 +1502,99 @@ readable, and `gpsmon` is a curses UI unsuitable for the serial console.
 
 Physical only: the GNSS antenna needs clear sky visibility, and its seating in the
 WM1302 GNSS connector should be confirmed while doing so. No software action remains.
+
+---
+
+## WM1302 GNSS — SATELLITE FIX OBTAINED, GNSS validation COMPLETE (2026-08-30)
+
+Antenna relocated to a window (closed) via roughly seven 1-foot extension sections
+with multiple inline connectors (~7 ft of added RF path). A valid 3D fix was
+acquired and held.
+
+### Result
+
+| Item | Value |
+|---|---|
+| TPV mode | **3 (3D fix)** |
+| Fix type | 3D |
+| Latitude / longitude | **present** (values deliberately not recorded) |
+| Altitude | **available** — `altHAE`, `altMSL`, `alt` all present |
+| Time solution | present, with `leapseconds` |
+| Velocity / ECEF | `speed`, `climb`, `track`, `magtrack`, `velN/E/D`, `ecefx/y/z` present |
+| Satellites used / visible | **not reportable** — see limitation below |
+| Time to first fix | ~3.8 min into the capture; **~5-6 min after antenna placement** |
+| Fix held | **8 min 41 s continuous** (06:57:08.999Z -> 07:05:50.000Z), 1044 consecutive mode-3 reports |
+| Fix stability | monotonic: all 454 mode-1 reports precede all 1044 mode-3 reports; no reversion to mode 1 |
+
+**Independent corroboration of a genuine fix:** the receiver reports UTC
+`2026-08-30T06:57:08.999Z` — the correct real-world date — while the system clock
+still reads `Jun 24 2025`. Correct UTC date/time cannot be derived without decoding
+satellite navigation messages, so this is proof of real satellite reception rather
+than a spurious solution.
+
+### Accuracy and convergence — the RF chain degraded but did not prevent the fix
+
+| | First fix | Latest |
+|---|---|---|
+| `eph` (horizontal, m) | 74.48 | 77.52 |
+| `epv` (vertical, m) | 172.73 | 162.84 |
+| `sep` (spherical, m) | 160.93 | 155.42 |
+| `hdop` | 4.08 | **1.57** |
+| `pdop` | 8.18 | **2.29** |
+| `vdop` | 7.08 | **1.67** |
+
+DOP improved by roughly a factor of 3-4 as the receiver converged. The slow TTFF and
+the initially poor DOP/accuracy are consistent with the expected loss from ~7 ft of
+segmented coax with multiple inline connectors plus a closed window, but the chain
+was still good enough to acquire and hold a 3D fix.
+
+### openmanetd reception — VERIFIED
+
+`alfred -r 102` (`NodeDataType`, `mgmt/gateway.go:24`) returns two node records:
+
+- `f2:f2:b2:10:1d:4e` -> `RAPTOR-01`, `10.41.254.142` (Pi 4) — **no position field**
+- `f2:cf:67:3d:3f:76` -> `BCM2712-3f76`, `10.41.183.117` (Pi 5) — carries an
+  embedded 23-byte protobuf submessage holding two float64 values (latitude and
+  longitude). Payload bytes deliberately not reproduced here.
+
+So openmanetd has the GNSS fix and is publishing this node's position across the
+BATMAN mesh via alfred. That closes the chain:
+
+```
+/dev/ttyAMA0 -> u-blox -> gpsd -> openmanetd -> alfred -> mesh
+```
+
+### CORRECTION to the earlier "zero satellites" reading
+
+The previous section stated that the receiver was "tracking zero satellites" because
+no SKY report contained a `satellites` array. **That inference was wrong.** SKY still
+contains no `satellites` array now, while a 3D fix is active — gpsd's u-blox driver
+is simply not emitting per-satellite data (UBX-NAV-SAT) for this receiver
+configuration, so the array's absence carries no information about satellite
+tracking.
+
+The genuinely meaningful indicator was the DOP values: all-zero DOPs meant no
+solution, and non-zero DOPs now mean satellites are in the solution. The conclusion
+reached at the time (category A — environmental, not a software fault) was correct;
+the supporting reasoning was not. Satellite used/visible counts remain unavailable
+from this image, since `ubxtool` is not installed.
+
+### Final GNSS status
+
+| Item | State |
+|---|---|
+| Software path | **VERIFIED** |
+| Hardware receiver communication | **VERIFIED** |
+| Patch 0007 (chip/SPI-path-agnostic `gpsboard.init`) | **VERIFIED on Pi 5** |
+| Patch 0010 (openmanetd GNSS capability) | **VERIFIED on Pi 5** |
+| Satellite fix | **VERIFIED — 3D fix acquired and held** |
+| openmanetd reception + mesh publication | **VERIFIED** |
+
+No software changes were required at any point in GNSS validation.
+
+### Observation for later (not a blocker)
+
+The system clock is not disciplined from GNSS — it read `2025-06-24` while the
+receiver had correct `2026-08-30` UTC. Worth deciding later whether gpsd should be
+allowed to set system time on these units, since log timestamps across the mesh are
+currently wrong.

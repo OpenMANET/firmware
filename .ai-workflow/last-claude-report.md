@@ -152,3 +152,71 @@ console.
 Give the GNSS antenna clear sky visibility, and while you are at the unit confirm it
 is seated in the WM1302's **GNSS** connector rather than the LoRa one. I will resume
 monitoring over UART automatically on your confirmation.
+
+---
+
+# GNSS UPDATE — SATELLITE FIX OBTAINED, validation COMPLETE (2026-08-30)
+
+Antenna moved to a closed window via ~7 ft of segmented coax (roughly seven 1-foot
+sections with multiple inline connectors). **A valid 3D fix was acquired and held.**
+
+| Item | Value |
+|---|---|
+| TPV mode | **3 (3D fix)** |
+| Lat / lon | **present** (values not recorded) |
+| Altitude | **available** (`altHAE`, `altMSL`, `alt`) |
+| Satellites used / visible | **not reportable** — see correction below |
+| Time to first fix | ~5–6 min after antenna placement |
+| Fix held | **8 min 41 s continuous**, 1044 consecutive mode-3 reports |
+| Stability | monotonic — all 454 mode-1 reports precede all 1044 mode-3; no reversion |
+
+**Independent corroboration:** the receiver reported UTC `2026-08-30T06:57:08.999Z`
+— the correct real date — while the system clock still read `Jun 24 2025`. Correct
+UTC date cannot be produced without decoding satellite navigation messages.
+
+**The RF chain degraded but did not defeat the fix.** DOP improved 3–4× as the
+receiver converged: hdop 4.08 → **1.57**, pdop 8.18 → **2.29**, vdop 7.08 → **1.67**.
+Position accuracy stayed coarse (eph ~75 m, epv ~165 m), which is what you'd expect
+from that many inline connectors plus glass — but it acquired and held.
+
+**openmanetd reception verified.** `alfred -r 102` shows two node records: the Pi 4
+(`RAPTOR-01`, 10.41.254.142) with no position field, and this Pi 5
+(`BCM2712-3f76`, 10.41.183.117) carrying an embedded 23-byte protobuf submessage
+with two float64s — latitude and longitude. openmanetd has the fix and is publishing
+position across the BATMAN mesh:
+
+```
+/dev/ttyAMA0 → u-blox → gpsd → openmanetd → alfred → mesh
+```
+
+## Correction to my earlier reading
+
+I previously reported the receiver was "tracking zero satellites" because no SKY
+message contained a `satellites` array. **That inference was wrong.** SKY still has
+no `satellites` array now, with a 3D fix active — gpsd's u-blox driver simply does
+not emit per-satellite data (UBX-NAV-SAT) for this receiver configuration, so the
+array's absence says nothing about tracking.
+
+The meaningful indicator was the DOP values all being 0.00 (no solution), now
+non-zero. My conclusion at the time — category A, environmental rather than a
+software fault — was correct, but the reasoning I gave for it was not. Satellite
+counts remain unavailable from this image because `ubxtool` is not installed.
+
+## Final GNSS status
+
+| Item | State |
+|---|---|
+| Software path | **VERIFIED** |
+| Hardware receiver communication | **VERIFIED** |
+| Patch 0007 | **VERIFIED on Pi 5** |
+| Patch 0010 | **VERIFIED on Pi 5** |
+| Satellite fix | **VERIFIED — 3D acquired and held** |
+| openmanetd reception + mesh publication | **VERIFIED** |
+
+No software changes were required at any point.
+
+## One observation for later (not a blocker)
+
+The system clock is not disciplined from GNSS — it read `2025-06-24` while the
+receiver had correct `2026-08-30` UTC. Worth deciding whether gpsd should set system
+time on these units, since mesh-wide log timestamps are currently wrong.
