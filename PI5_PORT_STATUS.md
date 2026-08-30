@@ -1070,3 +1070,93 @@ The Pi 4 image still contains the original gate at line 86
 (`if [ "$band" != "s1g" ]; then`), confirming the patch is genuinely
 board-scoped. `cfg80211.ko`, `mac80211.ko`, `mm6108_sdio.ko`, `batman-adv.ko`
 and `brcmfmac.ko` are byte-identical, with no non-metadata differences at all.
+
+## UART console automation (2026-08-29)
+
+The Pi 5 is now operated directly over its USB-TTL UART console. Helper:
+
+```
+C:\AI-Projects\OpenMANET-Pi5\.ai-workflow\pi5-uart.ps1
+```
+
+Port **COM4**, identified by FTDI VID `0403`/PID `6001` (the other two COM ports
+are an LG display and a Sennheiser headset interface). 115200 8N1,
+`Handshake=None`, DTR and RTS explicitly de-asserted so the adapter cannot hold
+the Pi in reset. Uses .NET `System.IO.Ports` via PowerShell — real Python is not
+installed on this workstation (Store stub only), and this needs no install and
+no network. Transcripts append to `.ai-workflow\pi5-uart.log`, `-Label` adds a
+dated rotated copy. Secrets (PSK/key/passphrase/token/PEM) are redacted from
+durable logs and reports.
+
+Actions: `Probe`, `Sync`, `Run`, `Batch`, `Capture`, `WaitForShell`, `Reboot`.
+
+**Command completion is not prompt-based.** Each command is wrapped in unique
+BEGIN/END markers carrying `$?`. First attempt failed and the failure was
+instructive: the console line-wraps the *echo* of the command at 80 columns,
+which split `__OM_END_` from `1495851E__RC=` and broke marker counting. The
+markers are now assembled by the shell from two variables
+(`_A=__OM; _B=<id>; echo "${_A}_BEG_${_B}"`), so the literal marker text never
+appears in the command line and therefore never in its echo — each marker
+appears exactly once, in real output, at the start of its own short line.
+
+## Reserved-page/beacon failure — live hardware evidence (2026-08-29)
+
+Captured over UART, uptime ~3780 s, RTL8822BU AP on phy5, channel 36 VHT80:
+
+- **7 × `error beacon valid`** at 231, 1703, 2004, 2251, 2322, 2912, 3159 s.
+  Intervals 1472 / 301 / 247 / 71 / 590 / 247 s — **irregular and NOT
+  accelerating**.
+- 6 × `failed to download beacon` vs 7 × `error beacon valid`: the event at
+  2251 s produced only `error beacon valid` + `failed to download drv rsvd
+  page`, so different reserved-page entries fail on different occasions.
+- **The client rode through it.** Connected 2166 s continuously (associated at
+  boottime 1671 s), i.e. across 6 of the 7 events: authorized/authenticated/
+  associated yes, rx 396,916 B / 5,695 pkt, tx 249,761 B / 2,393 pkt,
+  tx retries 0, tx failed 2, rx drop misc 0, rx 702 Mbit/s VHT-MCS8 80 MHz
+  NSS2, DTIM 2.
+- No correlation with anything in `logread` at those timestamps.
+
+### Trigger identified in source
+
+`mac80211.c:429-432` — `BSS_CHANGED_BEACON` -> `rtw_fw_download_rsvd_page()`.
+In AP mode mac80211 raises that whenever beacon content changes (TIM, ERP/
+protection, HT/VHT operation elements as clients come and go), which is
+event-driven, not periodic — matching the irregular intervals exactly. It does
+not require deep LPS (`disable_lps_deep=N` is set, but the `LPS_DEEP_MODE_PG`
+rsvd-page path in `ps.c` is a separate, non-periodic trigger).
+
+### Which candidate cause this is — and is not
+
+This is **not** the TX page-pool exhaustion path (Mehmet Fide's acked-but-
+unapplied bmc/DTIM series). That signature is a monotonic drain to zero free
+pages ending in a terminal state where "nothing can join until the device is
+rebooted". Ours is sporadic over 52 minutes, self-recovering, with a client
+holding a 2166 s session straight through it. Live evidence, not inference.
+
+It IS consistent with the async-URB race that lwfinger PR #455 describes.
+
+### Decision: do NOT apply PR #455 (unchanged, now with hardware backing)
+
+- Never submitted upstream despite the maintainer asking twice; still open.
+- Its own author flagged that blocking 5 s under `rtwdev->mutex` stalls the
+  whole driver, suggested 500 ms, and the committed patch still uses 5000 ms.
+- One reporter still lost the AP with it applied, plus a new `-110`/-ETIMEDOUT
+  failure mode from the new wait.
+- It needs hand-porting: it calls `rtw_tx_fill_tx_desc(..., struct rtw_tx_desc *)`
+  but our 6.12.61 takes `struct sk_buff *`, and this kernel builds
+  `-Werror=incompatible-pointer-types`, so it is a hard build failure as-is.
+- **And the symptom is demonstrably non-fatal on our hardware.**
+
+REVISIT IF: beaconing actually stops, clients cannot associate, or the event
+rate starts accelerating rather than staying sporadic. Also revisit if the fix
+is accepted upstream, in which case take the upstream version.
+
+NOTE: `85bf3041a0ea` ("Set `pkt_info.ls` for the reserved page", v6.13) is
+already in our tree via OpenWrt `patches/rtl/034` — verified, no action needed.
+
+### Unrelated observation
+
+`logread` is currently full of `alfred: can't get interface: No such device`
+and `openmanetd: batctl mj/gwj: exit status 1`, because `bat0` does not exist —
+the HaLow mesh is un-provisioned after the earlier `rm /etc/config/wireless`.
+Expected; it is restored as part of the final Phase 1 regression.
