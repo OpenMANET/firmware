@@ -71,9 +71,84 @@ written off as explained.
 
 ## Next hardware-validation areas (unchanged)
 
-1. **WM1302 HAT GPS/GNSS** — `patches/ekh-bcm2712/0007` and `0010` are still
-   unexercised on hardware.
+1. **WM1302 HAT GPS/GNSS** — done on 2026-08-30; see the GNSS section below.
 2. **NVMe** — deferred.
 3. `build-ekh-bcm2712` is still not wired into `build-release.yml`.
 
 Authoritative state: `PI5_PORT_STATUS.md`.
+
+---
+
+# WM1302 GNSS VALIDATION — SOFTWARE VERIFIED, fix pending antenna (2026-08-30)
+
+Both target patches are now exercised on Pi 5 hardware. No code changes were needed
+or made.
+
+## Software chain verified: `/dev/ttyAMA0` → u-blox → gpsd → openmanetd
+
+GPSD reports `"driver":"u-blox"`, `9600 8N1`, `"native":1`, activated on
+`/dev/ttyAMA0` — and `native:1` means gpsd successfully *switched* the receiver into
+binary mode, which the receiver must accept, so this is two-way communication rather
+than passive listening. A 400-message capture over ~200 s yielded 199 TPV and 198 SKY
+at a steady ~1 Hz with no dropouts. openmanetd logs `INF gps Connected to GPSD`.
+
+The GPS UART (`ttyAMA0`, 204,64) is distinct from our debug console (`ttyAMA10`,
+204,74), so there is no contention between GNSS and the UART operator workflow.
+
+## Patch 0007 — VALIDATED
+
+The boot log shows `configuring GPS GPIOs (RST=25, WAKE=12)` and
+`pulsing GPS reset on GPIO25`. Reaching those lines *is* the proof:
+`check_morse_device` calls `exit 0` unless the morse radio path suffix-matches
+`spi_master/spi0/spi0.0`, and the live path is
+`platform/axi/1000120000.pcie/1f00050000.spi/spi_master/spi0/spi0.0` — which the old
+BCM2711-literal comparison would have rejected, killing the script before any GPIO
+work.
+
+`gpioinfo` shows GPIO25/GPIO12 held as outputs with `consumer="gps-wm1302"` by two
+live `gpioset` daemons (pids 2017, 2020), which fully explains the `?` readback. Left
+alone, as instructed.
+
+**One correction worth recording:** the patch comment justifies avoiding
+`-c gpiochip0` by asserting RP1 "is not gpiochip0" on BCM2712. On this kernel that is
+not true — `gpiodetect` shows `gpiochip0 [pinctrl-rp1] (54 lines)` with brcmstb at
+`gpiochip10..13`. The `--by-name` fix is still correct (name resolution is
+enumeration-order independent), but the comment's specific predicted failure did not
+occur and should not be cited as demonstrated.
+
+## Patch 0010 — VALIDATED
+
+`/tmp/sysinfo/board_name` = `bcm2712,mm6108-spi`, and that string is present in the
+shipped binary. `supported_features.go:39` puts `BCM2712_MM6108_SPI` in the
+`GNSSsupoorted()` true-case; without the patch it would hit `default: return false`.
+
+The functional proof: `openmanet.go:86` creates the GPS service — and its `gps`
+logger — only inside `if cfg.GetEnableGNSS() && board.GNSSsupoorted()`. The live
+`INF gps Connected to GPSD` line cannot appear unless that returned true.
+
+## No satellite fix — environmental, not a software regression
+
+All 199 TPV reports are `mode:1`, and **none of the 198 SKY reports contained a
+`satellites` array**, with all DOPs at 0.00. So the receiver is tracking *zero*
+satellites rather than failing to resolve a fix from weak ones. That is category A
+(receiver and software working, no signal), not category B.
+
+Zero satellites in view is a stronger symptom than a marginal indoor attempt, where a
+few low-C/N0 satellites would normally still be listed. I cannot narrow it further
+from software: `ubxtool` is not in the image, so UBX-MON-HW antenna status
+(OK/OPEN/SHORT) is unreadable, and `gpsmon` is a curses UI unsuitable for a serial
+console.
+
+| Item | State |
+|---|---|
+| Software path | **VERIFIED** |
+| Hardware receiver communication | **VERIFIED** |
+| Patch 0007 | **VERIFIED on Pi 5** |
+| Patch 0010 | **VERIFIED on Pi 5** |
+| Satellite fix | **PENDING** — antenna |
+
+## Owner action required
+
+Give the GNSS antenna clear sky visibility, and while you are at the unit confirm it
+is seated in the WM1302's **GNSS** connector rather than the LoRa one. I will resume
+monitoring over UART automatically on your confirmation.

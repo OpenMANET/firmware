@@ -428,8 +428,14 @@ installed scripts call missing is a real packaging gap.
 
 ## Blocker
 
-None. The §14 blocker (the 802.11s mesh SAE passphrase) was resolved by the owner on
-2026-08-30, and Phase 1 has been re-verified end to end on the current image —
+**Active (2026-08-30, physical only):** GNSS validation is complete on the software
+side but no satellite fix has been obtained — the receiver reports zero satellites
+tracked. This requires an antenna placement / seating action, not a code change.
+See "WM1302 GNSS validation" at the end of this file.
+
+No software blockers. The §14 blocker (the 802.11s mesh SAE passphrase) was resolved
+by the owner on 2026-08-30, and Phase 1 has been re-verified end to end on the
+current image —
 Pi4<->Pi5 HaLow mesh, BATMAN_V, 4/4 ping at 3.950 ms average, with the RTL8822BU
 still at SuperSpeed simultaneously. See "§14 Phase 1 regression — COMPLETE,
 HARDWARE VERIFIED" at the end of this file.
@@ -1393,3 +1399,109 @@ do not treat it as explained.
 ### Blocker
 
 None. Phase 1 is re-verified end to end on the current image.
+
+---
+
+## WM1302 GNSS validation (2026-08-30) — SOFTWARE PATH VERIFIED, fix pending antenna
+
+Performed over UART on the current production image with the restored mesh topology
+live. Patches `0007` and `0010` are both now exercised on Pi 5 hardware.
+
+### Software chain — VERIFIED end to end
+
+```
+/dev/ttyAMA0 -> u-blox receiver -> gpsd -> openmanetd
+```
+
+- `/dev/ttyAMA0` present (204,64) and distinct from the `ttyAMA10` debug console
+  (204,74) — no contention between the GPS UART and our console.
+- `gpsd` running (pid 3216), `uci` device `/dev/ttyAMA0`, port 2947.
+- GPSD `DEVICES` reports: `"driver":"u-blox"`, `"bps":9600`, `"parity":"N"`,
+  `"stopbits":1`, `"native":1`, activated. Matches the previously established
+  9600 8N1 u-blox result. `native:1` means gpsd successfully switched the receiver
+  into binary mode, which requires the receiver to accept commands — so this is
+  two-way communication, not passive listening.
+- Live data flows at ~1 Hz: a 400-message capture over ~200 s contained 199 TPV and
+  198 SKY reports with no dropouts.
+- `openmanetd`: `INF gps Connected to GPSD address=localhost:2947`.
+
+### Patch 0007 (chip/SPI-path-agnostic `gpsboard.init`) — VALIDATED
+
+Boot log (`init-gps-device`):
+
+```
+GPS device: /dev/ttyAMA0
+configuring GPS GPIOs (RST=25, WAKE=12)
+pulsing GPS reset on GPIO25
+GPIO25 (RST)     = ?
+GPIO12 (WAKEUP) = ?
+```
+
+The proof is that `configuring GPS GPIOs` was reached at all. `check_morse_device`
+suffix-matches `spi_master/spi0/spi0.0` and calls `exit 0` when it does not match;
+the live path is
+`platform/axi/1000120000.pcie/1f00050000.spi/spi_master/spi0/spi0.0`, which the old
+BCM2711-literal comparison would have rejected, aborting the script before any GPIO
+work. It did not abort.
+
+`gpioinfo` confirms both lines are held as outputs with `consumer="gps-wm1302"` by
+two live daemonised `gpioset` processes (pids 2017, 2020). The `?` readback is fully
+explained by that ownership. **No source change made or warranted.**
+
+**Accuracy note on the patch rationale.** The in-script comment argues that
+`-c gpiochip0` is unsafe because "on BCM2712 the header pins live on RP1, which
+probes from PCIe with .base = -1 and is not gpiochip0". On this kernel that specific
+prediction does not hold — `gpiodetect` shows `gpiochip0 [pinctrl-rp1] (54 lines)`
+with the brcmstb controllers at `gpiochip10..13`, so RP1 *is* gpiochip0 here and the
+old assumption would have coincidentally worked. The `--by-name` approach remains the
+correct fix regardless, because name resolution does not depend on probe/enumeration
+order, but the comment's stated failure mode was not observed and should not be cited
+as demonstrated.
+
+### Patch 0010 (openmanetd GNSS capability) — VALIDATED
+
+- `/tmp/sysinfo/board_name` = `bcm2712,mm6108-spi`; model `RPI RPI5-MM6108 (SPI)`.
+- That exact string is present in the shipped `/usr/bin/openmanetd` binary
+  (`board_type.go:10`, `BCM2712_MM6108_SPI`).
+- `supported_features.go:39` lists `BCM2712_MM6108_SPI` in the `GNSSsupoorted()`
+  true-case (upstream's spelling). Without patch 0010 the board would fall through
+  to `default: return false`.
+- **Functional proof:** `openmanet.go:86` gates GPS module creation on
+  `cfg.GetEnableGNSS() && board.GNSSsupoorted()`, and the `gps` logger is created
+  only inside that branch. The live `INF gps Connected to GPSD` line therefore
+  cannot be emitted unless `GNSSsupoorted()` returned true on this board.
+- openmanetd starts normally; zero "unsupported / unknown board" messages in the log.
+
+### Satellite fix — NOT obtained; environmental, not software
+
+199 of 199 TPV reports are `"mode":1` (no fix). More significantly, **none of the 198
+SKY reports contained a `satellites` array at all**, and all DOP values are 0.00 —
+the receiver is tracking zero satellites, not merely failing to resolve a fix.
+
+This is category **A** (receiver and software functioning, no satellite signal), not
+category B. The UART link, protocol negotiation, framing, and the full
+gpsd -> openmanetd path are all demonstrably healthy; there is simply no GNSS signal
+reaching the receiver.
+
+Zero satellites *in view* over 200 s is a stronger symptom than a marginal indoor
+fix attempt, where a few low-C/N0 satellites would normally still be listed. The
+likely physical causes are the antenna not being seated in the WM1302's GNSS
+connector (the HAT has separate LoRa and GNSS connectors), or the antenna having no
+sky visibility at all. This cannot be distinguished from software:
+`ubxtool` is not in the image, so UBX-MON-HW antenna status (OK/OPEN/SHORT) is not
+readable, and `gpsmon` is a curses UI unsuitable for the serial console.
+
+### Status summary
+
+| Item | State |
+|---|---|
+| Software path (`ttyAMA0` -> u-blox -> gpsd -> openmanetd) | **VERIFIED** |
+| Hardware receiver communication (two-way, 9600 8N1, binary mode) | **VERIFIED** |
+| Patch 0007 chip/SPI-path independence | **VERIFIED on Pi 5** |
+| Patch 0010 GNSS capability | **VERIFIED on Pi 5** |
+| Satellite fix | **PENDING** — antenna placement / connection |
+
+### Blocker
+
+Physical only: the GNSS antenna needs clear sky visibility, and its seating in the
+WM1302 GNSS connector should be confirmed while doing so. No software action remains.
