@@ -428,9 +428,14 @@ installed scripts call missing is a real packaging gap.
 
 ## Blocker
 
-None. Phase 1 is complete and hardware verified. The only prerequisite for the next
-phase is flashing the current image (it carries the openmanetd BCM2712 board-capability
-support that GPS validation depends on) - see Next Engineering Action.
+**Active (2026-08-30):** the §14 Phase 1 re-regression is blocked on one credential —
+the 802.11s mesh SAE passphrase, which must match the Pi 4 and was lost when
+`/etc/config/wireless` was regenerated during USB testing. See
+"§14 Phase 1 regression over UART" at the end of this file for the full analysis,
+including why running the LuCI EKH wizard on this box would damage working config.
+
+Phase 1 itself remains hardware verified from the 2026-08-28 run; this is a
+re-verification of the current image, not a regression of the earlier result.
 
 ## Next Engineering Action (exact)
 
@@ -1160,3 +1165,134 @@ already in our tree via OpenWrt `patches/rtl/034` — verified, no action needed
 and `openmanetd: batctl mj/gwj: exit status 1`, because `bat0` does not exist —
 the HaLow mesh is un-provisioned after the earlier `rm /etc/config/wireless`.
 Expected; it is restored as part of the final Phase 1 regression.
+
+---
+
+## §14 Phase 1 regression over UART (2026-08-29/30) — PARTIAL, blocked on credential
+
+Performed entirely over the 3-pin JST-SH UART console (`.ai-workflow/pi5-uart.ps1`,
+COM4). Device: `BCM2712-3f76`, OpenMANET 24.10 1.8.0, kernel 6.6.138.
+
+### MM6108 / HaLow radio path — REGRESSION-CLEAN
+
+Restored via the image's own shipped one-shot default script, NOT by hand-written
+config: `sh /rom/etc/uci-defaults/99_morse_radio_defaults` (the copy in `/etc` had
+already been consumed and deleted on first boot, which is why `radio2` had lost
+country/channel/BCF after the earlier `/etc/config/wireless` regeneration).
+
+Restored values: `channel=42`, `country=US`, `bcf=bcf_fgh100mhaamd.bin`,
+`enable_ext_xtal_init=1`, `enable_ps=0`, `enable_twt=0`.
+
+Bring-up verified end to end:
+
+- `morse_spi spi0.0` probes; `morse_of_probe` reads GPIO config from DT; GPIO reset OK
+- firmware `morse/mm6108.bin`, 468304 B, crc32 `0xbe7b5c8f`
+- **US BCF** `morse/bcf_fgh100mhaamd.bin`, 1251 B, crc32 `0x941b2a82`
+- driver modparams confirm `country: US`, `enable_ext_xtal_init: Y`
+- `hostapd_s1g`: `morse_set_interface: s1g_chan_center=42, ht_center_chan=159`
+- `wlh0` created, `AP-ENABLED`, forwarding on `br-lan`
+
+So RP1 -> SPI -> DW AXI DMA -> MM6108 -> firmware -> BCF -> `wlh0` is intact on the
+current image. Driver version `0-rel_mm6108_2_0_1_2026_Jun_11`.
+
+Regdb corroborates the validated tuple — `/usr/share/morse-regdb/channels.csv`:
+`US,,True,2,42,2,69,923.0,100.0,100.0,USA,36.0,False,0.0,0.0,0.0,159`.
+The `map_5g_chan=159` column is why `iw` displays `wlh0` as "channel 157 (5785 MHz)":
+that is the 5 GHz shadow mapping, not a misconfiguration.
+
+### RTL8822BU / USB3 — REGRESSION-CLEAN
+
+- `/sys/bus/usb/devices/4-1/speed` = **5000** — patch 054 holds across reboots
+- AP `phy5-ap0` up, ch36 VHT80; client connected 3350 s at 292.5 Mbit/s
+  VHT-MCS7 NSS1, **0 tx retries**, 2 tx failed, -27 dBm
+- only the known benign `error beacon valid` / `failed to download drv rsvd page`
+  pair since the dmesg clear — matches the non-fatal pattern recorded in `8bd27bb`;
+  client session unaffected
+- boot-order recovery (patch 0011) confirmed present on-device: the hotplug handler
+  carries the comment "The s1g-only restriction that used to be here has been lifted
+  for this board."
+- batman-adv `2025.4-openwrt-2` loaded; `batctl`, `alfred`, and `batadv.sh` /
+  `batadv_hardif.sh` / `batadv_vlan.sh` all present
+
+### Provisioning path — investigated, and the naive plan is WRONG
+
+`openmanet.setup.v1.SetupService/ApplySetup` (openmanetd, ports 8081/8087) is NOT
+usable for a restore, on two independent grounds:
+
+1. it is the **first-boot** wizard — `admin_password` is a required field
+   (`min_len 8`) and it flips `auth.enable`, i.e. it changes credentials;
+2. `/etc/openmanetd/config.yml` has no `setup:` key, so `setup.enabled` defaults
+   false and the call returns `CodeUnavailable`.
+
+There is no server-side backend for the LuCI EKH wizard either — `/usr/libexec/rpcd/`
+holds only `switch_wifi_driver`; the wizard is pure client-side JS writing UCI through
+LuCI's generic rpc.
+
+**Critical finding: running the LuCI EKH wizard on this box would damage working
+configuration and weaken the firewall.** `resetUci()` / `resetUciNetworkTopology()`
+(`tools/morse/wizard.js:412-542`) run unconditionally on wizard *entry*, before any
+user choice, and:
+
+- delete **every** `config rule` in `firewall` (wizard.js:494-496) and replace them
+  with the wizard's own 13
+- set the **wan** zone `input/output/forward=ACCEPT` (wizard.js:364-366) — the stock
+  default is REJECT — and strip `masq`/`mtu_fix` from all zones
+- set `enabled=0` on every existing forwarding, including stock `lan -> wan`
+- set `ignore=1` on every `dhcp` pool (wizard.js:512)
+- delete every bridge device section including `br-lan`, and unset `.device` on every
+  interface, leaving `lan` deviceless (wizard.js:517-521, 540)
+- strip `wireless.radio1` to a 14-option whitelist and `default_radio1` to
+  `network device key encryption mode ssid mesh_id`, dropping everything else
+- set `disabled=1` on **every** wifi-iface (wizard.js:463)
+- silently convert an `encryption='none'` AP to `psk2` (the encryption widget offers
+  only psk2/sae-mixed/sae, and `ui.Select` ignores an out-of-list cfgvalue), then
+  refuse to advance without a passphrase
+- delete outright any wifi-iface not named `default_<device>`
+  (`removeExtraWifiIfaces`, wizard.js:390-398)
+
+Ground truth for all of the above: `openmanetd-1.3.10/testfixtures/setup-wizard/`
+contains a captured real before/after UCI dump of this exact wizard run on a
+Pi 4 + MM6108-over-SPI.
+
+**The transformation IS fully reproducible as a plain `uci` shell sequence** — nothing
+on the Mesh Point path depends on a live scan, iwinfo probe, or DOM state. Only three
+values are random, and they are free choices, not derived:
+
+| value | source | space |
+|---|---|---|
+| `network.ahwlan.ipaddr` | `uci.js:549` | `10.41.254.0`-`10.41.254.253` (3rd octet hard-coded 254) |
+| `dhcp.ahwlan.start` | `uci.js:136` | `255 + 16k`, k in [0,14] |
+| `br-ahwlan` `macaddr` | `uci.js:22-25` | `F2:` + 5 random octets |
+
+Two source defects noted: `uci.js:526` writes `mesh11sd.mesh_params.nolearn`, but the
+shipped config and `morse.sh` use `mesh_nolearn` — the wizard's option is dead. And
+`device_mode_meshpoint` is forced to `bridge` in the OpenMANET fork
+(`meshwizard.js:485-486`, `readonly = true`), so "Mesh Point" always yields the bridge
+topology regardless of the none/extender selection.
+
+### Blocker
+
+**The 802.11s mesh SAE passphrase is not recoverable and must match the Pi 4.**
+`/etc/config/wireless` was regenerated during USB testing, so the passphrase used in
+the validated Phase 1 run is gone. Guessing or inventing it is forbidden by the
+operator rules, and a mismatch means the mesh simply will not associate.
+
+Secondary: the intended topology merges `lan` and `ahwlan` into a single
+`10.41.0.0/16` network (`br-ahwlan` carries `eth0` + `bat0`, `lan` goes deviceless).
+The current box has `lan` at `10.41.254.1/16` AND would get `ahwlan` at
+`10.41.254.x/16` — a subnet collision — so a mesh-only partial replay is not clean
+either. Restoring the validated topology necessarily moves the RTL8822BU AP onto
+`ahwlan`, which disconnects the client currently associated at `10.41.0.225`.
+
+### Exact next action
+
+Owner supplies the mesh SAE passphrase (or authorises a specific one to be set on
+BOTH nodes), and confirms the Pi 4 is powered on and provisioned as Mesh Gate with
+`mesh_id=openmanet`, channel 42, US. Then apply the wizard's Mesh Point transformation
+as a scripted `uci` sequence over UART with the three random values pinned, reload,
+and complete the regression: `iw dev wlh0 station dump`, `batctl if/n/o`, `bat0` state,
+`openmanetd` status, and an end-to-end ping to the Pi 4 across `bat0`.
+
+Full config backup already on the device in `/root/cfgbak/` (`network`, `wireless`,
+`firewall`, `dhcp`, `mesh11sd`, plus `.pre-wizard` copies). The UART console is
+independent of networking, so no network change can lock us out.

@@ -1,69 +1,87 @@
-# Last Claude Report — Raspberry Pi 5 Port, Session 4
+# Last Claude Report — Raspberry Pi 5 Port, Session 5
 
-Date: 2026-08-28
+Date: 2026-08-30
 Branch: `pi5-wm6108-port` · Baseline: `365b276`
+Mode: UART operator — all software-side work done over the 3-pin JST-SH console
+(`.ai-workflow/pi5-uart.ps1`, COM4). No owner keystrokes required for any of it.
 
-# PHASE 1 COMPLETE — HARDWARE VERIFIED
+## Status: §14 Phase 1 re-regression is PARTIAL — blocked on one credential
 
-The Raspberry Pi 5 OpenMANET port is **HARDWARE VERIFIED, not merely BUILD VERIFIED.**
-The full physical path is demonstrated on real hardware:
+Phase 1 remains **HARDWARE VERIFIED** from the 2026-08-28 run. This session
+re-verified the current image on the live unit. Both subsystems check out
+individually; the two-node mesh test could not be completed.
 
-```
-Pi 5 -> RP1 -> SPI -> MM6108 -> 923 MHz Wi-Fi HaLow -> 802.11s -> BATMAN-adv -> Pi 4
-```
+### Verified clean this session
 
-## What was verified on hardware
+**MM6108 / HaLow** — restored using the image's own shipped one-shot default script
+(`/rom/etc/uci-defaults/99_morse_radio_defaults`), not hand-written config. Full
+path confirmed: `morse_spi spi0.0` probe → GPIO reset → firmware `mm6108.bin`
+(crc32 `0xbe7b5c8f`) → **US BCF `bcf_fgh100mhaamd.bin`** (crc32 `0x941b2a82`) →
+`wlh0` up and `AP-ENABLED`. Driver reports `country: US`,
+`enable_ext_xtal_init: Y`. `hostapd_s1g` logs `s1g_chan_center=42,
+ht_center_chan=159`.
 
-**Platform:** Pi 5 boots OpenMANET; the dedicated 3-pin JST-SH UART carries
-bootloader, kernel AND interactive console at 115200; RP1 initialises; SPI/DW-SSI and
-DW AXI DMA initialise.
+So RP1 → SPI → DW AXI DMA → MM6108 → firmware → BCF is intact on this image.
 
-**Radio:** MM6108 probes on `spi0.0`; GPIO reset works; firmware loads; US BCF
-`bcf_fgh100mhaamd.bin` loads; country = US; `wlh0` comes up.
+**RTL8822BU / USB3** — still **SuperSpeed (5000)**, so patch 054 holds across
+reboots. AP up on ch36 VHT80; client connected 3350 s at 292.5 Mbit/s VHT-MCS7
+NSS1, **0 tx retries**, −27 dBm. Only the known benign reserved-page/beacon pair
+appeared — the non-fatal pattern recorded in `8bd27bb`, session unaffected.
+Boot-order recovery (patch 0011) confirmed present on-device.
 
-**Mesh:** provisioning creates `wlh0 -> batmesh0 -> bat0 -> br-ahwlan`;
-algorithm `BATMAN_V`; Pi 5 as Mesh Point, Pi 4 as Mesh Gate; Mesh ID `openmanet`,
-2 MHz, channel 42 / 923 MHz. Station dump: plink ESTAB, authorized/authenticated/
-associated yes, ~-46 dBm, ~7.52 Mbps expected throughput. BATMAN neighbour
-`a8:dd:9f:4d:c0:e3` via `wlh0` (~7.2); originator table shows the Pi 4.
-End-to-end ping Pi 5 -> Pi 4: **4/4, 0% loss, 3.620/3.892/4.105 ms**.
+### Why it stopped
 
-Two pre-hardware calls were vindicated: `CONFIG_DW_AXI_DMAC=y` (without it the SPI
-controller would have failed to probe silently) and the `ttyAMA10` console routing.
+**The 802.11s mesh SAE passphrase is unrecoverable and must match the Pi 4.**
+`/etc/config/wireless` was regenerated during USB testing, so the passphrase from
+the validated Phase 1 run is gone. Inventing one is forbidden by the operator
+rules, and a mismatch means the mesh will not associate at all.
 
-## Recorded for the next unit
+### The important finding — do NOT just run the wizard
 
-- **The missing `bat0` before provisioning was expected factory/unprovisioned
-  behaviour, not a defect.** Nothing in the image — Pi 4 or Pi 5 — creates a batman
-  device at boot.
-- **Quick Config alone was NOT sufficient** on the Pi 4 to rebuild the BATMAN
-  topology; running the **full 802.11s wizard** corrected it. Quick Config does not
-  reach `wizard.js:1214 save()` -> `uci.js:444-518`, the only path that creates
-  `bat0`/`batmesh0`/`batmesh1` and appends `bat0` to `br-ahwlan`.
+I traced the LuCI EKH wizard to source and corroborated it against a captured real
+before/after UCI dump in `openmanetd-1.3.10/testfixtures/setup-wizard/` (a genuine
+Pi 4 + MM6108-over-SPI wizard run). `resetUci()` / `resetUciNetworkTopology()`
+(`tools/morse/wizard.js:412-542`) run unconditionally on wizard **entry**, before
+any user choice, and would:
 
-## Next hardware-validation areas
+- delete every `firewall` rule and replace them with the wizard's own 13
+- set the **wan** zone to `input/output/forward=ACCEPT` (stock default is REJECT)
+- disable every forwarding, including stock `lan → wan`
+- set `ignore=1` on every DHCP pool
+- delete every bridge section including `br-lan`, leaving `lan` deviceless
+- force `disabled=1` on every wifi-iface and strip `default_radio1` to 7 options
+- silently convert the open RTL8822BU AP to `psk2`, then block progress until a
+  passphrase is supplied
 
-1. **Flash the current image first — required before GPS.** The unit that passed
-   Phase 1 predates commit `a3b80a1`, so openmanetd still reports GNSS unsupported on
-   it and the GPS would look broken for an unrelated reason.
+That is a real security and configuration regression on this box, so the wizard
+should not be clicked through blindly here.
 
-   ```
-   C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
-   sha256 1cfccb4c92020021e8eda9ca481cebecdd55897d4cca47297c47d82605a8d837
-   53,401,122 bytes
-   ```
+**The good news:** the transformation is fully reproducible as a plain `uci` shell
+sequence — nothing on the Mesh Point path depends on a live scan, iwinfo probe, or
+DOM state. Only three values are random (`ahwlan` IP, `dhcp.ahwlan.start`,
+`br-ahwlan` MAC) and they are free choices. So this can be applied over UART with
+those pinned, skipping the destructive global resets.
 
-   Re-provision with the full wizard afterwards and re-confirm the Phase 1 path.
-2. **WM1302 HAT GPS/GNSS** — `patches/ekh-bcm2712/0007` (chip- and SPI-path-agnostic
-   `gpsboard.init`) and `0010` (openmanetd GNSS capability) are both unexercised on
-   hardware.
-3. **External USB Wi-Fi AC dongle** for local EUD/ATAK access. HaLow stays the MANET
-   transport; do not redesign around Pi 5 onboard Wi-Fi.
-4. **NVMe — deferred** until the core radio / GPS / USB-Wi-Fi stack is validated.
+Also worth knowing: `device_mode_meshpoint` is forced to `bridge` in the OpenMANET
+fork (`meshwizard.js:485-486`, `readonly = true`), so "Mesh Point" always yields the
+bridge topology regardless of the none/extender selection.
 
-## Housekeeping
+### Owner action required (one thing)
 
-`build-ekh-bcm2712` is still not wired into `build-release.yml` — unblocked since the
-build went green, but CI wiring cannot be validated without pushing the branch.
+Supply the mesh SAE passphrase — or authorise a specific one to be set on **both**
+nodes — and confirm the Pi 4 is powered on and provisioned as Mesh Gate with
+`mesh_id=openmanet`, channel 42, US.
+
+Be aware: restoring the validated topology necessarily moves the RTL8822BU AP onto
+`ahwlan`, which will disconnect whatever is currently associated at `10.41.0.225`.
+The intended design merges `lan` and `ahwlan` into one `10.41.0.0/16` network
+(`br-ahwlan` carries `eth0` + `bat0`), so a mesh-only partial replay would collide
+on the subnet.
+
+### Safety state
+
+Full config backup is on the device at `/root/cfgbak/` (`network`, `wireless`,
+`firewall`, `dhcp`, `mesh11sd`, plus `.pre-wizard` copies). The UART console is
+independent of networking, so no network change can lock us out.
 
 Authoritative state: `PI5_PORT_STATUS.md`.
