@@ -175,7 +175,7 @@ symbols are "unreliable here". No action needed.
 
 | | |
 |---|---|
-| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,352 bytes, sha256 `c215d08a3be6b83d63f6d351052263489f33fb235cd4617712dd3d267c156c6d` (rebuilt at `80c8396`; PRODUCTION - diagnostics removed; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
+| `ekh-bcm2712` (Pi 5) | `make -j20` exit 0, no errors. `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`, 53,560,864 bytes, sha256 `2d0764b55c05cb899d51b0d037032bf3e89aefc9ced59c17a8bcff8b11567c1f` (rebuilt at `6ea1380`; PRODUCTION; all earlier images superseded). Log `~/logs/build-2712-v4.log`. |
 | `ekh-bcm2711` (Pi 4 regression) | `make -j12` exit 0, no errors. All three shipping images produced: `rpi4-mm6108-spi`, `rpi4-mm6108-sdio`, `rpi4-mm8108-usb`. Last run at `a3b80a1`, log `~/logs/build-2711-v2.log`. |
 
 Both built from commit `619022f` of `pi5-wm6108-port`.
@@ -447,8 +447,8 @@ reason that has nothing to do with the GPS.
 
 ```
 C:\AI-Projects\OpenMANET-Pi5\images\openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz
-sha256 c215d08a3be6b83d63f6d351052263489f33fb235cd4617712dd3d267c156c6d
-53,560,352 bytes
+sha256 2d0764b55c05cb899d51b0d037032bf3e89aefc9ced59c17a8bcff8b11567c1f
+53,560,864 bytes
 ```
 
 Contains `a3b80a1`: `patches/ekh-bcm2712/0010` (openmanetd recognises
@@ -1006,3 +1006,67 @@ script was deliberately NOT added — that would be redesigning networking.
 
 `cfg80211.ko`, `mac80211.ko`, `mm6108_sdio.ko`, `batman-adv.ko`,
 `brcmfmac.ko` all byte-identical; no non-metadata differences at all.
+
+## USB Wi-Fi boot-order race — FIXED (commit `6ea1380`)
+
+Symptom, reproduced after `rm /etc/config/wireless; wifi config` and a FULL
+reboot (so not stale UCI/netifd state): `radio1` (RTL8822BU) never comes up on
+boot —
+
+```
+netifd: radio1: Phy not found / Could not find PHY for device 'radio1'
+netifd: Wireless device 'radio1' set retry=0 ... setup failed, retry=0
+morse-wifi-re-enable: Ignoring Wi-Fi phy3 hotplug add as network.wireless
+                      status does not have a path for /devices/.../usb4/4-1/...
+```
+
+### Mechanism (source-proven)
+
+1. The RTL8822BU probes on USB 2. `rtw_usb_probe()` **skips
+   `rtw_register_hw()`** when the USB2->USB3 switch fires, so no phy exists yet.
+2. It re-enumerates at SuperSpeed (`usb4/4-1`) and becomes `phy3`.
+3. netifd has already tried `radio1` and failed. `/lib/netifd/wireless/
+   mac80211.sh:1206` does `find_phy || { ...; wireless_set_retry 0; }`.
+4. That sets `retry_setup_failed`, and netifd's `wireless_device_set_up()`
+   returns early **forever** while it is set (`wireless.c:539`). Only
+   `wireless_device_set_down()` clears it (`wireless.c:718`) — i.e. the *down*
+   half of `wifi up`.
+5. The `ieee80211` hotplug add for `phy3` then arrives, but the only installed
+   re-enable handler skipped every non-s1g radio, so `radio1` was never retried.
+
+### Why the fix is in hotplug, not netifd
+
+`retry=0` is deliberate upstream behaviour — retrying a *missing* phy on a timer
+achieves nothing, so mac80211.sh tells netifd not to spend retries and leaves
+recovery to hotplug. Raising netifd's retry count would fight that design and
+amount to a blind timer. Stock OpenWrt has **no** generic late-phy handler:
+`/etc/hotplug.d/ieee80211/10-wifi-detect` only runs `wifi config`, which writes
+UCI and never brings a radio up.
+
+### The fix
+
+`patches/ekh-bcm2712/0011` lifts the s1g-only gate in
+`15-morse-wifi-re-enable`. That restriction was never technical — its own
+comment read *"This code should work in the generic case, but currently it's in
+netifd-morse so let's only try to deal with Morse wifi chips."*
+
+Safeguards verified intact (in source AND in the shipped image):
+
+- the radio is acted on only when its configured path matches the event's
+  `DEVPATH`, so one hotplug event still affects at most one radio;
+- `pending` still prevents bouncing a radio mid-reconfiguration;
+- `autostart` still protects a radio brought down with `wifi down` — netifd
+  clears `autostart` **only** in `wireless_device_set_down()`, never on a failed
+  setup, so it survives the failure as 1 but a manual `wifi down` sets it to 0;
+- netifd-not-up early exit, migration path and single-match `exit 0` unchanged.
+
+s1g/HaLow behaviour is unchanged — the gate only ever *excluded* non-s1g. No
+loop risk: the handler fires on phy add/remove, and `wifi up` creates netdevs,
+not phys.
+
+### Pi 4 regression for `6ea1380` — clean, with board-scoping proven
+
+The Pi 4 image still contains the original gate at line 86
+(`if [ "$band" != "s1g" ]; then`), confirming the patch is genuinely
+board-scoped. `cfg80211.ko`, `mac80211.ko`, `mm6108_sdio.ko`, `batman-adv.ko`
+and `brcmfmac.ko` are byte-identical, with no non-metadata differences at all.
