@@ -220,3 +220,75 @@ No software changes were required at any point.
 The system clock is not disciplined from GNSS — it read `2025-06-24` while the
 receiver had correct `2026-08-30` UTC. Worth deciding whether gpsd should set system
 time on these units, since mesh-wide log timestamps are currently wrong.
+
+---
+
+# RELEASE WORKFLOW — `build-ekh-bcm2712` wired in (2026-08-30)
+
+A port addition, not a CI redesign. The reusable `build-firmware.yml` already
+expressed everything needed, so no build logic was duplicated and **no existing job
+was modified**.
+
+## Files changed
+
+- `.github/workflows/build-release.yml` — 14 insertions, 2 deletions, nothing else
+- `.ai-workflow/validate-workflows.py` — new local validator
+
+`build-pr-bcm2712.yml` already existed and needed no change.
+
+## The change
+
+One new job mirroring `build-ekh-bcm2711`, placed right after it, with
+`cpu_arch: aarch64_cortex-a76` (read from the real build tree, not assumed — Pi 4 is
+`a72`). Then `build-ekh-bcm2712` added to the `needs:` of `publish-packages` and
+`release`. No action version bumps, no formatting churn, no condition changes, no
+reordering.
+
+**Pi 4 is regression-clean by construction:** the only shared lines touched are two
+`needs:` arrays, which gain an element and lose nothing.
+
+## Expected artifacts
+
+| Artifact | Pi 4 | Pi 5 |
+|---|---|---|
+| firmware | `firmware-ekh-bcm2711` | `firmware-ekh-bcm2712` |
+| build log | `build-log-ekh-bcm2711` | `build-log-ekh-bcm2712` |
+| target packages | `packages-targets-bcm27xx--bcm2711` | `packages-targets-bcm27xx--bcm2712` |
+| arch packages | `packages-arch-aarch64_cortex-a72` | `packages-arch-aarch64_cortex-a76` |
+| release checksums | `sha256sums-ekh-bcm2711.txt` | `sha256sums-ekh-bcm2712.txt` |
+| images | `openmanet-1.8.0-rpi4-{mm6108-sdio,mm6108-spi,mm8108-usb}-…img.gz` | `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz` |
+
+The `release` job flattens all `*.img.gz` into one directory, so I checked basenames
+against real build output: `rpi4` vs `rpi5` prefixes, no possible overwrite.
+
+## Local validation — all passing
+
+`.ai-workflow/validate-workflows.py` checks what GitHub otherwise only reports once a
+run starts: all 18 workflows parse; all 12 `needs:` resolve; every input passed to
+`build-firmware.yml` is declared; all 22 artifact names unique; both gates wait on
+6/6 build jobs.
+
+## What is NOT verified until GitHub runs it
+
+- that `ekh-bcm2712` builds on a `ubuntu-24.04` runner inside the 240-min timeout
+  (it has only ever been built in our WSL tree)
+- that `bin/packages/aarch64_cortex-a76/` is non-empty in CI — the arch upload uses
+  `if-no-files-found: warn`, so an empty directory would pass silently
+- runner disk headroom with a sixth full board build
+- real artifact upload/download and release-file organisation
+
+## Why I stopped instead of pushing
+
+`build-release.yml` triggers only on a tag push or `workflow_dispatch` — **a plain
+branch push does not run it**, so pushing would not validate this change.
+
+And `origin` is the **official upstream** `OpenMANET/firmware.git`; the branch does
+not exist there and there are 30 unpushed commits, so a push would publish the entire
+in-progress port branch to the public OpenMANET org repo. That push would trigger
+only `kernel.yml` (read-only) — no release, tag, or container publish — but it is
+still a first-time public publication, and it would not achieve the CI validation
+that motivated it. `gh` is also not installed here, so runs can't be monitored.
+
+Exercising `build-release.yml` needs either a tag (creates a release) or
+`workflow_dispatch` (all six boards, ~hours, creates a **draft release** named after
+the ref). Both are consequential and need your explicit approval.

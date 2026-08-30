@@ -1598,3 +1598,113 @@ The system clock is not disciplined from GNSS — it read `2025-06-24` while the
 receiver had correct `2026-08-30` UTC. Worth deciding later whether gpsd should be
 allowed to set system time on these units, since log timestamps across the mesh are
 currently wrong.
+
+---
+
+## Release workflow — `build-ekh-bcm2712` wired in (2026-08-30)
+
+Treated as a port addition, not a CI redesign. The reusable
+`.github/workflows/build-firmware.yml` already expressed everything needed, so no
+build logic was duplicated and no existing job was modified.
+
+### Files changed
+
+- `.github/workflows/build-release.yml` — one new job plus two `needs` entries
+  (14 insertions, 2 deletions; no other edits)
+- `.ai-workflow/validate-workflows.py` — new local validator (see below)
+
+`.github/workflows/build-pr-bcm2712.yml` already existed from earlier work and
+needed no change.
+
+### Exact change
+
+New job, mirroring `build-ekh-bcm2711` exactly and placed directly after it:
+
+```yaml
+  build-ekh-bcm2712:
+    name: Build ekh-bcm2712
+    uses: ./.github/workflows/build-firmware.yml
+    with:
+      board: ekh-bcm2712
+      target: bcm27xx
+      subtarget: bcm2712
+      description: "Raspberry Pi 5, CM5"
+      releasepackages: true
+      cpu_arch: aarch64_cortex-a76
+    secrets: inherit
+```
+
+`build-ekh-bcm2712` was then added to the `needs:` list of both `publish-packages`
+and `release`. Nothing else in the file changed — no action version bumps, no
+formatting churn, no condition changes, no reordering of existing jobs.
+
+`cpu_arch: aarch64_cortex-a76` was taken from the real build tree
+(`bin/packages/aarch64_cortex-a76`), not assumed. Pi 4 is `aarch64_cortex-a72`.
+
+### Pi 4 regression-clean by construction
+
+No existing job, input, artifact name, path, or condition was touched. The only
+edits to shared lines are two `needs:` arrays, which gain an element and lose
+nothing — `publish-packages` and `release` now additionally wait for the Pi 5 build.
+
+### Naming collisions — checked, none
+
+| Artifact | Pi 4 | Pi 5 |
+|---|---|---|
+| firmware | `firmware-ekh-bcm2711` | `firmware-ekh-bcm2712` |
+| build log | `build-log-ekh-bcm2711` | `build-log-ekh-bcm2712` |
+| target packages | `packages-targets-bcm27xx--bcm2711` | `packages-targets-bcm27xx--bcm2712` |
+| arch packages | `packages-arch-aarch64_cortex-a72` | `packages-arch-aarch64_cortex-a76` |
+| release checksums | `sha256sums-ekh-bcm2711.txt` | `sha256sums-ekh-bcm2712.txt` |
+
+The `release` job flattens all `*.img.gz` into one directory, so image basenames
+were checked against real build output rather than inferred:
+
+- Pi 4: `openmanet-1.8.0-rpi4-mm6108-sdio-…`, `…-rpi4-mm6108-spi-…`,
+  `…-rpi4-mm8108-usb-…`
+- Pi 5: `openmanet-1.8.0-rpi5-mm6108-spi-squashfs-sysupgrade.img.gz`
+
+Distinct `rpi4`/`rpi5` prefixes, so the Pi 5 output is unambiguously identifiable
+and cannot overwrite a Pi 4 image.
+
+### Local validation
+
+`.ai-workflow/validate-workflows.py` (new) checks what GitHub otherwise only reports
+after a run starts. All checks pass:
+
+- all 18 workflow files parse as YAML
+- all 12 `needs:` references resolve to real jobs
+- every input passed to `build-firmware.yml` is declared by it
+- all 22 artifact names are unique across the six build jobs
+- both `publish-packages` and `release` wait on all 6/6 build jobs
+
+Reproducibility is unchanged: the job calls
+`./scripts/openmanet_setup.sh -i -b ekh-bcm2712` via the reusable workflow, and
+`boards/ekh-bcm2712/` plus the `patches/ekh-bcm2712/` 0001-0011 stack are present.
+
+### NOT YET VERIFIED — requires GitHub execution
+
+`build-release.yml` triggers only on a tag push or `workflow_dispatch`. **A plain
+branch push does not run it**, so pushing the branch would not validate this change.
+
+What remains unproven until GitHub actually executes the workflow:
+- that the `ekh-bcm2712` build completes on a `ubuntu-24.04` runner within the
+  240-minute timeout (it has only ever been built in our WSL tree)
+- that `bin/packages/aarch64_cortex-a76/` is non-empty in CI (the arch upload uses
+  `if-no-files-found: warn`, so an empty dir would pass silently)
+- runner disk headroom with a sixth full board build added
+- actual artifact upload/download and release-file organisation
+
+### Blocker — owner decision, not technical
+
+`origin` is the **official upstream** `https://github.com/OpenMANET/firmware.git`,
+the branch does **not** exist there, and there are 30 unpushed commits. Pushing would
+publish the whole in-progress port branch to the public OpenMANET organisation repo.
+A branch push would trigger only `kernel.yml` (read-only; `package/kernel/**` and
+`target/linux/**` changed) — no release, tag, container publish, or `build-release`
+run. `gh` is also not installed, so runs cannot be monitored from here.
+
+Exercising `build-release.yml` requires either a tag (creates a release) or
+`workflow_dispatch` (runs all six boards, ~hours, and creates a **draft GitHub
+release** named after the ref). Both are consequential external actions and need
+explicit owner approval.
