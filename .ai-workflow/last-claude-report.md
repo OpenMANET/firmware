@@ -292,3 +292,72 @@ that motivated it. `gh` is also not installed here, so runs can't be monitored.
 Exercising `build-release.yml` needs either a tag (creates a release) or
 `workflow_dispatch` (all six boards, ~hours, creates a **draft release** named after
 the ref). Both are consequential and need your explicit approval.
+
+---
+
+# FORK + PR CI VALIDATION (2026-08-30) — PR #70 open, CI blocked on approval
+
+Published via the standard fork workflow; nothing was pushed into the upstream org.
+
+## Setup
+
+`gh` is not installed — auth came from Git Credential Manager. Account:
+**`patriotscraft`**, token scopes `gist, repo, workflow` (the `workflow` scope is
+required here because the branch edits `.github/workflows/`). No fork existed, so
+**`patriotscraft/firmware`** was created.
+
+| Remote | URL |
+|---|---|
+| `upstream` | `OpenMANET/firmware` (official) |
+| `origin` | `patriotscraft/firmware` (fork, writable) |
+
+I renamed `origin`→`upstream` and repointed `origin` at the fork rather than just
+adding a remote: leaving `origin` on the official repo means a bare `git push` would
+target upstream, which is exactly what we're avoiding. No force-push, no upstream
+history rewritten.
+
+## PR
+
+**https://github.com/OpenMANET/firmware/pull/70** —
+`patriotscraft:pi5-wm6108-port` → `OpenMANET:24.10`, 31 commits, 50 files,
++7870/−6.
+
+Opened as a **draft** on purpose: it flags the work as under active validation and
+structurally prevents accidental merge. The description states what is
+hardware-verified and keeps deferred items explicit — NVMe deferred, the RTL8822BU
+reserved-page/beacon warning classified non-fatal but *unfixed*, GNSS system-clock
+sync a future item, and `build-release.yml` not yet run in Actions.
+
+## CI triggered — then stopped for approval
+
+All eight expected workflows queued against head `fe86ef1`:
+
+| Workflow | Run | Status |
+|---|---|---|
+| **Build Firmware (PR) on bcm2712** | 33299430867 | `action_required` |
+| Build Firmware (PR) on bcm2711 | 33299430820 | `action_required` |
+| Build Firmware (PR) on bcm2710 | 33299430843 | `action_required` |
+| Build Firmware (PR) on halowlink2 | 33299430824 | `action_required` |
+| Build Firmware (PR) on ht-hd01-v2 | 33299430850 | `action_required` |
+| Build Firmware (PR) on Venice | 33299430884 | `action_required` |
+| Test Formalities | 33299430964 | `action_required` |
+| Build Kernel | 33299431092 | `action_required` |
+
+**`build-pr-bcm2712.yml` does trigger** — path filters match. The Pi 4 `bcm2711` PR
+build triggers too (this PR touches `package/kernel/**` and
+`target/linux/bcm27xx/**`), which gives a free Pi 4 regression check in CI.
+
+## Blocker — needs someone with admin rights
+
+`patriotscraft` is read-only on `OpenMANET/firmware`:
+`{"admin":false,"maintain":false,"push":false,"triage":false,"pull":true}`.
+
+I attempted the approval and it was refused:
+`POST /actions/runs/33299430867/approve` → **403 "Must have admin rights to
+Repository."**
+
+A maintainer must press **"Approve and run workflows"** on PR #70. Until then none of
+the CI questions can be answered — Pi 5 build success, runner timeout, artifact
+upload, whether `bin/packages/aarch64_cortex-a76/` is actually populated (the upload
+uses `if-no-files-found: warn`, so empty would pass silently), and Pi 4 CI
+regression.

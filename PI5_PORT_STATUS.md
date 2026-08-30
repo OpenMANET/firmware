@@ -1708,3 +1708,88 @@ Exercising `build-release.yml` requires either a tag (creates a release) or
 `workflow_dispatch` (runs all six boards, ~hours, and creates a **draft GitHub
 release** named after the ref). Both are consequential external actions and need
 explicit owner approval.
+
+---
+
+## Fork + PR CI validation (2026-08-30) — PR #70 open, CI BLOCKED on approval
+
+The Pi 5 port branch was published via the standard fork workflow, not pushed into the
+upstream organisation.
+
+### GitHub identity and remotes
+
+- `gh` CLI is not installed; auth came from Git Credential Manager.
+- Authenticated GitHub account: **`patriotscraft`**. Token scopes `gist, repo,
+  workflow` — the `workflow` scope matters, since this branch edits
+  `.github/workflows/`.
+- No fork existed, so one was created: **`patriotscraft/firmware`** (fork of
+  `OpenMANET/firmware`, default branch `24.10`).
+
+Remotes were rearranged to the canonical fork layout:
+
+| Remote | URL |
+|---|---|
+| `upstream` | `https://github.com/OpenMANET/firmware.git` (official) |
+| `origin` | `https://github.com/patriotscraft/firmware.git` (fork, writable) |
+
+`origin` was **renamed** to `upstream` and `origin` repointed at the fork, rather
+than simply adding a remote. Rationale: leaving `origin` on the official repo means a
+bare `git push` would target upstream — precisely the thing to avoid. This layout
+makes the default push target the fork. Nothing was force-pushed and no upstream
+history was rewritten.
+
+### PR
+
+**<https://github.com/OpenMANET/firmware/pull/70>** — `bcm2712: Raspberry Pi 5 +
+WM1302 / Wio-WM6108 (MM6108 over SPI) port`
+
+- `patriotscraft:pi5-wm6108-port` -> `OpenMANET:24.10`
+- Opened as a **draft**, deliberately: it marks the work as under active validation
+  and structurally prevents an accidental merge.
+- 31 commits, 50 changed files, +7870 / -6.
+- The description states the hardware-verified items and keeps deferred items
+  explicit (NVMe deferred; the RTL8822BU reserved-page/beacon warning classified
+  non-fatal but unfixed; GNSS system-clock sync a future item;
+  `build-release.yml` not yet run in Actions).
+
+### CI triggered correctly, then stopped for approval
+
+All eight expected workflows queued against head `fe86ef1`, including the one that
+matters:
+
+| Workflow | Run | Status |
+|---|---|---|
+| Build Firmware (PR) on bcm2712 | 33299430867 | `action_required` |
+| Build Firmware (PR) on bcm2711 | 33299430820 | `action_required` |
+| Build Firmware (PR) on bcm2710 | 33299430843 | `action_required` |
+| Build Firmware (PR) on halowlink2 | 33299430824 | `action_required` |
+| Build Firmware (PR) on ht-hd01-v2 | 33299430850 | `action_required` |
+| Build Firmware (PR) on Venice | 33299430884 | `action_required` |
+| Test Formalities | 33299430964 | `action_required` |
+| Build Kernel | 33299431092 | `action_required` |
+
+So **`build-pr-bcm2712.yml` does trigger** — the path filters match, and the Pi 4
+`bcm2711` PR build triggers too (this PR touches `package/kernel/**` and
+`target/linux/bcm27xx/**`), giving a free Pi 4 regression check in CI.
+
+`action_required` is GitHub holding fork-PR workflows pending maintainer approval.
+
+### Blocker — external authorisation, cannot be resolved from here
+
+`patriotscraft` has **read-only** access to `OpenMANET/firmware`:
+`{"admin":false,"maintain":false,"push":false,"triage":false,"pull":true}`.
+
+Approving the runs was attempted and refused:
+`POST /actions/runs/33299430867/approve` -> **403 "Must have admin rights to
+Repository."**
+
+Someone with admin/maintain rights on `OpenMANET/firmware` must press
+**"Approve and run workflows"** on PR #70.
+
+### Still unverified until those runs execute
+
+Everything CI-side: that the Pi 5 build completes on a `ubuntu-24.04` runner inside
+the 240-minute timeout, that `firmware-ekh-bcm2712` and the package artifacts upload,
+that `bin/packages/aarch64_cortex-a76/` is actually populated (the upload uses
+`if-no-files-found: warn`, so an empty directory would pass silently), runner disk
+headroom, and that Pi 4 CI behaviour is unchanged.
