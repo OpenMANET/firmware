@@ -2,86 +2,78 @@
 
 Date: 2026-08-30
 Branch: `pi5-wm6108-port` · Baseline: `365b276`
-Mode: UART operator — all software-side work done over the 3-pin JST-SH console
-(`.ai-workflow/pi5-uart.ps1`, COM4). No owner keystrokes required for any of it.
+Mode: UART operator — every software action below was performed over the 3-pin
+JST-SH console (`.ai-workflow/pi5-uart.ps1`, COM4). No owner keystrokes were needed
+apart from supplying the mesh passphrase.
 
-## Status: §14 Phase 1 re-regression is PARTIAL — blocked on one credential
+# §14 PHASE 1 REGRESSION — COMPLETE, HARDWARE VERIFIED
 
-Phase 1 remains **HARDWARE VERIFIED** from the 2026-08-28 run. This session
-re-verified the current image on the live unit. Both subsystems check out
-individually; the two-node mesh test could not be completed.
+The Pi4↔Pi5 HaLow mesh is restored and re-verified on the current image, with the
+RTL8822BU running healthy at SuperSpeed at the same time.
 
-### Verified clean this session
+## Result vs. the original Phase 1 run
 
-**MM6108 / HaLow** — restored using the image's own shipped one-shot default script
-(`/rom/etc/uci-defaults/99_morse_radio_defaults`), not hand-written config. Full
-path confirmed: `morse_spi spi0.0` probe → GPIO reset → firmware `mm6108.bin`
-(crc32 `0xbe7b5c8f`) → **US BCF `bcf_fgh100mhaamd.bin`** (crc32 `0x941b2a82`) →
-`wlh0` up and `AP-ENABLED`. Driver reports `country: US`,
-`enable_ext_xtal_init: Y`. `hostapd_s1g` logs `s1g_chan_center=42,
-ht_center_chan=159`.
+| Check | Phase 1 (2026-08-28) | §14 re-verification |
+|---|---|---|
+| `wlh0` type | mesh point | **mesh point** |
+| Peer | `a8:dd:9f:4d:c0:e3` | **`a8:dd:9f:4d:c0:e3`** (same unit) |
+| mesh plink | ESTAB | **ESTAB** |
+| authorized / authenticated / associated | yes | **yes / yes / yes** |
+| signal | ~ −46 dBm | **−35 to −38 dBm** |
+| expected throughput | ~7.52 Mbps | **7.52 Mbps** |
+| `batctl if` | wlh0 active | **wlh0: active** |
+| routing algo | BATMAN_V | **BATMAN_V** |
+| BATMAN neighbour / originator | via `wlh0`, ~7.2 | **via `wlh0`, 7.2 / 7.1** |
+| end-to-end ping | 4/4, 0%, 3.620/3.892/4.105 ms | **4/4, 0%, 3.854/3.950/4.075 ms** |
 
-So RP1 → SPI → DW AXI DMA → MM6108 → firmware → BCF is intact on this image.
+Beyond the original run: `batctl gwl` shows the Pi 4 as a live **gateway**
+(10.0/2.0 MBit) and the station dump reports `mesh connected to gate: yes`. After a
+reboot the mesh re-formed **unattended** at boottime 24.6 s, with BATMAN resolving
+the peer by name as `RAPTOR-01_wlh0`; post-reboot ping **10/10, 0% loss,
+3.886/4.828/10.316 ms**. That is a stronger result than Phase 1, which was
+provisioned live rather than cold-booted. The chronic
+`alfred: can't get interface` spam is gone now that `bat0` exists.
 
-**RTL8822BU / USB3** — still **SuperSpeed (5000)**, so patch 054 holds across
-reboots. AP up on ch36 VHT80; client connected 3350 s at 292.5 Mbit/s VHT-MCS7
-NSS1, **0 tx retries**, −27 dBm. Only the known benign reserved-page/beacon pair
-appeared — the non-fatal pattern recorded in `8bd27bb`, session unaffected.
-Boot-order recovery (patch 0011) confirmed present on-device.
+All preservation requirements held: country **US**, channel **42 / 923.0 MHz**,
+**`bcf_fgh100mhaamd.bin`**, `mesh_id=openmanet`, 802.11s, **BATMAN_V**.
 
-### Why it stopped
+## How it was provisioned
 
-**The 802.11s mesh SAE passphrase is unrecoverable and must match the Pi 4.**
-`/etc/config/wireless` was regenerated during USB testing, so the passphrase from
-the validated Phase 1 run is gone. Inventing one is forbidden by the operator
-rules, and a mismatch means the mesh will not associate at all.
+I applied the LuCI EKH wizard's **Mesh Point / bridge** transformation as a scripted
+`uci` sequence, from the source analysis in `PI5_PORT_STATUS.md`, and deliberately
+did **not** replay the wizard's destructive global resets. So the firewall rule set,
+the wan zone's REJECT posture and the stock forwardings all survived — running the
+real wizard would have wiped them.
 
-### The important finding — do NOT just run the wizard
+`br-lan` was replaced by `br-ahwlan{eth0, bat0}`, `lan` left deviceless (no
+`10.41.0.0/16` collision), and the RTL8822BU AP moved onto `ahwlan`. Full pre-change
+backup remains at `/root/cfgbak/`.
 
-I traced the LuCI EKH wizard to source and corroborated it against a captured real
-before/after UCI dump in `openmanetd-1.3.10/testfixtures/setup-wizard/` (a genuine
-Pi 4 + MM6108-over-SPI wizard run). `resetUci()` / `resetUciNetworkTopology()`
-(`tools/morse/wizard.js:412-542`) run unconditionally on wizard **entry**, before
-any user choice, and would:
+One deliberate deviation: the wizard writes `mesh11sd.mesh_params.nolearn`, which is
+a dead option — the shipped config and `morse.sh` both use `mesh_nolearn`. I wrote
+the working name.
 
-- delete every `firewall` rule and replace them with the wizard's own 13
-- set the **wan** zone to `input/output/forward=ACCEPT` (stock default is REJECT)
-- disable every forwarding, including stock `lan → wan`
-- set `ignore=1` on every DHCP pool
-- delete every bridge section including `br-lan`, leaving `lan` deviceless
-- force `disabled=1` on every wifi-iface and strip `default_radio1` to 7 options
-- silently convert the open RTL8822BU AP to `psk2`, then block progress until a
-  passphrase is supplied
+## Two behaviours worth knowing
 
-That is a real security and configuration regression on this box, so the wizard
-should not be clicked through blindly here.
+**openmanetd rewrites the `ahwlan` address.** My pinned `10.41.254.15` was replaced
+with `10.41.183.117` and written back into UCI by openmanetd's
+`AddressReservationWorker`. That is the product's own mesh-wide address reservation
+working as designed — the wizard's random IP is only a seed, not a final value.
 
-**The good news:** the transformation is fully reproducible as a plain `uci` shell
-sequence — nothing on the Mesh Point path depends on a live scan, iwinfo probe, or
-DOM state. Only three values are random (`ahwlan` IP, `dhcp.ahwlan.start`,
-`br-ahwlan` MAC) and they are free choices. So this can be applied over UART with
-those pinned, skipping the destructive global resets.
+**One unexplained reboot.** The unit rebooted once mid-verification with no recorded
+cause: `/sys/fs/pstore` empty, no under-voltage, OOM, panic, hung task or RCU stall,
+and 7.9 GB of 8 GB RAM free. It happened while a 254-process ping sweep (used to find
+the Pi 4's address) overlapped a netifd reconfiguration, and the cmdline carries
+`reboot=w` with procd's watchdog active — so a watchdog reset triggered by my own
+diagnostic sweep is the most plausible explanation. **I could not prove it.** It did
+not recur and the box returned with the mesh fully working, but it should not be
+written off as explained.
 
-Also worth knowing: `device_mode_meshpoint` is forced to `bridge` in the OpenMANET
-fork (`meshwizard.js:485-486`, `readonly = true`), so "Mesh Point" always yields the
-bridge topology regardless of the none/extender selection.
+## Next hardware-validation areas (unchanged)
 
-### Owner action required (one thing)
-
-Supply the mesh SAE passphrase — or authorise a specific one to be set on **both**
-nodes — and confirm the Pi 4 is powered on and provisioned as Mesh Gate with
-`mesh_id=openmanet`, channel 42, US.
-
-Be aware: restoring the validated topology necessarily moves the RTL8822BU AP onto
-`ahwlan`, which will disconnect whatever is currently associated at `10.41.0.225`.
-The intended design merges `lan` and `ahwlan` into one `10.41.0.0/16` network
-(`br-ahwlan` carries `eth0` + `bat0`), so a mesh-only partial replay would collide
-on the subnet.
-
-### Safety state
-
-Full config backup is on the device at `/root/cfgbak/` (`network`, `wireless`,
-`firewall`, `dhcp`, `mesh11sd`, plus `.pre-wizard` copies). The UART console is
-independent of networking, so no network change can lock us out.
+1. **WM1302 HAT GPS/GNSS** — `patches/ekh-bcm2712/0007` and `0010` are still
+   unexercised on hardware.
+2. **NVMe** — deferred.
+3. `build-ekh-bcm2712` is still not wired into `build-release.yml`.
 
 Authoritative state: `PI5_PORT_STATUS.md`.

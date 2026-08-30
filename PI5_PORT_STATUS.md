@@ -428,14 +428,14 @@ installed scripts call missing is a real packaging gap.
 
 ## Blocker
 
-**Active (2026-08-30):** the §14 Phase 1 re-regression is blocked on one credential —
-the 802.11s mesh SAE passphrase, which must match the Pi 4 and was lost when
-`/etc/config/wireless` was regenerated during USB testing. See
-"§14 Phase 1 regression over UART" at the end of this file for the full analysis,
-including why running the LuCI EKH wizard on this box would damage working config.
+None. The §14 blocker (the 802.11s mesh SAE passphrase) was resolved by the owner on
+2026-08-30, and Phase 1 has been re-verified end to end on the current image —
+Pi4<->Pi5 HaLow mesh, BATMAN_V, 4/4 ping at 3.950 ms average, with the RTL8822BU
+still at SuperSpeed simultaneously. See "§14 Phase 1 regression — COMPLETE,
+HARDWARE VERIFIED" at the end of this file.
 
-Phase 1 itself remains hardware verified from the 2026-08-28 run; this is a
-re-verification of the current image, not a regression of the earlier result.
+One open observation, not a blocker: a single unexplained reboot during verification
+with no recorded cause. Details in that section.
 
 ## Next Engineering Action (exact)
 
@@ -1296,3 +1296,100 @@ and complete the regression: `iw dev wlh0 station dump`, `batctl if/n/o`, `bat0`
 Full config backup already on the device in `/root/cfgbak/` (`network`, `wireless`,
 `firewall`, `dhcp`, `mesh11sd`, plus `.pre-wizard` copies). The UART console is
 independent of networking, so no network change can lock us out.
+
+---
+
+## §14 Phase 1 regression — COMPLETE, HARDWARE VERIFIED (2026-08-30)
+
+The blocker above is resolved. The owner supplied the existing lab mesh SAE
+passphrase (not recorded here) and confirmed the Pi 4 was powered on and still
+carrying its verified Mesh Gate configuration.
+
+### What was applied
+
+The LuCI EKH wizard's **Mesh Point / bridge** transformation, applied as a scripted
+`uci` sequence over UART from the source analysis above — the destructive global
+resets (`resetUci` / `resetUciNetworkTopology`) were deliberately NOT replayed, so
+the firewall rule set, the wan zone's REJECT posture, and the stock forwardings were
+all left intact.
+
+Applied: `default_radio2` -> `mode=mesh`, `mesh_id=openmanet`, `encryption=sae`,
+`beacon_int=1000`, `wds=1`, `network=batmesh0`; `bat0` (`proto=batadv`,
+`routing_algo=BATMAN_V`, `gw_mode=client`, bridge_loop_avoidance/bonding/
+aggregated_ogms/fragmentation/DAT/multicast_mode/network_coding, `orig_interval=1000`,
+`hop_penalty=30`); `batmesh0`/`batmesh1` (`proto=batadv_hardif`, `master=bat0`);
+`br-lan` replaced by `br-ahwlan` (bridge, ports `eth0` + `bat0`); `ahwlan`
+(`proto=static`, `/16`, `ip6assign=64`, `ip6ifaceid=eui64`, `ip6class=local`);
+`lan` left **deviceless** so there is no `10.41.0.0/16` collision; firewall zone
+`ahwlan` (ACCEPT/ACCEPT/ACCEPT, `mtu_fix=1`) plus one `ahwlan -> lan` forwarding;
+`dhcp.ahwlan` server pool with `dhcp.lan.ignore=1`; `mesh11sd.mesh_params`
+`mesh_fwding=0`, `mesh_nolearn=1`, `mesh_gate_announcements=0` (Mesh Point);
+`default_radio1` (RTL8822BU AP) moved onto `ahwlan`.
+
+**Note — `mesh_nolearn` not `nolearn`.** The wizard writes the dead `nolearn` option
+(uci.js:526); the shipped mesh11sd config and `morse.sh` use `mesh_nolearn`. The
+working name was used deliberately.
+
+### Result — matches the 2026-08-28 Phase 1 result
+
+| Check | Phase 1 (2026-08-28) | §14 re-verification |
+|---|---|---|
+| `wlh0` type | mesh point | **mesh point** |
+| Peer | `a8:dd:9f:4d:c0:e3` | **`a8:dd:9f:4d:c0:e3`** (same unit) |
+| mesh plink | ESTAB | **ESTAB** |
+| authorized / authenticated / associated | yes | **yes / yes / yes** |
+| signal | ~ -46 dBm | **-35 to -38 dBm** |
+| expected throughput | ~7.52 Mbps | **7.52 Mbps** |
+| `batctl if` | wlh0 active | **wlh0: active** |
+| routing algo | BATMAN_V | **BATMAN_V** (`batctl ra` confirms) |
+| BATMAN neighbour / originator | via `wlh0`, ~7.2 | **via `wlh0`, 7.2 / 7.1** |
+| end-to-end ping | 4/4, 0%, 3.620/3.892/4.105 ms | **4/4, 0%, 3.854/3.950/4.075 ms** |
+
+Additional evidence beyond the original run:
+
+- `batctl gwl` lists the Pi 4 as an actual **gateway** (10.0/2.0 MBit), and the
+  station dump reports `mesh connected to gate: yes` — the Mesh Gate role is live,
+  not merely configured.
+- After a reboot the mesh re-formed **automatically** at boottime 24.567 s with no
+  operator action, and BATMAN resolved the peer by name as `RAPTOR-01_wlh0` (alfred
+  name resolution working). Post-reboot steady-state ping: **10/10, 0% loss,
+  3.886/4.828/10.316 ms**. This is a stronger result than the original Phase 1 run,
+  which was provisioned live rather than cold-booted.
+- The chronic `alfred: can't get interface: No such device` log spam is **gone**
+  (count 0) now that `bat0` exists. `batctl gwj: exit status 254` appears only twice
+  at boot, before the mesh forms.
+
+### Both subsystems healthy simultaneously
+
+- **MM6108:** `wlh0` mesh point, US / channel 42 / `bcf_fgh100mhaamd.bin`,
+  peer ESTAB, BATMAN_V, `bat0` UP/LOWER_UP under `br-ahwlan`, openmanetd running.
+- **RTL8822BU:** still **SuperSpeed 5000** after the reboot, AP up and `forwarding`
+  in `br-ahwlan`. Only the known benign `error beacon valid` / `failed to download
+  drv rsvd page` set, consistent with `8bd27bb`. The single
+  `write register 0xc4 failed with -71` at t=13 s is on the **High Speed** instance
+  (`3-1:1.0`) before SuperSpeed re-enumeration as `4-1:1.0` — the documented
+  boot-order behaviour that patch 0011 handles.
+- `br-ahwlan` ports: `eth0` (NO-CARRIER, no cable), `bat0` forwarding,
+  `phy3-ap0` forwarding.
+
+### Two behaviours worth recording
+
+**openmanetd rewrites the `ahwlan` address.** The pinned `10.41.254.15` was replaced
+with `10.41.183.117` and written back into UCI by openmanetd's
+`AddressReservationWorker`. This is the product's own designed mesh-wide address
+reservation and supersedes the wizard's random seed IP — it is not a defect, and it
+means the wizard's `getRandomIpaddr` value is only a starting point.
+
+**One unexplained reboot.** The unit rebooted once during verification. There is no
+recorded cause: `/sys/fs/pstore` is empty, and there is no under-voltage, OOM, panic,
+hung-task or RCU stall in the log; 7.9 GB of 8 GB RAM was free. It occurred while a
+254-process concurrent ping sweep (run to discover the Pi 4's address) overlapped a
+netifd reconfiguration, and the kernel cmdline carries `reboot=w` with procd's
+watchdog active, so the most plausible explanation is a watchdog reset from a
+transient stall induced by that diagnostic sweep. **This is unproven.** It did not
+recur, and the box came back with the full mesh working unattended. Watch for it;
+do not treat it as explained.
+
+### Blocker
+
+None. Phase 1 is re-verified end to end on the current image.
