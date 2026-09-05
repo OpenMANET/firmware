@@ -1,4 +1,6 @@
 dtoverlay=raven
+dtoverlay=uart3
+dtoverlay=uart4
 dtoverlay=disable-bt
 dtoverlay=disable-wifi
 hdmi_blanking=2
