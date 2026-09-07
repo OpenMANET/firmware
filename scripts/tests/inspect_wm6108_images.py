@@ -58,6 +58,17 @@ def main():
             assert b"START=09" in init and b"start() { :; }" in init
             listing = command(opts.unsquashfs, "-ll", str(root)).decode()
             assert "etc/rc.d/S09wm6108-spi-reset" in listing
+            assert b"START=10" in read("etc/init.d/boot")
+            assert b"/sbin/kmodloader" in read("etc/init.d/boot")
+            for entry in listing.splitlines():
+                if "squashfs-root/etc/modules-boot.d/" not in entry:
+                    continue
+                module_file = entry.split("squashfs-root/", 1)[1].split(" -> ", 1)[0]
+                if " -> " in entry:
+                    module_file = "etc/modules.d/" + entry.rsplit("/", 1)[1]
+                for line in read(module_file).decode().splitlines():
+                    words = line.split()
+                    assert not words or words[0] not in ("morse", "mm6108_sdio"), "Morse loads before reset window"
             # Some install orders can retain the harmless vendor init. Its entry
             # point must always be the verified no-op above, never the old helper.
             assert "libgpiod.so.3" in listing and "libfdt.so.1" in listing
@@ -75,6 +86,9 @@ def main():
                 assert command("fdtget", str(overlay), "/fragment@0/__overlay__/mm6108@0", "openmanet,wm6108-reset").strip() == b""
             elif "mm8108-usb" in image.name:
                 assert "dtoverlay=mm610x" not in distro and "dtoverlay=mm810x" not in distro
+                assert "brcmfmac.ko" in listing, "missing onboard Wi-Fi driver"
+                assert "43455-sdio.bin" in listing, "missing onboard Wi-Fi firmware"
+                assert "43455-sdio.raspberrypi,4-compute-module.txt" in listing, "missing CM4 Wi-Fi NVRAM alias"
             elif "mm6108-sdio" in image.name:
                 assert "dtoverlay=mm610x-spi" not in distro
             else:

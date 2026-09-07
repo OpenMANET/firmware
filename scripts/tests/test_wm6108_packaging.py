@@ -42,6 +42,12 @@ def main():
         script.write_text(postinst)
         for board in [True, False]:
             root = tmp / ("pi-root" if board else "other-root")
+            root.mkdir()
+            if board:
+                # BSP before bundle: no service exists yet; later bundle install
+                # must still supply only the harmless vendor entry point.
+                subprocess.run(["busybox", "ash", str(script)],
+                               env={**os.environ, "IPKG_INSTROOT": str(root)}, check=True)
             makefile = target / "test-install.mk"
             makefile.write_text("CONFIG_TARGET_bcm27xx:=" + ("y" if board else "") + "\n" +
                                 "INSTALL_DIR:=install -d\nINSTALL_BIN:=install -m0755\nINSTALL_DATA:=install -m0644\n" +
