@@ -74,8 +74,19 @@ camera_auto_detect=1
 # Cap CPU at 1.0 GHz (stock 1500)
 #arm_freq=1000
 # Idle frequency floor
-#arm_freq_min=200
+#arm_freq_min=400
 # Under-volt SoC to reduce thermal output
 #over_voltage=-2
-# Cap GPU clock
+
+# Increases arm_freq to the highest supported frequency for the board-type and firmware. Set to 1 to enable.
+arm_boost=0
+
+# GPU Freqs
+# Sets core_freq, h264_freq, isp_freq, v3d_freq and hevc_freq together.
 #gpu_freq=250
+# Frequency of the GPU processor core in MHz. Influences CPU performance because it drives the L2 cache and memory bus
+#core_freq=250
+#core_freq_min=250
+# Frequency of the hardware video block in MHz
+#h264_freq=500
+
