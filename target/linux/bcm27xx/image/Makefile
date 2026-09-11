@@ -6,7 +6,7 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
-DEVICE_VARS += SYSINFO_MODEL SYSINFO_BOARD_NAME DISTROCONFIG_EXTRA
+DEVICE_VARS += SYSINFO_MODEL SYSINFO_BOARD_NAME DISTROCONFIG_FILES
 
 FAT32_BLOCK_SIZE=1024
 FAT32_BLOCKS=$(shell echo $$(($(CONFIG_TARGET_KERNEL_PARTSIZE)*1024*1024/$(FAT32_BLOCK_SIZE))))
@@ -74,10 +74,12 @@ define Build/boot-ekh01
 	# Note that we cannot easily put it on the rootfs, because our multi-profile builds share this
 	# (i.e. they only differ in /boot).
 	# We can't easily use /boot directly because that's not mounted early in the preinit process.
-	# As well as this, we have a custom DISTROCONFIG_EXTRA section which is used to define
-	# the necessary SPI/SDIO overlays for the product.
+	# As well as this, DISTROCONFIG_FILES lists the boards/ekh01/ distroconfig fragments
+	# that are concatenated (in order) to form /boot/distroconfig.txt for the product.
+	# Most products layer a product-specific file on top of the shared distroconfig.txt;
+	# a product may instead list a single standalone file.
 
-	echo -e '\ndtoverlay=sysinfo,board-name="$(SYSINFO_BOARD_NAME)",model="$(SYSINFO_MODEL)"' | cat boards/ekh01/distroconfig.txt boards/ekh01/distroconfig-$(DISTROCONFIG_EXTRA).txt - | mcopy -o -i $@.boot - ::/distroconfig.txt
+	echo -e '\ndtoverlay=sysinfo,board-name="$(SYSINFO_BOARD_NAME)",model="$(SYSINFO_MODEL)"' | cat $(addprefix boards/ekh01/,$(DISTROCONFIG_FILES)) - | mcopy -o -i $@.boot - ::/distroconfig.txt
 
 endef
 
@@ -293,7 +295,7 @@ define Device/bcm2711_mm6108-spi
 	kmod-mm6108 netifd-morse mm6108-firmware \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-spi
-  DISTROCONFIG_EXTRA := mm610x-spi
+  DISTROCONFIG_FILES := distroconfig.txt distroconfig-mm610x-spi.txt
 endef
 ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm6108-spi
@@ -308,7 +310,7 @@ define Device/bcm2711_mm6108-sdio
 	kmod-mm6108 netifd-morse mm6108-firmware \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm6108-sdio
-  DISTROCONFIG_EXTRA := mm610x-sdio
+  DISTROCONFIG_FILES := distroconfig.txt distroconfig-mm610x-sdio.txt
 endef
 ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm6108-sdio
@@ -323,6 +325,7 @@ define Device/bcm2711_mm8108-usb
 	kmod-mm8108 netifd-morse mm8108-firmware \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm8108-usb
+  DISTROCONFIG_FILES := distroconfig.txt
 endef
 ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm8108-usb
@@ -337,7 +340,8 @@ define Device/bcm2711_raven
 	kmod-mm8108 netifd-morse mm8108-firmware \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += bcm2711,raven
-  DISTROCONFIG_EXTRA := raven
+  # Standalone: not layered on the shared ekh01 distroconfig.txt
+  DISTROCONFIG_FILES := distroconfig-raven.txt
 endef
 ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_raven
@@ -352,7 +356,7 @@ define Device/bcm2710_mm6108-spi
 	kmod-mm6108 netifd-morse mm6108-firmware \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += bcm2710,mm6108-spi
-  DISTROCONFIG_EXTRA := mm610x-spi
+  DISTROCONFIG_FILES := distroconfig.txt distroconfig-mm610x-spi.txt
 endef
 ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm6108-spi
@@ -367,7 +371,7 @@ define Device/bcm2710_mm6108-sdio
 	kmod-mm6108 netifd-morse mm6108-firmware \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += bcm2710,mm6108-sdio
-  DISTROCONFIG_EXTRA := mm610x-sdio
+  DISTROCONFIG_FILES := distroconfig.txt distroconfig-mm610x-sdio.txt
 endef
 ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm6108-sdio

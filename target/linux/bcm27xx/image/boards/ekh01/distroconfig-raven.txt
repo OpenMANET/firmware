@@ -1,18 +1,81 @@
-dtoverlay=raven
-dtoverlay=uart3
-dtoverlay=uart4
+################################################################################
+# Bootloader configuration - distroconfig.txt (RAVEN, CM4 carrier)
+#
+# Standalone: this file is NOT layered on top of boards/ekh01/distroconfig.txt.
+# RAVEN is CM4-only, so no model filters ([pi4], [cm4], ...) are used.
+#
+# The build appends "dtoverlay=sysinfo,..." (board identification) after
+# this file. Site-specific tweaks belong in config.txt, not here.
+#
+# Reference: https://www.raspberrypi.com/documentation/computers/config_txt.html
+################################################################################
+
+[all]
+
+#--- Memory / display --------------------------------------------------------
+# GPU memory (MB) by total RAM size
+gpu_mem_256=128
+gpu_mem_512=128
+gpu_mem_1024=128
+# Display supports full resolution; comment out if edges are cut off
+disable_overscan=1
+# Headless: blank HDMI output when no display is attached
+hdmi_blanking=2
+
+#--- Onboard radios ----------------------------------------------------------
+# HaLow radio is the only wireless interface; disable Bluetooth so PL011
+# (ttyAMA0, GPIO14/15) is free for the GPS module.
 dtoverlay=disable-bt
 dtoverlay=disable-wifi
-hdmi_blanking=2
-dtoverlay=pps-gpio,gpiopin=18
+
+#--- USB / PCIe --------------------------------------------------------------
+# Allow PCIe (m.2) wifi cards
+dtoverlay=pcie-32bit-dma
+# Carrier USB ports run in host mode (MM8108 HaLow radio is on USB)
+dtoverlay=dwc2,dr_mode=host
+
+#--- Serial ------------------------------------------------------------------
+# Primary UART (PL011 / ttyAMA0, GPIO14/15): LC76G GPS
+uart_enable=1
+# UART3 (GPIO4/5)  -> ttyAMA1
+dtoverlay=uart3
+# UART4 (GPIO8/9)  -> ttyAMA2
+# Do not add ctsrts: CTS would land on GPIO10 (TALKGROUP_5)
+dtoverlay=uart4
+# uart5 intentionally NOT enabled: GPIO12 is GPS_WAKE
+
+#--- I2C ---------------------------------------------------------------------
+# I2C1 (GPIO2/3) user bus
+dtparam=i2c1=on
+# I2C0 (GPIO0/1) exposed to userspace (camera / ID EEPROM bus)
 dtparam=i2c_vc=on
-# Power tuning disabled for bring-up: validate boot stability at stock
-# clocks/voltage first, then re-enable one line at a time.
-# Limit maximum CPU frequency to 1.0 GHz (Stock is 1500)
+
+#--- GPS timing --------------------------------------------------------------
+# GPS 1PPS on GPIO18 -> /dev/pps0 (consumed by gpsd/ntp)
+dtoverlay=pps-gpio,gpiopin=18
+
+#--- Board overlay -----------------------------------------------------------
+# RAVEN carrier: GPIO line names, talk group selector pull-up hog,
+# uart5 disabled. Keep after the generic overlays above so it wins any
+# pin conflict.
+dtoverlay=raven
+
+#--- Misc --------------------------------------------------------------------
+# SD activity LED off by default (userspace re-purposes it for HaLow)
+dtparam=act_led_trigger=none
+# Persist kernel oops/panic logs across reboot
+dtoverlay=ramoops
+# Auto-load camera sensor overlays
+camera_auto_detect=1
+
+#--- Power tuning (disabled for bring-up) ------------------------------------
+# Validate boot stability at stock clocks/voltage first, then re-enable
+# one line at a time.
+# Cap CPU at 1.0 GHz (stock 1500)
 #arm_freq=1000
-# Drop idle frequency to the minimum stable floor
+# Idle frequency floor
 #arm_freq_min=200
-# Under-volt the CPU SoC to reduce thermal output
+# Under-volt SoC to reduce thermal output
 #over_voltage=-2
-# Limit GPU frequencies to save power
+# Cap GPU clock
 #gpu_freq=250
