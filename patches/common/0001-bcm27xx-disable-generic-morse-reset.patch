@@ -1,0 +1,29 @@
+--- a/feeds/morse/hardware/morse-bundle/Makefile
++++ b/feeds/morse/hardware/morse-bundle/Makefile
+@@ -7,7 +7,7 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=morse-bundle
+-PKG_RELEASE=2
++PKG_RELEASE=3
+ 
+ PKG_MAINTAINER:=Morse Micro
+ 
+@@ -62,6 +62,10 @@
+ 	$(INSTALL_BIN) ./files/etc/sysctl.d/* $(1)/etc/sysctl.d/
+ 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/morse-bundle.json $(1)/usr/share/rpcd/acl.d/
+ 	$(INSTALL_DATA) ./files/lib/functions/morse.sh $(1)/lib/functions/
++	# Never detach an arbitrary MMC controller on Raspberry Pi. The BSP owns
++	# the separate WM6108 SPI-only boot helper; runtime reset stays driver-owned.
++	$(if $(CONFIG_TARGET_bcm27xx), \
++		$(INSTALL_BIN) ./files/bcm27xx/chipreset.sh $(1)/morse/scripts/chipreset.sh)
+ endef
+ 
+ $(eval $(call BuildPackage,morse-bundle))
+--- /dev/null
++++ b/feeds/morse/hardware/morse-bundle/files/bcm27xx/chipreset.sh
+@@ -0,0 +1,4 @@
++#!/bin/sh
++# SPI boot reset is owned by bsp-bcm271x. USB/SDIO need no userspace reset.
++echo 'morsechipreset: skipped: generic reset disabled on Raspberry Pi'
++exit 0

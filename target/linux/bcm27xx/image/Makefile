@@ -323,6 +323,7 @@ define Device/bcm2711_mm8108-usb
 	kmod-mm8108 netifd-morse mm8108-firmware \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += morse,ekh01 morse,ekh01v1 morse,ekh01v2 morse,ekh01-03 morse,ekh01-05us bcm2711,mm8108-usb
+  DISTROCONFIG_EXTRA := mm810x-usb
 endef
 ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm8108-usb
