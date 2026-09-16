@@ -1,1 +1,0 @@
-# MM810x USB transport requires no additional device-tree overlays.
