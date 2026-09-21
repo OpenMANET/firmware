@@ -22,3 +22,14 @@ Validation matrix:
 Reproduce external UCI edits while openmanetd remains alive, followed by an AP-only save. Capture before/after wireless and network configs, browser request endpoint/payload, installed binary version, batctl if/neighbors/gateways, and per-node traffic. Check both LuCI and daemon UI routes; the current daemon API has no writable band field.
 
 Build the reported rpi4-mm8108-usb profile using scripts/openmanet_setup.sh and the repository's board profile mapping; follow the workspace .codex clean-build instructions if a clean rebuild is needed. Confirm the resulting image's package versions and command availability, not only .config. No target hardware was accessed during this investigation.
+
+## Implemented build inputs
+
+- Packages branch: fix/halow-gps, commit 9d3fefe21f5b3a2b4f2f96c68cadf779c3d40c23.
+- Daemon branch: fix/halow-gps, commit e639e9a7ed6c2d590059c723078217bc41fa23b6 (pinned by that packages commit).
+- Both tracked feeds.conf.default and the local active feeds.conf use the same packages commit. The old local source override was saved under logs/halow-gps before replacing it.
+- GPIO initialization defaults to HAT identity detection. Synthetic identity fixtures pass; actual WM1302 EEPROM data is not yet available. Missing identity skips GPIO manipulation; verified boards without EEPROM data can explicitly set gpsd.core.board=wm1302.
+- Both BSPs install procps-ng and procps-ng-pkill. GPSD read-only mode is available but remains off by default; issue 4 acquisition behavior needs hardware diagnosis.
+- Fresh configuration exposed an OpenVLM sound-core dependency cycle; the package now explicitly selects sound-core. Regenerated config selects bsp-bcm271x, procps-ng, procps-ng-pkill, gpiod-tools, gpsd and openmanetd.
+
+Pre-build checks: daemon full host build, internal unit suite, integration suite, vet, full golangci-lint (0 issues), and network/handler race tests passed. Package GPIO/identity/migration and GPSD argument tests passed. Profile: ekh-bcm2711 (MM8108 USB and MM6108 SPI/SDIO).
