@@ -15,7 +15,7 @@ Validation matrix:
 | Reported CM4 + MM8108 USB + WM1302 | GPS initialized automatically after reboot; correct wake/reset waveform; AP settings changes preserve batmesh0 and wlh0 active |
 | SPI HaLow + WM1302 | Existing radio/GPS boot paths remain functional |
 | Raspberry Pi without WM1302 | GPS-specific pins not claimed based solely on radio or UART presence |
-| Raven | GPS reset works without pkill; carrier-specific GPIO behavior preserved |
+| Raven | Installed pkill releases reset requests; carrier-specific GPIO behavior preserved |
 | Three-node mesh | Multihop traffic and gateway selection survive repeated AP saves; not just ESTAB peering |
 | L76K versus supported u-blox module | Raw/read-only/normal experiment establishes whether scoped GPSD changes are needed |
 
@@ -33,3 +33,35 @@ Build the reported rpi4-mm8108-usb profile using scripts/openmanet_setup.sh and 
 - Fresh configuration exposed an OpenVLM sound-core dependency cycle; the package now explicitly selects sound-core. Regenerated config selects bsp-bcm271x, procps-ng, procps-ng-pkill, gpiod-tools, gpsd and openmanetd.
 
 Pre-build checks: daemon full host build, internal unit suite, integration suite, vet, full golangci-lint (0 issues), and network/handler race tests passed. Package GPIO/identity/migration and GPSD argument tests passed. Profile: ekh-bcm2711 (MM8108 USB and MM6108 SPI/SDIO).
+
+## Build results — 2026-09-21
+
+Build passed with firmware input commit edf9634 on fix/halow-gps, packages b76405d86439bd5a70ffa21e8e0ad391a7f287b9 and daemon e639e9a7ed6c2d590059c723078217bc41fa23b6. This report is a documentation-only follow-up to the built firmware inputs.
+
+The ekh-bcm2711 profile produced all three images under bin/targets/bcm27xx/bcm2711/. The final make -j8 exited 0. The daemon's upstream submodule SSH URLs required a scoped HTTPS rewrite for download and build:
+
+```sh
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=url.https://github.com/.insteadOf GIT_CONFIG_VALUE_0=git@github.com: make -j8
+```
+
+No global Git configuration was changed. Build log: logs/halow-gps/build-retry.log (local, ignored). The earlier attempt failed retrieving SSH submodules; the retry succeeded.
+
+| Image | SHA-256 |
+|---|---|
+| openmanet-1.8.1-rpi4-mm6108-sdio-squashfs-sysupgrade.img.gz | b9a5d49833c975fb2fcfa3516989f617c502779592fbbb7c22357714b4df06a9 |
+| openmanet-1.8.1-rpi4-mm6108-spi-squashfs-sysupgrade.img.gz | 16fba210cf7ca5ff78cd5b520bdedbae40fe6e2340de2f9eb7ef24a88fbe63c1 |
+| openmanet-1.8.1-rpi4-mm8108-usb-squashfs-sysupgrade.img.gz | 616860fd9125025946718e3164895447a9a6a63d16f3d358ce703964652a336d |
+
+All three image hashes match sha256sums. All three gzip payload integrity checks passed after fwtool extracted the appended sysupgrade metadata. USB image inspection verified:
+
+- Installed gpsboard.init and gpsd scripts exactly match the committed packages sources.
+- gpsd.core.board defaults to auto and readonly defaults to 0.
+- BSP 1.0-r12, GPSD 3.25-r4, procps-ng and procps-ng-pkill 4.0.4-r1, daemon main-r3.
+- ARM64 daemon embeds version main-e639e9a; the feed buildinfo records packages b76405d.
+- pkill executable and alternative symlink are present; development Go commands are absent.
+- MM8108 USB driver is present and MM6108 driver absent from the USB image.
+- GPS board boot service S21, GPSD S50, and board-selection migration script are installed.
+
+Local evidence: logs/halow-gps/usb-image-verification.log, usb-daemon-buildinfo.txt, gps-tests.log, daemon-race.log and daemon-targeted-lint.log.
+
+Hardware validation remains outstanding: actual WM1302 EEPROM identity/provisioning, GPS reset waveform, L76K acquisition, and mesh traffic after AP saves. Auto detection was tested with synthetic HAT identities; missing or unmatched identity leaves GPIOs untouched. Explicit gpsd.core.board=wm1302 remains available for a verified carrier without usable EEPROM identity. Read-only GPSD is a diagnostic option, not a confirmed acquisition fix. Issue 5 remains excluded.
