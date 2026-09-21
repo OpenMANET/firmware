@@ -25,7 +25,7 @@ Build the reported rpi4-mm8108-usb profile using scripts/openmanet_setup.sh and 
 
 ## Implemented build inputs
 
-- Packages branch: fix/halow-gps, commit 9d3fefe21f5b3a2b4f2f96c68cadf779c3d40c23.
+- Packages branch: fix/halow-gps, commit b76405d86439bd5a70ffa21e8e0ad391a7f287b9.
 - Daemon branch: fix/halow-gps, commit e639e9a7ed6c2d590059c723078217bc41fa23b6 (pinned by that packages commit).
 - Both tracked feeds.conf.default and the local active feeds.conf use the same packages commit. The old local source override was saved under logs/halow-gps before replacing it.
 - GPIO initialization defaults to HAT identity detection. Synthetic identity fixtures pass; actual WM1302 EEPROM data is not yet available. Missing identity skips GPIO manipulation; verified boards without EEPROM data can explicitly set gpsd.core.board=wm1302.
