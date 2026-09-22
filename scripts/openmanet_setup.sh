@@ -220,19 +220,12 @@ if [ "${INITIALIZE}" ]; then
     ./scripts/feeds uninstall -a
     ./scripts/feeds update -a
     #patch packages if necessary and re-create index files
-    sh ./scripts/openmanet_patch_common.sh
     patch_feeds_packages "${BOARD:-}"
     ./scripts/feeds update -i
     ./scripts/feeds install -p openmanet -a
     ./scripts/feeds install -a
 
     ./scripts/feeds install -f -p morse iwinfo
-fi
-
-# Existing feed checkouts also need mandatory patches when selecting a board
-# without -i. Do not require downloaded feeds just to assemble a fresh config.
-if [ -z "$INITIALIZE" ] && [ -f feeds/morse/hardware/morse-bundle/Makefile ]; then
-    sh ./scripts/openmanet_patch_common.sh
 fi
 
 case "${MODE}" in
