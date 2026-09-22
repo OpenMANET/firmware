@@ -65,3 +65,21 @@ All three image hashes match sha256sums. All three gzip payload integrity checks
 Local evidence: logs/halow-gps/usb-image-verification.log, usb-daemon-buildinfo.txt, gps-tests.log, daemon-race.log and daemon-targeted-lint.log.
 
 Hardware validation remains outstanding: actual WM1302 EEPROM identity/provisioning, GPS reset waveform, L76K acquisition, and mesh traffic after AP saves. Auto detection was tested with synthetic HAT identities; missing or unmatched identity leaves GPIOs untouched. Explicit gpsd.core.board=wm1302 remains available for a verified carrier without usable EEPROM identity. Read-only GPSD is a diagnostic option, not a confirmed acquisition fix. Issue 5 remains excluded.
+
+## Rebuild results — 2026-09-22
+
+Draft PRs: packages #27 and firmware #74, both targeting 1.8.1-dev. Firmware #74 includes reset PR #72, which should merge first.
+
+Build inputs: firmware 145a0f3, packages 91b4687856ca93785c2d5b8afeae57b60c8e563f, daemon e639e9a7ed6c2d590059c723078217bc41fa23b6. Packages includes the 1.8.1-dev squash merges and uses daemon package release 4. This results update is documentation-only.
+
+Board setup (-i -b ekh-bcm2711), make download -j8, and make -j8 all passed. The scoped HTTPS submodule rewrite documented above was used. All existing board feed patches were verified as already applied. The feed refresh triggered a full Go bootstrap and additional native dependency rebuilds.
+
+All three fresh images passed metadata extraction, gzip payload integrity, and SHA-256 verification. USB inspection confirmed the committed GPS scripts, WM1302 auto default, readonly=0, working package payload/alternative for pkill, daemon main-r4 with embedded main-e639e9a, BSP 1.0-r12, GPSD 3.25-r4, MM8108 driver without MM6108, GPS boot/migration entries, and the Morse reset guard. Development Go commands are absent. feeds.buildinfo records packages 91b4687.
+
+| Image | SHA-256 |
+|---|---|
+| openmanet-1.8.1-rpi4-mm6108-sdio-squashfs-sysupgrade.img.gz | 8c3f176aa104a5201ea9055a9ccf27dade497cba616d5fa471101eb5001064f6 |
+| openmanet-1.8.1-rpi4-mm6108-spi-squashfs-sysupgrade.img.gz | e3e9391017f52bd613d7414729ab7275aabcf24ac07e05db20285e53b80b0a37 |
+| openmanet-1.8.1-rpi4-mm8108-usb-squashfs-sysupgrade.img.gz | 8b37868b975631af20849e705280a60a7a04a4cb9273a6f0db9355f282687aa8 |
+
+Local logs and inspection evidence are under logs/halow-gps-rebuild/. The hardware validation limitations above remain unchanged; no physical node was flashed or tested.
