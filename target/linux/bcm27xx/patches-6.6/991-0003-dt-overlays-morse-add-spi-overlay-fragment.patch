@@ -6,7 +6,7 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 
 --- /dev/null
 +++ b/arch/arm/boot/dts/overlays/mm610x-spi-overlay.dts
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,81 @@
 +/dts-v1/;
 +/plugin/;
 +
@@ -25,6 +25,7 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +
 +			mm6108: mm6108@0 {
 +				compatible = "morse,mm610x-spi";
++				openmanet,wm6108-reset;
 +				reg = <0>; /* CE0 */
 +				reset-gpios = <&gpio 17 0>;
 +				power-gpios = <&gpio 23 0>,
