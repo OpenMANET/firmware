@@ -1,6 +1,6 @@
 --- a/arch/arm/boot/dts/overlays/Makefile
 +++ b/arch/arm/boot/dts/overlays/Makefile
-@@ -184,7 +184,10 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
+@@ -184,6 +184,9 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
  	miniuart-bt.dtbo \
  	mipi-dbi-spi.dtbo \
  	mlx90640.dtbo \
@@ -10,7 +10,6 @@
  	mmc.dtbo \
  	mz61581.dtbo \
  	ov2311.dtbo \
- 	ov5647.dtbo \
 @@ -228,6 +231,7 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
  	qca7000-uart0.dtbo \
  	ramoops.dtbo \
