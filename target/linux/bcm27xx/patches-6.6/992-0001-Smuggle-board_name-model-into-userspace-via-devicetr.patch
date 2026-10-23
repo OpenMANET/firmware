@@ -13,7 +13,7 @@ Subject: [PATCH] Smuggle board_name/model into userspace via devicetree
 
 --- a/arch/arm/boot/dts/overlays/Makefile
 +++ b/arch/arm/boot/dts/overlays/Makefile
-@@ -300,6 +300,7 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
+@@ -298,6 +298,7 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
  	sunfounder-pironman5.dtbo \
  	superaudioboard.dtbo \
  	sx150x.dtbo \
@@ -21,7 +21,6 @@ Subject: [PATCH] Smuggle board_name/model into userspace via devicetree
  	tc358743.dtbo \
  	tc358743-audio.dtbo \
  	tinylcd35.dtbo \
-
 --- /dev/null
 +++ b/arch/arm/boot/dts/overlays/sysinfo-overlay.dts
 @@ -0,0 +1,28 @@
@@ -53,5 +52,3 @@ Subject: [PATCH] Smuggle board_name/model into userspace via devicetree
 +		board-name = <&overlay>,"sysinfo-board-name";
 +	};
 +};
--- 
-2.25.1
