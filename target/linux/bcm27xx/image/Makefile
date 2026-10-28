@@ -357,7 +357,7 @@ define Device/bcm2710_mm6108-spi
 	kmod-mm6108 netifd-morse mm6108-firmware \
 	kmod-video-ov5647 kmod-video-imx219 kmod-video-imx477 kmod-video-imx708
   SUPPORTED_DEVICES += bcm2710,mm6108-spi
-  DISTROCONFIG_FILES := distroconfig.txt distroconfig-mm610x-spi.txt
+  DISTROCONFIG_FILES := distroconfig.txt distroconfig-mm610x-spi-bcm2710.txt
 endef
 ifeq ($(SUBTARGET),bcm2710)
   TARGET_DEVICES += bcm2710_mm6108-spi

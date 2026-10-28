@@ -21,7 +21,8 @@ context lines (no inline comments) make the hunk unambiguous.
 
 --- a/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
 +++ b/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
-@@ -329,11 +329,11 @@
+@@ -324,14 +324,14 @@
+ 			  "GPIO14",
  			  "GPIO15",
  			  "GPIO16",
 -			  "GPIO17",
@@ -36,3 +37,5 @@ context lines (no inline comments) make the hunk unambiguous.
 +			  "MM_WAKE",
 +			  "MM_BUSY",
  			  "GPIO25",
+ 			  "GPIO26",
+ 			  "GPIO27",

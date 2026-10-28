@@ -9,4 +9,9 @@ permissions:
 jobs:
   build:
     name: Test Formalities
+    permissions:
+      contents: read
+      pull-requests: write
     uses: openwrt/actions-shared-workflows/.github/workflows/formal.yml@main
+    with:
+      post_comment: false

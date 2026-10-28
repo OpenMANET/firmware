@@ -1,0 +1,4 @@
+# Conservative MM6108 SPI default for Raspberry Pi 3 and Zero 2 W.
+# An explicit driver spi_clock_speed setting takes precedence.
+dtparam=spi=on
+dtoverlay=mm610x-spi,spi_max_frequency=25000000

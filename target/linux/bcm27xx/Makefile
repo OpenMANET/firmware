@@ -11,6 +11,12 @@ BOARDNAME:=Broadcom BCM27xx
 FEATURES:=audio boot-part display ext4 fpu gpio rootfs-part rtc squashfs usb usbgadget
 SUBTARGETS:=bcm2708 bcm2709 bcm2710 bcm2711 bcm2712
 
+# Shared GitHub CI workflows enumerate this list. BCM2708 is unsupported
+# by OpenMANET; keep it available for local OpenWrt builds only.
+ifeq ($(GITHUB_ACTIONS),true)
+  SUBTARGETS:=$(filter-out bcm2708,$(SUBTARGETS))
+endif
+
 KERNEL_PATCHVER:=6.6
 
 define Target/Description
