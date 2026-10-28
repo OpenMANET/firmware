@@ -6,7 +6,7 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 
 --- /dev/null
 +++ b/arch/arm/boot/dts/overlays/mm610x-spi-overlay.dts
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,85 @@
 +/dts-v1/;
 +/plugin/;
 +
@@ -86,6 +86,10 @@ Subject: [PATCH] bcm27xx: (APP-3660) Create separate SPI device tree overlay
 +			};
 +
 +		};
++	};
++
++	__overrides__ {
++		spi_max_frequency = <&mm6108>, "spi-max-frequency:0";
 +	};
 +};
 \ No newline at end of file
