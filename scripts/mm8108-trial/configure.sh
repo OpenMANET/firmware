@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-# Configure only the trial image and dependencies, not the optional package repo.
+# Keep installed image defaults; omit explicit optional (=m) repository packages.
+# Kconfig still selects per-device packages and dependencies automatically.
 set -euo pipefail
-common=()
-for fragment in boards/common/*_diffconfig; do
-    [[ ${fragment##*/} == kitchensink_diffconfig ]] || common+=("$fragment")
-done
-awk 1 "${common[@]}" boards/rpi4-mm8108-2.1-trial/*_diffconfig > .config
+awk '!/^CONFIG_PACKAGE_[^=]+=m$/' boards/common/*_diffconfig \
+    boards/rpi4-mm8108-2.1-trial/*_diffconfig > .config
 make defconfig
 python3 scripts/mm8108-trial/check-config.py

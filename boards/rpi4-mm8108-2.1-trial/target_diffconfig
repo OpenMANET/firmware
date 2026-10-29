@@ -40,3 +40,8 @@ CONFIG_PACKAGE_kmod-r8125=y
 CONFIG_PACKAGE_kmod-of-mdio=y
 # Disable ext4 image creation.
 CONFIG_TARGET_ROOTFS_EXT4FS=n
+
+# Preserve the full libraries installed by the baseline configuration, even
+# without the optional repository packages that otherwise pull them in.
+CONFIG_PACKAGE_libiconv-full=y
+CONFIG_PACKAGE_libintl-full=y
