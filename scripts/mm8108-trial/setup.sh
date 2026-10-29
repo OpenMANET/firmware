@@ -9,5 +9,5 @@ revision=$(cat scripts/mm8108-trial/packages.rev)
 [[ "$(git -C "$packages" rev-parse HEAD)" == "$revision" ]] || { echo "Expected packages commit $revision" >&2; exit 1; }
 [[ -z "$(git -C "$packages" status --porcelain)" ]] || { echo 'Packages checkout must be clean' >&2; exit 1; }
 { printf 'src-git openmanet file://%s^%s\n' "$packages" "$revision"; sed '/^src-git openmanet /d' feeds.conf.default; } > feeds.conf
-./scripts/openmanet_setup.sh -i -b rpi4-mm8108-2.1-trial
-python3 scripts/mm8108-trial/check-config.py
+./scripts/openmanet_setup.sh -i
+./scripts/mm8108-trial/configure.sh
