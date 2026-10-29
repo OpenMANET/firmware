@@ -38,3 +38,11 @@ source "target/sdk/Config.in"
 source "target/toolchain/Config.in"
 
 source "tmp/.config-package.in"
+
+config OPENMANET_MM8108_TRIAL
+	bool "Isolated MM8108 USB 2.1 trial (RPi4 only)"
+	depends on TARGET_bcm27xx_bcm2711
+	default n
+	help
+	  Select the experimental shim dependency for existing Morse userspace.
+	  Use only the rpi4-mm8108-2.1-trial board in a separate build tree.

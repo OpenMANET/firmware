@@ -1,0 +1,18 @@
+{
+  "firmware_baseline": "c0f0ba46375c4ed93be416521d4a7f8730440481",
+  "packages_baseline": "4736e44791166e3252ddbc4f050a784b8b5ab062",
+  "packages_trial": "c0393cf955728391283768b70c530cc91c1507b9",
+  "driver": {
+    "commit": "4ce0a0272f8ac8e2fa58eea8ff08116e493399de",
+    "archive_sha256": "84f60321cccf26b2aa538878323a459b587186a6d7876e0c8c12e03024181c56",
+    "mmrc_submodule": "24f6c69dc9b78490b75cd181ad7013c1b3c3def6"
+  },
+  "firmware": {
+    "commit": "919f27a6dc2d46a988682d6ff64dd3fdb9ffc465",
+    "archive_sha256": "f753174a6b7a78634728e8abfdf8bc62c19e844fb707e5f9c5605b8e89463dc4",
+    "mm8108b2_sha256": "8cfabb9736e6ac047020eb2dc20dd7851a507777d47f47560b5e0afc28cd95cc"
+  },
+  "preserved_bcf_sha256": "7fdc1f9ed7ecb1cae20369383eb9d24878230226a4ac09c16a7680acd4a5e1e2",
+  "archive_environment": "Linux, GNU tar, umask 022, OpenWrt host zstd 1.5.7; rawgit recipe including submodules",
+  "other_feeds": "Unchanged from feeds.conf.default"
+}
