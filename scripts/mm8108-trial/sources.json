@@ -1,7 +1,7 @@
 {
   "firmware_baseline": "c0f0ba46375c4ed93be416521d4a7f8730440481",
   "packages_baseline": "4736e44791166e3252ddbc4f050a784b8b5ab062",
-  "packages_trial": "8d677a48e35d673d11a03f2da61b65ae35417674",
+  "packages_trial": "3e540744a685a8ca28cfc83535e4a242053aa176",
   "driver": {
     "commit": "4ce0a0272f8ac8e2fa58eea8ff08116e493399de",
     "archive_sha256": "84f60321cccf26b2aa538878323a459b587186a6d7876e0c8c12e03024181c56",
