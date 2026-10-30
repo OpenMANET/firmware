@@ -31,5 +31,10 @@
     "packages": "ec6146eff8c28eb44f2afa8496a5ecafcb379f1a",
     "firmware": "a1eee8863dfa4635d0bfa75fe499738a48861e83"
   },
-  "packages_commit": "ac30d4be7785578d762fa0b3e8315da38cc3c107"
+  "packages_commit": "ac30d4be7785578d762fa0b3e8315da38cc3c107",
+  "sdio_bcf": {
+    "file": "bcf_mf04151.bin",
+    "package": "bsp-bcm271x",
+    "sha256": "e317084ede244ee5e76b296db5ec4107a42337cb6b766429e8a4daf905512702"
+  }
 }

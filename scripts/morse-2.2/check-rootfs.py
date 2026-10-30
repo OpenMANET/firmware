@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Inspect the RPi4 image without mounting or writing an SD card.
-Usage: check-rootfs.py image.img.gz [usb|spi]
+Usage: check-rootfs.py image.img.gz [usb|spi|sdio]
 Requires unsquashfs in PATH. Extracts only squashfs bytes to a temporary file.
 """
 import gzip, hashlib, json, pathlib, struct, subprocess, sys, tempfile
 image = pathlib.Path(sys.argv[1])
 radio = sys.argv[2] if len(sys.argv) > 2 else 'usb'
-assert radio in ('usb', 'spi')
-chip = 'mm6108' if radio == 'spi' else 'mm8108'
-other = 'mm8108' if radio == 'spi' else 'mm6108'
+assert radio in ('usb', 'spi', 'sdio')
+chip = 'mm6108' if radio != 'usb' else 'mm8108'
+other = 'mm8108' if radio != 'usb' else 'mm6108'
 sources = json.loads(pathlib.Path(__file__).with_name('sources.json').read_text())
 
 with tempfile.TemporaryDirectory() as d:
@@ -46,10 +46,10 @@ with tempfile.TemporaryDirectory() as d:
     assert not forbidden & packages.keys(), forbidden & packages.keys()
     assert len([p for p in paths if p.endswith('/morse.ko')]) == 1
     assert not any(p.endswith(('/dot11ah.ko', '/mm6108_sdio.ko')) for p in paths)
-    version = '2.2.2' if radio == 'spi' else '2.2.3'
+    version = '2.2.2' if radio != 'usb' else '2.2.3'
     module_path = next(p for p in paths if p.endswith('/morse.ko'))
     module = cat(module_path)
-    driver_source = sources['spi']['driver'] if radio == 'spi' else sources['driver']
+    driver_source = sources['spi']['driver'] if radio != 'usb' else sources['driver']
     release = version + '-g' + driver_source['commit'][:8]
     # OpenWrt CONFIG_MODULE_STRIPPED removes version/device-alias metadata.
     # Check the actual release string used by the driver's startup log instead.
@@ -58,13 +58,16 @@ with tempfile.TemporaryDirectory() as d:
     if radio == 'spi':
         assert b'\0morse_spi_init\0' in module and b'\0mm6108-spi\0' in module, 'SPI frontend missing'
         assert b'\0morse_usb_init\0' not in module, 'unexpected USB frontend'
+    elif radio == 'sdio':
+        assert b'\0morse_sdio_init\0' in module, 'SDIO frontend missing'
+        assert b'\0morse_usb_init\0' not in module, 'unexpected USB frontend'
     else:
         assert b'\0morse_usb_init\0' in module, 'USB frontend missing'
         assert b'\0morse_spi_init\0' not in module, 'unexpected SPI frontend'
     for name in required:
         assert version in packages[name]['Version'], packages[name]
-    firmware = 'mm6108.bin' if radio == 'spi' else 'mm8108b2-rl.bin'
-    expected = sources['spi']['firmware']['mm6108_sha256'] if radio == 'spi' else sources['firmware']['mm8108b2_sha256']
+    firmware = 'mm6108.bin' if radio != 'usb' else 'mm8108b2-rl.bin'
+    expected = sources['spi']['firmware']['mm6108_sha256'] if radio != 'usb' else sources['firmware']['mm8108b2_sha256']
     assert hashlib.sha256(cat('lib/firmware/morse/' + firmware)).hexdigest() == expected, 'wrong chip firmware'
     owned_paths = ['lib/firmware/morse/' + firmware]
     if radio == 'spi':
@@ -74,6 +77,12 @@ with tempfile.TemporaryDirectory() as d:
         assert packages['morse-board-config']['Version'] == bcf['package_version'], 'changed baseline BCF package'
         defaults = cat('etc/uci-defaults/99_morse_radio_defaults')
         assert b'/etc/modules.d/mm6108' in defaults, 'SPI missing persistent crystal initialization'
+        owned_paths.append(bcf_path)
+    if radio == 'sdio':
+        bcf = sources['sdio_bcf']
+        bcf_path = 'lib/firmware/morse/' + bcf['file']
+        assert hashlib.sha256(cat(bcf_path)).hexdigest() == bcf['sha256'], 'wrong SDIO board calibration'
+        assert bcf['package'] in packages
         owned_paths.append(bcf_path)
     if radio == 'usb':
         bcf = cat('lib/firmware/morse/bcf_mm8108_m20_us.bin')
