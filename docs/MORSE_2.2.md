@@ -35,7 +35,7 @@ make download
 make -j8
 python3 scripts/morse-2.2/check-config.py usb
 python3 scripts/morse-2.2/check-artifacts.py bin/targets/bcm27xx/bcm2711 usb
-python3 scripts/morse-2.2/check-rootfs.py bin/targets/bcm27xx/bcm2711/*sysupgrade.img.gz usb
+python3 scripts/morse-2.2/check-rootfs.py bin/targets/bcm27xx/bcm2711/*rpi4-mm8108-usb-squashfs-sysupgrade.img.gz usb
 ```
 
 Use `spi` for MM6108. In an initialized builder use
@@ -55,6 +55,33 @@ export GIT_CONFIG_VALUE_0=git@github.com:
 make download
 make -j8
 ```
+
+## Verified build results (2026-10-30)
+
+Both standard images completed `make download` and `make -j8` successfully.
+Build inputs were firmware commit
+`ebfabedb022ed7d296a641926df8ad74bd447a15` and packages commit
+`ac30d4be7785578d762fa0b3e8315da38cc3c107`. Later documentation-only commits
+do not change these recorded image build revisions.
+
+| Image | SHA-256 |
+| --- | --- |
+| `openmanet-1.8.1-rpi4-mm8108-usb-squashfs-sysupgrade.img.gz` | `89b3e5e134077ec49c7377432931aea6fa209b64f33b90ef0a4cabb5bc5d362e` |
+| `openmanet-1.8.1-rpi4-mm6108-spi-squashfs-sysupgrade.img.gz` | `978c3bbafa096cb51de0830045fac6359e03269d9fcd80d4264d03c32b5819c3` |
+
+Configuration, manifest and extracted-rootfs checks passed for both images:
+normal 2.2 package selection, one integrated `morse.ko`, correct driver runtime
+version and bus support, exact firmware/calibration hashes and file ownership.
+The SPI image also passed the external-crystal default check. SHA-256 checks
+passed for every saved image and metadata file. Three netifd/default tests and
+10 actual-code regulatory cases per driver passed. Both branch histories contain
+the `1.8.1-dev` baseline commits listed above.
+
+Workspace artifacts are under `/home/ubuntu/openmanet/morse-2.2-artifacts/usb`
+and `/home/ubuntu/openmanet/morse-2.2-artifacts/spi`, with logs under `evidence`.
+Each image directory includes its manifest, resolved config, feed pins, build
+revisions, source hashes and `sha256sums`. These are build-verified images;
+no device has been flashed or hardware-tested as part of these checks.
 
 ## Hardware validation still required
 
