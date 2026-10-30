@@ -6,7 +6,7 @@ Kconfig reselects dependencies of the retained per-device packages afterward.
 import pathlib, sys
 radio = sys.argv[1] if len(sys.argv) > 1 else "usb"
 chip = "mm6108" if radio == "spi" else "mm8108"
-profile = f'DEVICE_bcm2711_{chip}-{radio}-trial'
+profile = f'DEVICE_bcm2711_{chip}-{radio}'
 active = False
 required = None
 for line in pathlib.Path('tmp/.targetinfo').read_text().splitlines():
@@ -15,7 +15,7 @@ for line in pathlib.Path('tmp/.targetinfo').read_text().splitlines():
     if active and line.startswith('Target-Profile-Packages: '):
         required = set(line.split(': ', 1)[1].split())
         break
-assert required and f'kmod-{chip}-trial' in required, 'trial profile metadata missing'
+assert required and f'kmod-{chip}' in required, 'profile metadata missing'
 p = pathlib.Path('.config')
 lines = p.read_text().splitlines()
 for line in lines:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Inspect the RPi4 image without mounting or writing an SD card.
-Usage: check-rootfs.py trial.img.gz [usb|spi]
+Usage: check-rootfs.py image.img.gz [usb|spi]
 Requires unsquashfs in PATH. Extracts only squashfs bytes to a temporary file.
 """
 import gzip, hashlib, json, pathlib, struct, subprocess, sys, tempfile
@@ -40,10 +40,8 @@ with tempfile.TemporaryDirectory() as d:
         fields = dict(line.split(': ', 1) for line in paragraph.splitlines() if ': ' in line and not line.startswith(' '))
         if 'Package' in fields:
             packages[fields['Package']] = fields
-    required = {f'kmod-{chip}-trial', f'{chip}-trial-firmware'}
-    forbidden = {'kmod-mm8108', 'kmod-mm6108', 'kmod-dot11ah', 'kmod-morse',
-                 'kmod-dot11ah-mm8108-trial', 'mm6108-firmware', 'mm8108-firmware',
-                 f'kmod-{other}-trial', f'{other}-trial-firmware'}
+    required = {f'kmod-{chip}', f'{chip}-firmware'}
+    forbidden = {'kmod-dot11ah', 'kmod-morse', 'kmod-mm6108-trial', 'kmod-mm8108-trial', 'mm6108-trial-firmware', 'mm8108-trial-firmware', f'kmod-{other}', f'{other}-firmware'}
     assert required <= packages.keys(), required - packages.keys()
     assert not forbidden & packages.keys(), forbidden & packages.keys()
     assert len([p for p in paths if p.endswith('/morse.ko')]) == 1
@@ -75,14 +73,14 @@ with tempfile.TemporaryDirectory() as d:
         assert hashlib.sha256(cat(bcf_path)).hexdigest() == bcf['sha256'], 'wrong SPI board calibration'
         assert packages['morse-board-config']['Version'] == bcf['package_version'], 'changed baseline BCF package'
         defaults = cat('etc/uci-defaults/99_morse_radio_defaults')
-        assert b'/etc/modules.d/mm6108-trial' in defaults, 'SPI trial missing persistent crystal initialization'
+        assert b'/etc/modules.d/mm6108' in defaults, 'SPI missing persistent crystal initialization'
         owned_paths.append(bcf_path)
     if radio == 'usb':
         bcf = cat('lib/firmware/morse/bcf_mm8108_m20_us.bin')
         assert hashlib.sha256(bcf).hexdigest() == sources['bcf_sha256'], 'wrong M20-US BCF'
         assert 'bcf_boardtype_0808.bin -> bcf_mm8108_m20_us.bin' in inventory
         owned_paths += ['lib/firmware/morse/bcf_mm8108_m20_us.bin', 'lib/firmware/morse/bcf_boardtype_0808.bin']
-    assert f'etc/modules.d/{chip}-trial' in paths
+    assert f'etc/modules.d/{chip}' in paths
     if 'camera-onvif-server' in packages:
         assert b'option service_port 8082' in cat('etc/config/camera-onvif-server'), 'missing 1.8.1-dev ONVIF port fix'
     # Check ownership from installed package file lists, rather than manifest alone.
