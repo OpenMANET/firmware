@@ -7,7 +7,6 @@ CONFIG_TARGET_bcm27xx_bcm2711=y
 CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_bcm2711_mm8108-usb-trial=y
 CONFIG_TARGET_DEVICE_PACKAGES_bcm27xx_bcm2711_DEVICE_bcm2711_mm8108-usb-trial="-wpad-basic-mbedtls"
 CONFIG_PACKAGE_kmod-mm8108-trial=y
-CONFIG_PACKAGE_kmod-dot11ah-mm8108-trial=y
 CONFIG_PACKAGE_mm8108-trial-firmware=y
 CONFIG_PACKAGE_kmod-mm8108=n
 CONFIG_PACKAGE_kmod-dot11ah=n

@@ -1,18 +1,14 @@
 {
-  "firmware_baseline": "c0f0ba46375c4ed93be416521d4a7f8730440481",
-  "packages_baseline": "4736e44791166e3252ddbc4f050a784b8b5ab062",
-  "packages_trial": "3e540744a685a8ca28cfc83535e4a242053aa176",
   "driver": {
-    "commit": "4ce0a0272f8ac8e2fa58eea8ff08116e493399de",
-    "archive_sha256": "84f60321cccf26b2aa538878323a459b587186a6d7876e0c8c12e03024181c56",
-    "mmrc_submodule": "24f6c69dc9b78490b75cd181ad7013c1b3c3def6"
+    "commit": "270da4733cd4dc62e78e897746f98f6dfb3bef80",
+    "archive_sha256": "3734d4297a25c619a94893c4345bed59cc4010e535a5b29d83b49d75c0ca4c9f",
+    "mmrc_submodule": "9d4d6fe3db2dc64690c42bc0e67a7f3783858ca4"
   },
   "firmware": {
-    "commit": "919f27a6dc2d46a988682d6ff64dd3fdb9ffc465",
-    "archive_sha256": "f753174a6b7a78634728e8abfdf8bc62c19e844fb707e5f9c5605b8e89463dc4",
-    "mm8108b2_sha256": "8cfabb9736e6ac047020eb2dc20dd7851a507777d47f47560b5e0afc28cd95cc"
+    "commit": "db4b69fd212990c59c5f1712e23060cbb94276ec",
+    "archive_sha256": "eefdaf701aa171a4f1c7b2391db5e84e09eb748fa8cd75e2a2626b6c5145a555",
+    "mm8108b2_sha256": "44ebafb072c480f5df1cdd72549893265f23812567ea3777340cdf3217acb72e"
   },
-  "preserved_bcf_sha256": "7fdc1f9ed7ecb1cae20369383eb9d24878230226a4ac09c16a7680acd4a5e1e2",
-  "archive_environment": "Linux, GNU tar, umask 022, OpenWrt host zstd 1.5.7; rawgit recipe including submodules",
-  "other_feeds": "Unchanged from feeds.conf.default"
+  "bcf_sha256": "84834f8862991cfe40d33c185b54efbcff6467a938b3b48c2fb8d4c08a15a0b3",
+  "packages_trial": "bc4a38168051561393c5507aa5c52c74a5f549f4"
 }

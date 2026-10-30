@@ -332,7 +332,7 @@ endif
 # Isolated experimental image: never substitute the shared baseline shim.
 define Device/bcm2711_mm8108-usb-trial
   $(Device/bcm2711_mm8108-usb)
-  DEVICE_VARIANT := USB-2.1-TRIAL
+  DEVICE_VARIANT := USB-2.2-TRIAL
   DEVICE_PACKAGES := $$(filter-out kmod-mm8108 mm8108-firmware wpad-basic-mbedtls,$$(DEVICE_PACKAGES)) kmod-mm8108-trial mm8108-trial-firmware
 endef
 ifeq ($(SUBTARGET),bcm2711)
