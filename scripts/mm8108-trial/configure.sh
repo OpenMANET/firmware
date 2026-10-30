@@ -17,6 +17,10 @@ case "$radio" in
 esac
 ./scripts/mm8108-trial/apply-board-patches.sh
 # Existing builders may still link the old Morse-feed camera package.
+# -f overrides core packages only; uninstall the stale feed link first.
+if [[ -L package/feeds/morse/camera-onvif-server ]]; then
+  ./scripts/feeds uninstall camera-onvif-server
+fi
 ./scripts/feeds install -f -p openmanet camera-onvif-server
 awk 1 boards/common/*_diffconfig "boards/$board/"*_diffconfig > .config
 if [[ -n ${MORSE_TRIAL_EXTERNAL_TOOLCHAIN:-} ]]; then
