@@ -51,14 +51,18 @@ with tempfile.TemporaryDirectory() as d:
     version = '2.2.2' if radio == 'spi' else '2.2.3'
     module_path = next(p for p in paths if p.endswith('/morse.ko'))
     module = cat(module_path)
-    assert (b'version=' + version.encode() + b'-g') in module, 'wrong compiled driver version'
+    driver_source = sources['spi']['driver'] if radio == 'spi' else sources['driver']
+    release = version + '-g' + driver_source['commit'][:8]
+    # OpenWrt CONFIG_MODULE_STRIPPED removes version/device-alias metadata.
+    # Check the actual release string used by the driver's startup log instead.
+    assert b'\0' + release.encode() + b'\0' in module, 'wrong compiled driver version'
     assert b'parmtype=channelization_scheme:' in module, 'missing integrated channelization parameter'
     if radio == 'spi':
-        assert b'alias=spi:mm6108-spi' in module, 'SPI frontend missing'
-        assert b'alias=usb:' not in module, 'unexpected USB frontend'
+        assert b'\0morse_spi_init\0' in module and b'\0mm6108-spi\0' in module, 'SPI frontend missing'
+        assert b'\0morse_usb_init\0' not in module, 'unexpected USB frontend'
     else:
-        assert b'alias=usb:' in module, 'USB frontend missing'
-        assert b'alias=spi:' not in module, 'unexpected SPI frontend'
+        assert b'\0morse_usb_init\0' in module, 'USB frontend missing'
+        assert b'\0morse_spi_init\0' not in module, 'unexpected SPI frontend'
     for name in required:
         assert version in packages[name]['Version'], packages[name]
     firmware = 'mm6108.bin' if radio == 'spi' else 'mm8108b2-rl.bin'
