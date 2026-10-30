@@ -69,6 +69,14 @@ with tempfile.TemporaryDirectory() as d:
     expected = sources['spi']['firmware']['mm6108_sha256'] if radio == 'spi' else sources['firmware']['mm8108b2_sha256']
     assert hashlib.sha256(cat('lib/firmware/morse/' + firmware)).hexdigest() == expected, 'wrong chip firmware'
     owned_paths = ['lib/firmware/morse/' + firmware]
+    if radio == 'spi':
+        bcf = sources['spi']['bcf']
+        bcf_path = 'lib/firmware/morse/' + bcf['file']
+        assert hashlib.sha256(cat(bcf_path)).hexdigest() == bcf['sha256'], 'wrong SPI board calibration'
+        assert packages['morse-board-config']['Version'] == bcf['package_version'], 'changed baseline BCF package'
+        defaults = cat('etc/uci-defaults/99_morse_radio_defaults')
+        assert b'/etc/modules.d/mm6108-trial' in defaults, 'SPI trial missing persistent crystal initialization'
+        owned_paths.append(bcf_path)
     if radio == 'usb':
         bcf = cat('lib/firmware/morse/bcf_mm8108_m20_us.bin')
         assert hashlib.sha256(bcf).hexdigest() == sources['bcf_sha256'], 'wrong M20-US BCF'

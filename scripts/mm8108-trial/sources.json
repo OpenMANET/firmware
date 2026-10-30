@@ -10,7 +10,7 @@
     "mm8108b2_sha256": "44ebafb072c480f5df1cdd72549893265f23812567ea3777340cdf3217acb72e"
   },
   "bcf_sha256": "84834f8862991cfe40d33c185b54efbcff6467a938b3b48c2fb8d4c08a15a0b3",
-  "packages_trial": "0f01159c2b5af85e77d56aa88df867d4935e55fc",
+  "packages_trial": "5bdd57625276fe0ee3b229cca1a9f27fa68a7ae7",
   "spi": {
     "driver": {
       "commit": "b566725bd000aa1854ab406bae786d36014839c2",
@@ -21,6 +21,11 @@
       "commit": "db4b69fd212990c59c5f1712e23060cbb94276ec",
       "archive_sha256": "146b12adb8dd10f078134dec8fa980fb8958cf54ab1a9e8549c2997fb1be4d79",
       "mm6108_sha256": "aeacb187816b62c55efc362cde256c02b862613ebf136b96e11e4fa05b3e1b03"
+    },
+    "bcf": {
+      "package_version": "mm8108-2.0.0-r1",
+      "file": "bcf_fgh100mhaamd.bin",
+      "sha256": "55089af7d08597a16ddd4002ca4b23f24729aa5bd0f1b75b6e04bc5270d23ba6"
     }
   },
   "development_baselines": {
