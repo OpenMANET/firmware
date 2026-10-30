@@ -60,6 +60,31 @@ Exact driver, firmware and calibration source hashes are recorded in
 firmware, calibration, module parameters and package ownership separately;
 the shared multi-profile manifest alone cannot establish per-image contents.
 
+## Verified normal build (2026-10-30)
+
+The normal setup, `make download`, and `make -j8 V=sc` completed successfully
+in `/home/ubuntu/openmanet/firmware`. The images were built from firmware
+commit `63724b0be32ce9d3abb06b49e2214be220f38254`, with packages pinned to
+`0005a14dcbb3a19bc9459373ab98b9e04e41c7d6`. Subsequent documentation-only
+commits do not change this recorded image build revision.
+
+Configuration, output metadata and all three extracted-rootfs checks passed.
+`sha256sum -c sha256sums` passed. Each gzip payload also passed `gzip -t`
+after removing the OpenWrt metadata trailer from a temporary copy with
+`fwtool`; the original downloadable images retain their trailers. Running
+`gzip -t` directly on those images reports the expected trailing metadata.
+
+| Image | SHA-256 |
+| --- | --- |
+| MM8108 USB | `5404d380cad4001db96dcca13ce35777dab433b39c9d288b1655e45fae34b540` |
+| MM6108 SPI | `046e7326ea3860ebf8ee8ccf4e0ae3ff7e706d280390d794219ca6b0bfbb9c2a` |
+| MM6108 SDIO | `7b49be37b5e4a5b81746e4eda82495b1459f724960026c4d3f95a9fde5159f20` |
+
+The standard board patch disables GLib's optional, implicitly detected
+libelf support to avoid an undeclared build dependency during parallel builds.
+Both host and target GLib builds passed. Package source archive hashes match
+the normal OpenWrt downloader's output, including upstream BCF symlinks.
+
 ## Hardware validation still required
 
 Compilation and filesystem checks do not establish RF performance or runtime
