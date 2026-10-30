@@ -71,6 +71,8 @@ with tempfile.TemporaryDirectory() as d:
         assert 'bcf_boardtype_0808.bin -> bcf_mm8108_m20_us.bin' in inventory
         owned_paths += ['lib/firmware/morse/bcf_mm8108_m20_us.bin', 'lib/firmware/morse/bcf_boardtype_0808.bin']
     assert f'etc/modules.d/{chip}-trial' in paths
+    if 'camera-onvif-server' in packages:
+        assert b'option service_port 8082' in cat('etc/config/camera-onvif-server'), 'missing 1.8.1-dev ONVIF port fix'
     # Check ownership from installed package file lists, rather than manifest alone.
     for owned in owned_paths:
         owners = []

@@ -14,4 +14,8 @@ for key in [f'kmod-{other}-trial', f'{other}-trial-firmware', 'kmod-dot11ah-mm81
     assert c.get('CONFIG_PACKAGE_' + key, 'n') == 'n', f'baseline package selected: {key}'
 devices = [k for k, v in c.items() if k.startswith('CONFIG_TARGET_DEVICE_') and not k.startswith('CONFIG_TARGET_DEVICE_PACKAGES_') and v == 'y']
 assert devices == [f'CONFIG_TARGET_DEVICE_bcm27xx_bcm2711_DEVICE_bcm2711_{chip}-{radio}-trial'], devices
+if c.get('CONFIG_PACKAGE_camera-onvif-server') == 'y':
+    info = pathlib.Path('tmp/.packageinfo').read_text()
+    assert 'Source-Makefile: package/feeds/openmanet/camera-onvif-server/Makefile' in info, 'missing 1.8.1-dev camera override'
+    assert 'Source-Makefile: package/feeds/morse/camera-onvif-server/Makefile' not in info, 'stale camera feed provider'
 print(f'PASS: RPi4 {chip} {radio} trial only; baseline radio packages excluded')
