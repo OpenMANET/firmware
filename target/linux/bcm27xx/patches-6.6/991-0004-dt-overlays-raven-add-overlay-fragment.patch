@@ -1,18 +1,30 @@
 From: Corey Wagehoft <corey.wagehoft@gmail.com>
-Date: Tue, 7 Jul 2026 00:00:00 -0500
+Date: Sat, 5 Sep 2026 00:00:00 -0500
 Subject: [PATCH] dt-overlays: raven: add overlay fragment
 
-Rename GPIO lines for the RAVEN CM4 carrier board (LC76G GPS on
-UART0, 1PPS input on GPIO18, GPS jamming indicator on GPIO4).
+Overlay for the RAVEN CM4 carrier board.
+
+Rename GPIO lines to match the RAVEN schematic: LC76G GPS on UART0
+(GPIO14/15) with 1PPS on GPIO18, jamming indicator on GPIO23, wake on
+GPIO12 and reset on GPIO25; I2C1 on GPIO2/3; UART3 on GPIO4/5; UART4 on
+GPIO8/9; and the talk group selector inputs TALKGROUP_1..5 on
+GPIO17/27/22/24/10 (EXT_GPIO1..5 on the J4 header).
+
+Add a pinctrl hog on the gpio node so the talk group lines are inputs
+with pull-ups from pinctrl probe onwards. The bcm2835 pinmux is not
+strict, so userspace can still request the lines by name.
+
+Disable uart5: the shared ekh01 distroconfig enables it on GPIO12/13,
+but on RAVEN GPIO12 is GPS_WAKE.
 
 ---
- .../arm/boot/dts/overlays/raven-overlay.dts | 32 ++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ .../arm/boot/dts/overlays/raven-overlay.dts | 104 ++++++++++++++++++++++++++
+ 1 file changed, 104 insertions(+)
  create mode 100644 arch/arm/boot/dts/overlays/raven-overlay.dts
 
 --- /dev/null
 +++ b/arch/arm/boot/dts/overlays/raven-overlay.dts
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,104 @@
 +/dts-v1/;
 +/plugin/;
 +
@@ -23,25 +35,97 @@ UART0, 1PPS input on GPIO18, GPS jamming indicator on GPIO4).
 +		target = <&gpio>;
 +		__overlay__ {
 +			gpio-line-names =
-+				"ID_SDA", "ID_SCL", "SDA1", "SCL1",
-+				"GPS_JAM_IND",            /* GPIO4  - LC76G jamming indicator */
-+				"GPIO5", "GPIO6", "SPI_CE1_N",
-+				"SPI_CE0_N", "SPI_MISO", "SPI_MOSI", "SPI_SCLK",
-+				"GPIO12", "GPIO13",
-+				"GPS_UART_TX",            /* GPIO14 - CM4 TXD0 -> LC76G RX */
-+				"GPS_UART_RX",            /* GPIO15 - CM4 RXD0 <- LC76G TX */
-+				"GPIO16", "GPIO17",
-+				"GPS_PPS",                /* GPIO18 - 1PPS in */
-+				"GPIO19", "GPIO20", "GPIO21", "GPIO22", "GPIO23",
-+				"GPIO24", "GPIO25", "GPIO26", "GPIO27",
-+				"RGMII_MDIO", "RGMII_MDC", "CTS0", "RTS0",
-+				"TXD0", "RXD0", "SD1_CLK", "SD1_CMD",
-+				"SD1_DATA0", "SD1_DATA1", "SD1_DATA2", "SD1_DATA3",
-+				"PWM0_MISO", "PWM1_MOSI", "STATUS_LED_G_CLK", "SPIFLASH_CE_N",
-+				"SDA0", "SCL0",
-+				"RGMII_RXCLK", "RGMII_RXCTL", "RGMII_RXD0", "RGMII_RXD1",
-+				"RGMII_RXD2", "RGMII_RXD3", "RGMII_TXCLK", "RGMII_TXCTL",
-+				"RGMII_TXD0", "RGMII_TXD1", "RGMII_TXD2", "RGMII_TXD3";
++				"ID_SDA",           /* GPIO0  */
++				"ID_SCL",           /* GPIO1  */
++				"I2C1_SDA",         /* GPIO2  */
++				"I2C1_SCL",         /* GPIO3  */
++				"UART3_TX",         /* GPIO4  - TXD3 */
++				"UART3_RX",         /* GPIO5  - RXD3 */
++				"GPIO6",            /* GPIO6  */
++				"GPIO7",            /* GPIO7  - not connected */
++				"UART4_TX",         /* GPIO8  - TXD4 */
++				"UART4_RX",         /* GPIO9  - RXD4 */
++				"TALKGROUP_5",      /* GPIO10 - pull-up */
++				"GPIO11",           /* GPIO11 - not connected */
++				"GPS_WAKE",         /* GPIO12 - LC76G AP_REQ via level shifter */
++				"GPIO13",           /* GPIO13 */
++				"GPS_UART_TX",      /* GPIO14 - CM4 TXD0 -> LC76G RX */
++				"GPS_UART_RX",      /* GPIO15 - CM4 RXD0 <- LC76G TX */
++				"GPIO16",           /* GPIO16 */
++				"TALKGROUP_1",      /* GPIO17 - pull-up */
++				"GPS_PPS",          /* GPIO18 - 1PPS in */
++				"GPIO19",           /* GPIO19 */
++				"GPIO20",           /* GPIO20 */
++				"GPIO21",           /* GPIO21 */
++				"TALKGROUP_3",      /* GPIO22 - pull-up */
++				"GPS_JAM_IND",      /* GPIO23 - LC76G jamming indicator */
++				"TALKGROUP_4",      /* GPIO24 - pull-up */
++				"GPS_RESET",        /* GPIO25 - LC76G RESET_N via level shifter */
++				"GPIO26",           /* GPIO26 */
++				"TALKGROUP_2",      /* GPIO27 - pull-up */
++				"RGMII_MDIO",       /* GPIO28 */
++				"RGMII_MDC",        /* GPIO29 */
++				"CTS0",             /* GPIO30 */
++				"RTS0",             /* GPIO31 */
++				"TXD0",             /* GPIO32 */
++				"RXD0",             /* GPIO33 */
++				"SD1_CLK",          /* GPIO34 */
++				"SD1_CMD",          /* GPIO35 */
++				"SD1_DATA0",        /* GPIO36 */
++				"SD1_DATA1",        /* GPIO37 */
++				"SD1_DATA2",        /* GPIO38 */
++				"SD1_DATA3",        /* GPIO39 */
++				"PWM0_MISO",        /* GPIO40 */
++				"PWM1_MOSI",        /* GPIO41 */
++				"STATUS_LED_G_CLK", /* GPIO42 */
++				"SPIFLASH_CE_N",    /* GPIO43 */
++				"SDA0",             /* GPIO44 */
++				"SCL0",             /* GPIO45 */
++				"RGMII_RXCLK",      /* GPIO46 */
++				"RGMII_RXCTL",      /* GPIO47 */
++				"RGMII_RXD0",       /* GPIO48 */
++				"RGMII_RXD1",       /* GPIO49 */
++				"RGMII_RXD2",       /* GPIO50 */
++				"RGMII_RXD3",       /* GPIO51 */
++				"RGMII_TXCLK",      /* GPIO52 */
++				"RGMII_TXCTL",      /* GPIO53 */
++				"RGMII_TXD0",       /* GPIO54 */
++				"RGMII_TXD1",       /* GPIO55 */
++				"RGMII_TXD2",       /* GPIO56 */
++				"RGMII_TXD3";       /* GPIO57 */
++		};
++	};
++
++	/*
++	 * Talk group selector inputs. Hog the pinctrl state so the lines
++	 * are inputs with pull-ups from pinctrl probe onwards. The bcm2835
++	 * pinmux is not strict, so userspace (gpioget/openmanetd) can still
++	 * request the lines.
++	 */
++	fragment@1 {
++		target = <&gpio>;
++		__overlay__ {
++			pinctrl-names = "default";
++			pinctrl-0 = <&talkgroup_pins>;
++
++			talkgroup_pins: talkgroup_pins {
++				brcm,pins = <17 27 22 24 10>;
++				brcm,function = <0>;     /* input */
++				brcm,pull = <2 2 2 2 2>; /* pull-up */
++			};
++		};
++	};
++
++	/*
++	 * The shared ekh01 distroconfig enables uart5 (GPIO12/13) for every
++	 * board. On RAVEN GPIO12 is GPS_WAKE, so TXD5 idling high would hold
++	 * the LC76G in standby until gpsboard.init reclaims the pin. This
++	 * overlay is applied after uart5, so disabling it here wins.
++	 */
++	fragment@2 {
++		target = <&uart5>;
++		__overlay__ {
++			status = "disabled";
 +		};
 +	};
 +};
