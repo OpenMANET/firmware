@@ -7,6 +7,7 @@ case "$radio" in
   spi) board=rpi4-mm6108-2.2-trial ;;
   *) echo "usage: configure.sh [usb|spi]" >&2; exit 1 ;;
 esac
+./scripts/mm8108-trial/apply-board-patches.sh
 awk 1 boards/common/*_diffconfig "boards/$board/"*_diffconfig > .config
 if [[ -n ${MORSE_TRIAL_EXTERNAL_TOOLCHAIN:-} ]]; then
   ./scripts/ext-toolchain.sh --toolchain "$MORSE_TRIAL_EXTERNAL_TOOLCHAIN" --overwrite-config --config bcm27xx/bcm2711
