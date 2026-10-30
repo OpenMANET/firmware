@@ -342,6 +342,15 @@ ifeq ($(SUBTARGET),bcm2711)
   TARGET_DEVICES += bcm2711_mm8108-usb-trial
 endif
 
+define Device/bcm2711_mm6108-spi-trial
+  $(Device/bcm2711_mm6108-spi)
+  DEVICE_VARIANT := SPI-2.2-TRIAL
+  DEVICE_PACKAGES := $$(filter-out kmod-mm6108 mm6108-firmware wpad-basic-mbedtls,$$(DEVICE_PACKAGES)) kmod-mm6108-trial mm6108-trial-firmware
+endef
+ifeq ($(SUBTARGET),bcm2711)
+  TARGET_DEVICES += bcm2711_mm6108-spi-trial
+endif
+
 define Device/bcm2711_raven
   $(Device/morse_ekh01_base)
   DEVICE_MODEL := RAVEN-MM8108

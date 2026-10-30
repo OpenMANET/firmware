@@ -10,5 +10,21 @@
     "mm8108b2_sha256": "44ebafb072c480f5df1cdd72549893265f23812567ea3777340cdf3217acb72e"
   },
   "bcf_sha256": "84834f8862991cfe40d33c185b54efbcff6467a938b3b48c2fb8d4c08a15a0b3",
-  "packages_trial": "bc4a38168051561393c5507aa5c52c74a5f549f4"
+  "packages_trial": "90159676e50a492314e9ee5c5dae538681474a42",
+  "spi": {
+    "driver": {
+      "commit": "b566725bd000aa1854ab406bae786d36014839c2",
+      "archive_sha256": "7e1a0394dca300727c341fba58bfb28af66e407c23b78cc3db2fabe88c5f8109",
+      "mmrc_submodule": "32646409c58ca2b143d430aef3e43823e4420cde"
+    },
+    "firmware": {
+      "commit": "db4b69fd212990c59c5f1712e23060cbb94276ec",
+      "archive_sha256": "146b12adb8dd10f078134dec8fa980fb8958cf54ab1a9e8549c2997fb1be4d79",
+      "mm6108_sha256": "aeacb187816b62c55efc362cde256c02b862613ebf136b96e11e4fa05b3e1b03"
+    }
+  },
+  "development_baselines": {
+    "packages": "ec6146eff8c28eb44f2afa8496a5ecafcb379f1a",
+    "firmware": "a1eee8863dfa4635d0bfa75fe499738a48861e83"
+  }
 }

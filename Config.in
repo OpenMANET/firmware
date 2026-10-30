@@ -44,5 +44,16 @@ config OPENMANET_MM8108_TRIAL
 	depends on TARGET_bcm27xx_bcm2711
 	default n
 	help
-	  Select the experimental shim dependency for existing Morse userspace.
+	  Select the experimental driver dependency for existing Morse userspace.
 	  Use only the rpi4-mm8108-2.2-trial board in a separate build tree.
+
+config OPENMANET_MM6108_TRIAL
+	bool "Isolated MM6108 SPI 2.2 trial (RPi4 only)"
+	depends on TARGET_bcm27xx_bcm2711 && !OPENMANET_MM8108_TRIAL
+	default n
+	help
+	  Use only the rpi4-mm6108-2.2-trial board configuration.
+
+config OPENMANET_MORSE_22_TRIAL
+	bool
+	default y if OPENMANET_MM8108_TRIAL || OPENMANET_MM6108_TRIAL

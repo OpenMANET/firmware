@@ -10,4 +10,4 @@ revision=$(cat scripts/mm8108-trial/packages.rev)
 [[ -z "$(git -C "$packages" status --porcelain)" ]] || { echo 'Packages checkout must be clean' >&2; exit 1; }
 { printf 'src-git openmanet file://%s^%s\n' "$packages" "$revision"; sed '/^src-git openmanet /d' feeds.conf.default; } > feeds.conf
 ./scripts/openmanet_setup.sh -i
-./scripts/mm8108-trial/configure.sh
+./scripts/mm8108-trial/configure.sh "${2:-usb}"

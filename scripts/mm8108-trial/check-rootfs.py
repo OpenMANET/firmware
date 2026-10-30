@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Inspect the RPi4 image without mounting or writing an SD card.
-Usage: check-rootfs.py trial.img.gz [--baseline]
+Usage: check-rootfs.py trial.img.gz [usb|spi]
 Requires unsquashfs in PATH. Extracts only squashfs bytes to a temporary file.
 """
-import gzip, hashlib, pathlib, struct, subprocess, sys, tempfile
+import gzip, hashlib, json, pathlib, struct, subprocess, sys, tempfile
 image = pathlib.Path(sys.argv[1])
-baseline = '--baseline' in sys.argv[2:]
+radio = sys.argv[2] if len(sys.argv) > 2 else 'usb'
+assert radio in ('usb', 'spi')
+chip = 'mm6108' if radio == 'spi' else 'mm8108'
+other = 'mm8108' if radio == 'spi' else 'mm6108'
+sources = json.loads(pathlib.Path(__file__).with_name('sources.json').read_text())
+
 with tempfile.TemporaryDirectory() as d:
     rootfs = pathlib.Path(d) / 'rootfs.squashfs'
     with gzip.open(image, 'rb') as f:
@@ -35,31 +40,33 @@ with tempfile.TemporaryDirectory() as d:
         fields = dict(line.split(': ', 1) for line in paragraph.splitlines() if ': ' in line and not line.startswith(' '))
         if 'Package' in fields:
             packages[fields['Package']] = fields
-    trial = {'kmod-mm8108-trial', 'mm8108-trial-firmware'}
-    original = {'kmod-mm8108', 'kmod-dot11ah', 'mm8108-firmware'}
-    required, forbidden = (original, trial) if baseline else (trial, original)
+    required = {f'kmod-{chip}-trial', f'{chip}-trial-firmware'}
+    forbidden = {'kmod-mm8108', 'kmod-mm6108', 'kmod-dot11ah', 'kmod-morse',
+                 'kmod-dot11ah-mm8108-trial', 'mm6108-firmware', 'mm8108-firmware',
+                 f'kmod-{other}-trial', f'{other}-trial-firmware'}
     assert required <= packages.keys(), required - packages.keys()
-    assert not (forbidden | {'kmod-mm6108', 'mm6108-firmware', 'kmod-morse'}) & packages.keys(), 'mixed radio packages'
-    for module in (['morse.ko', 'dot11ah.ko'] if baseline else ['morse.ko']):
-        assert len([p for p in paths if p.endswith('/' + module)]) == 1, module
-    assert not any(p.endswith('/mm6108_sdio.ko') for p in paths)
+    assert not forbidden & packages.keys(), forbidden & packages.keys()
+    assert len([p for p in paths if p.endswith('/morse.ko')]) == 1
+    assert not any(p.endswith(('/dot11ah.ko', '/mm6108_sdio.ko')) for p in paths)
+    version = '2.2.2' if radio == 'spi' else '2.2.3'
     for name in required:
-        expected = '2.0.0' if baseline else '2.2.3'
-        assert expected in packages[name]['Version'], packages[name]
-    # Compare the calibration file byte-for-byte with the preserved baseline.
-    bcf = cat('lib/firmware/morse/bcf_mm8108_m20_us.bin')
-    assert hashlib.sha256(bcf).hexdigest() == ('7fdc1f9ed7ecb1cae20369383eb9d24878230226a4ac09c16a7680acd4a5e1e2' if baseline else '84834f8862991cfe40d33c185b54efbcff6467a938b3b48c2fb8d4c08a15a0b3'), 'board calibration changed'
-    assert 'bcf_boardtype_0808.bin -> bcf_mm8108_m20_us.bin' in inventory
-    if not baseline:
-        assert not any(p.endswith("/dot11ah.ko") for p in paths), "unexpected legacy shim"
-        chip = cat('lib/firmware/morse/mm8108b2-rl.bin')
-        assert hashlib.sha256(chip).hexdigest() == '44ebafb072c480f5df1cdd72549893265f23812567ea3777340cdf3217acb72e', 'wrong chip firmware'
+        assert version in packages[name]['Version'], packages[name]
+    firmware = 'mm6108.bin' if radio == 'spi' else 'mm8108b2-rl.bin'
+    expected = sources['spi']['firmware']['mm6108_sha256'] if radio == 'spi' else sources['firmware']['mm8108b2_sha256']
+    assert hashlib.sha256(cat('lib/firmware/morse/' + firmware)).hexdigest() == expected, 'wrong chip firmware'
+    owned_paths = ['lib/firmware/morse/' + firmware]
+    if radio == 'usb':
+        bcf = cat('lib/firmware/morse/bcf_mm8108_m20_us.bin')
+        assert hashlib.sha256(bcf).hexdigest() == sources['bcf_sha256'], 'wrong M20-US BCF'
+        assert 'bcf_boardtype_0808.bin -> bcf_mm8108_m20_us.bin' in inventory
+        owned_paths += ['lib/firmware/morse/bcf_mm8108_m20_us.bin', 'lib/firmware/morse/bcf_boardtype_0808.bin']
+    assert f'etc/modules.d/{chip}-trial' in paths
     # Check ownership from installed package file lists, rather than manifest alone.
-    for owned in ['lib/firmware/morse/bcf_mm8108_m20_us.bin', 'lib/firmware/morse/bcf_boardtype_0808.bin', 'lib/firmware/morse/mm8108b2-rl.bin']:
+    for owned in owned_paths:
         owners = []
         for p in paths:
             if p.startswith('usr/lib/opkg/info/') and p.endswith('.list'):
                 if '/' + owned in cat(p).decode().splitlines():
                     owners.append(p)
         assert len(owners) == 1, (owned, owners)
-    print('PASS:', image.name, 'baseline' if baseline else 'trial', 'radio modules, firmware, calibration and ownership')
+    print('PASS:', image.name, radio, 'radio modules, firmware, calibration and ownership')
