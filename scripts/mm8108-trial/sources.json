@@ -10,7 +10,7 @@
     "mm8108b2_sha256": "44ebafb072c480f5df1cdd72549893265f23812567ea3777340cdf3217acb72e"
   },
   "bcf_sha256": "84834f8862991cfe40d33c185b54efbcff6467a938b3b48c2fb8d4c08a15a0b3",
-  "packages_trial": "9de2e81c3df9cfde7b794e501a8a7ecd8c92ef58",
+  "packages_trial": "cd2853a5e698e07e27f93a7f8bbf9161b43e89df",
   "spi": {
     "driver": {
       "commit": "b566725bd000aa1854ab406bae786d36014839c2",
