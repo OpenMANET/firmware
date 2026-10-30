@@ -49,6 +49,16 @@ with tempfile.TemporaryDirectory() as d:
     assert len([p for p in paths if p.endswith('/morse.ko')]) == 1
     assert not any(p.endswith(('/dot11ah.ko', '/mm6108_sdio.ko')) for p in paths)
     version = '2.2.2' if radio == 'spi' else '2.2.3'
+    module_path = next(p for p in paths if p.endswith('/morse.ko'))
+    module = cat(module_path)
+    assert (b'version=' + version.encode() + b'-g') in module, 'wrong compiled driver version'
+    assert b'parmtype=channelization_scheme:' in module, 'missing integrated channelization parameter'
+    if radio == 'spi':
+        assert b'alias=spi:mm6108-spi' in module, 'SPI frontend missing'
+        assert b'alias=usb:' not in module, 'unexpected USB frontend'
+    else:
+        assert b'alias=usb:' in module, 'USB frontend missing'
+        assert b'alias=spi:' not in module, 'unexpected SPI frontend'
     for name in required:
         assert version in packages[name]['Version'], packages[name]
     firmware = 'mm6108.bin' if radio == 'spi' else 'mm8108b2-rl.bin'
