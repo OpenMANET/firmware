@@ -1,0 +1,20 @@
+Subject: [PATCH] glib2: disable undeclared optional libelf dependency
+
+GLib auto-detects libelf from an existing staging directory without declaring
+an elfutils build dependency. A parallel rebuild can remove that library
+before gresource links. Disable ELF resource inspection for gresource, a
+utility not shipped by the target glib2 package, to keep the build independent
+of staging contents and package build order.
+
+--- a/feeds/packages/libs/glib2/Makefile
++++ b/feeds/packages/libs/glib2/Makefile
+@@ -57,6 +57,9 @@ COMP_ARGS+=-Dlibmount=disabled
+ # default feature=auto see meson_options.txt
+ COMP_ARGS+=-Dselinux=disabled
+ 
++# gresource ELF inspection is optional; libelf is not a declared dependency.
++COMP_ARGS+=-Dlibelf=disabled
++
+ # default boolean=true see meson_options.txt
+ COMP_ARGS+=-Dglib_assert=false
+ 
