@@ -1,0 +1,104 @@
+--- a/usb.c
++++ b/usb.c
+@@ -326,11 +326,23 @@
+ 		goto error;
+ 	}
+ 
++	if (musb->errors)
++		dev_err(mors->dev, "MM22DIAG command callback error=%d ep=0x%02x actual=%u\n",
++			musb->errors, ep->addr, ep->urb->actual_length);
+ 	musb->ongoing_cmd = 0;
+ 
+ 	return writesize;
+ 
+ error:
++	if (writesize == sizeof(struct morse_usb_command)) {
++		struct morse_usb_command diag_cmd;
++
++		memcpy(&diag_cmd, user_buffer, sizeof(diag_cmd));
++		dev_err(mors->dev,
++			"MM22DIAG command dir=%u addr=0x%08x len=%u ep=0x%02x ret=%d callback_error=%d\n",
++			le32_to_cpu(diag_cmd.dir), le32_to_cpu(diag_cmd.address),
++			le32_to_cpu(diag_cmd.length), ep->addr, retval, musb->errors);
++	}
+ 	musb->ongoing_cmd = 0;
+ 	return retval;
+ }
+@@ -394,6 +406,8 @@
+ static int morse_usb_mem_read(struct morse_usb *musb, u32 address, u8 *data, ssize_t size)
+ {
+ 	int ret;
++	bool diag_submitted = false;
++	bool diag_timed_out = false;
+ 	struct morse_usb_command cmd;
+ 	struct morse *mors = usb_get_intfdata(musb->interface);
+ 
+@@ -435,12 +449,14 @@
+ 		goto error;
+ 	}
+ 
++	diag_submitted = true;
+ 	ret = wait_event_interruptible_timeout(musb->rw_in_wait, (!musb->ongoing_rw),
+ 					       msecs_to_jiffies(URB_TIMEOUT_MS));
+ 	if (ret < 0) {
+ 		MORSE_USB_ERR(mors, "%s: wait_event_interruptible: error %d\n", __func__, ret);
+ 		goto error;
+ 	} else if (ret == 0) {
++		diag_timed_out = true;
+ 		/* Timed out. */
+ 		usb_kill_urb(musb->endpoints[MORSE_EP_MEM_RD].urb);
+ 	}
+@@ -458,6 +474,14 @@
+ 	ret = size;
+ 
+ error:
++	if (ret < 0 || diag_timed_out)
++		dev_err(mors->dev,
++			"MM22DIAG %s addr=0x%08x len=%zd ep=0x%02x submitted=%u timeout=%u ret=%d urb_status=%d actual=%u flags=0x%lx\n",
++			__func__, address, size, musb->endpoints[MORSE_EP_MEM_RD].addr,
++			diag_submitted, diag_timed_out, ret,
++			diag_submitted ? musb->endpoints[MORSE_EP_MEM_RD].urb->status : 0,
++			diag_submitted ? musb->endpoints[MORSE_EP_MEM_RD].urb->actual_length : 0,
++			musb->flags);
+ 	musb->ongoing_rw = 0;
+ 	mutex_unlock(&musb->lock);
+ 
+@@ -467,6 +491,8 @@
+ static int morse_usb_mem_write(struct morse_usb *musb, u32 address, u8 *data, ssize_t size)
+ {
+ 	int ret;
++	bool diag_submitted = false;
++	bool diag_timed_out = false;
+ 	struct morse_usb_command cmd;
+ 	struct morse *mors = usb_get_intfdata(musb->interface);
+ 
+@@ -513,12 +539,14 @@
+ 		goto error;
+ 	}
+ 
++	diag_submitted = true;
+ 	ret = wait_event_interruptible_timeout(musb->rw_in_wait, (!musb->ongoing_rw),
+ 					       msecs_to_jiffies(URB_TIMEOUT_MS));
+ 	if (ret < 0) {
+ 		MORSE_USB_ERR(mors, "%s error %d\n", __func__, ret);
+ 		goto error;
+ 	} else if (ret == 0) {
++		diag_timed_out = true;
+ 		/* Timed out. */
+ 		usb_kill_urb(musb->endpoints[MORSE_EP_MEM_WR].urb);
+ 	}
+@@ -532,6 +560,14 @@
+ 	ret = size;
+ 
+ error:
++	if (ret < 0 || diag_timed_out)
++		dev_err(mors->dev,
++			"MM22DIAG %s addr=0x%08x len=%zd ep=0x%02x submitted=%u timeout=%u ret=%d urb_status=%d actual=%u flags=0x%lx\n",
++			__func__, address, size, musb->endpoints[MORSE_EP_MEM_WR].addr,
++			diag_submitted, diag_timed_out, ret,
++			diag_submitted ? musb->endpoints[MORSE_EP_MEM_WR].urb->status : 0,
++			diag_submitted ? musb->endpoints[MORSE_EP_MEM_WR].urb->actual_length : 0,
++			musb->flags);
+ 	musb->ongoing_rw = 0;
+ 	mutex_unlock(&musb->lock);
+ 	return ret;

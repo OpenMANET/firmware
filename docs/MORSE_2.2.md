@@ -17,6 +17,17 @@ its own driver and firmware. This avoids installing two providers of
 `morse.ko` into the shared rootfs. Common Morse userspace remains selected
 at `=y`. Netifd passes channelization parameters to the integrated module.
 
+## Current diagnostic output (2026-11-04)
+
+The current local USB output is diagnostic version `2.2.3-g270da473-diag2`.
+The previous diag1 image remains available alongside it.
+A distinctly named copy and checksums are under
+`bin/targets/bcm27xx/bcm2711/diagnostics/`. See
+[MORSE_2.2_USB_AUDIT.md](MORSE_2.2_USB_AUDIT.md) for provenance and validation.
+Use `check-rootfs.py IMAGE usb --diagnostic --diagnostic-version diag2` for this output. The October 30
+hashes below describe the previous build, saved under
+`logs/morse-2.2/diag1-image/previous-target-output/`. Hardware testing is recorded in [MORSE_2.2_HANDOFF.md](MORSE_2.2_HANDOFF.md).
+
 ## Normal build
 
 Use the repository workflow from `AGENTS.md`, starting in `firmware/`:

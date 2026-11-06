@@ -3,9 +3,16 @@
 Usage: check-rootfs.py image.img.gz [usb|spi|sdio]
 Requires unsquashfs in PATH. Extracts only squashfs bytes to a temporary file.
 """
-import gzip, hashlib, json, pathlib, struct, subprocess, sys, tempfile
-image = pathlib.Path(sys.argv[1])
-radio = sys.argv[2] if len(sys.argv) > 2 else 'usb'
+import argparse, gzip, hashlib, json, pathlib, struct, subprocess, sys, tempfile
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('image', type=pathlib.Path)
+parser.add_argument('radio', nargs='?', default='usb', choices=['usb', 'spi', 'sdio'])
+parser.add_argument('--diagnostic', action='store_true', help='Require the MM8108 diagnostic driver and logging')
+parser.add_argument('--diagnostic-version', choices=['diag1', 'diag2'], default='diag1')
+args = parser.parse_args()
+image = args.image
+radio = args.radio
+assert not args.diagnostic or radio == 'usb', 'diagnostic images are only built for USB'
 assert radio in ('usb', 'spi', 'sdio')
 chip = 'mm6108' if radio != 'usb' else 'mm8108'
 other = 'mm8108' if radio != 'usb' else 'mm6108'
@@ -51,6 +58,14 @@ with tempfile.TemporaryDirectory() as d:
     module = cat(module_path)
     driver_source = sources['spi']['driver'] if radio != 'usb' else sources['driver']
     release = version + '-g' + driver_source['commit'][:8]
+    if args.diagnostic:
+        release += '-' + args.diagnostic_version
+        assert packages['kmod-mm8108']['Version'].endswith('-r1.' + args.diagnostic_version)
+        assert b'MM22DIAG' in module, 'missing diagnostic logging'
+        if args.diagnostic_version == 'diag2':
+            assert b'MM22DIAG segment=' not in module
+            assert b'MM22DIAG stage=' not in module
+            assert b'submitted=%u timeout=%u' in module
     # OpenWrt CONFIG_MODULE_STRIPPED removes version/device-alias metadata.
     # Check the actual release string used by the driver's startup log instead.
     assert b'\0' + release.encode() + b'\0' in module, 'wrong compiled driver version'

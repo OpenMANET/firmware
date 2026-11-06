@@ -1,0 +1,13 @@
+Subject: Use the selected OpenWrt release identifier in module metadata
+
+--- a/Makefile
++++ b/Makefile
+@@ -8,7 +8,7 @@
+ endif
+ 
+ # Set 0 to a version number. This is done to match the Linux expectations
+-override MORSE_VERSION = "0-rel_mm6108_2_2_2_2026_Sep_23"
++MORSE_VERSION ?= "0-rel_mm6108_2_2_2_2026_Sep_23"
+ 
+ USING_CLANG := $(shell $(CC) -v 2>&1 | grep -c "clang version")
+ 
