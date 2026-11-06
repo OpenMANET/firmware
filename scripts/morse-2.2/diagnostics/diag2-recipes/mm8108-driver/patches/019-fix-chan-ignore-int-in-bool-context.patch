@@ -1,0 +1,44 @@
+Fix -Werror=int-in-bool-context with IEEE80211_CHAN_IGNORE as enum constant
+
+With the mac80211 subsys patch 999-0025-cfg-nl-ignore-chan.patch applied,
+IEEE80211_CHAN_IGNORE is an enum constant (BIT(31)) in
+enum ieee80211_channel_flags and HAS_IEEE80211_CHAN_IGNORE is defined, so
+morse.h no longer substitutes its fallback macro 0. GCC (>= 7) then rejects
+the driver's compile-time feature checks that use the constant directly in
+a boolean context:
+
+  mac.c: error: enum constant in boolean context [-Werror=int-in-bool-context]
+
+Use explicit ==/!= 0 comparisons instead. These compile identically in both
+configurations (fallback macro 0, or enum BIT(31)) and match the idiom the
+driver already uses elsewhere, e.g. (flags & IEEE80211_CHAN_IGNORE) == 0.
+
+--- a/mac.c
++++ b/mac.c
+@@ -2703,7 +2703,7 @@
+ 	}
+
+ 	/* Notify kernel channel is to be ignored */
+-	if (IEEE80211_CHAN_IGNORE) {
++	if (IEEE80211_CHAN_IGNORE != 0) {
+ 		if (op_chan_5g < 0) {
+ 			MORSE_WARN(mors, "%s: Channel %dkHz %dMHz %d (S1G) not found", __func__,
+ 				freq_khz, bw_mhz, op_chan_s1g);
+@@ -2764,7 +2764,7 @@
+
+ 	disabled_count = le32_to_cpu(resp->n_channels);
+
+-	if (disabled_count && !IEEE80211_CHAN_IGNORE) {
++	if (disabled_count && IEEE80211_CHAN_IGNORE == 0) {
+ 		MORSE_INFO(mors,
+ 			   "No IEEE80211_CHAN_IGNORE, ignored channels not conveyed to cfg80211\n");
+ 	}
+@@ -3980,7 +3980,7 @@
+ 		MORSE_ERR(mors, "%s: HW does not permit channel (f:%u kHz, bw:%u MHz)",
+ 			  __func__, HZ_TO_KHZ(freq_hz), op_bw_mhz);
+
+-		if (IEEE80211_CHAN_IGNORE) {
++		if (IEEE80211_CHAN_IGNORE != 0) {
+ 			/* If IEEE80211_CHAN_IGNORE is in use, then this channel should have been
+ 			 * marked as unusable on boot
+ 			 */

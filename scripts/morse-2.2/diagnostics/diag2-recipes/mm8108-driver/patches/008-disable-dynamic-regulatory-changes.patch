@@ -1,0 +1,33 @@
+From 3e704a5f883f54e60fb0c6f9d972598270413c1b Mon Sep 17 00:00:00 2001
+From: James Haggerty <james.haggerty@morsemicro.com>
+Date: Tue, 13 Aug 2024 17:08:38 +1000
+Subject: [PATCH] Disable dynamic regulatory changes
+
+Responding to a iw reg set does not pay off at the moment,
+as we can't bring up an AP when the country code is inconsistent
+with the new regdom (i.e. always). Moreover, there's an unrelated
+issue in OpenWrt where every wifi-device does its own iw
+reg set, and this means we don't have to care about this
+broken behaviour.
+---
+ mac.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/mac.c b/mac.c
+index 159b8d43..8b985752 100644
+--- a/mac.c
++++ b/mac.c
+@@ -6215,6 +6215,10 @@ void morse_reg_notifier(struct wiphy *wiphy, struct regulatory_request *request)
+ 		return;
+ 	}
+ 
++	/* For now, we block all dynamic regulatory changes, as support is incomplete. */
++	MORSE_WARN(mors, "Regulatory change ignored; modparam country_code=%s\n", country);
++	return;
++
+ 	MORSE_INFO(mors, "Regulatory notification received on %s\n", wiphy_name(wiphy));
+ 
+ 	if (request->initiator != NL80211_REGDOM_SET_BY_USER ||
+-- 
+2.25.1
+

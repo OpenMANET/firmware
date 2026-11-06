@@ -1,0 +1,40 @@
+{
+  "driver": {
+    "commit": "270da4733cd4dc62e78e897746f98f6dfb3bef80",
+    "archive_sha256": "5960e498da1ce76c4aa4e126ff13fe1ab97a47954ca3500598895072b186346d",
+    "mmrc_submodule": "9d4d6fe3db2dc64690c42bc0e67a7f3783858ca4"
+  },
+  "firmware": {
+    "commit": "db4b69fd212990c59c5f1712e23060cbb94276ec",
+    "archive_sha256": "9f1ab54051d825b7413797a985037c9e7151ee3c72ea0b884b2e62de4b0e23b1",
+    "mm8108b2_sha256": "44ebafb072c480f5df1cdd72549893265f23812567ea3777340cdf3217acb72e"
+  },
+  "bcf_sha256": "84834f8862991cfe40d33c185b54efbcff6467a938b3b48c2fb8d4c08a15a0b3",
+  "spi": {
+    "driver": {
+      "commit": "b566725bd000aa1854ab406bae786d36014839c2",
+      "archive_sha256": "f0237b3c71766b6191b3b9ff18ce7fe919bd022b6c5a6a4c6a2fc324c80e97a9",
+      "mmrc_submodule": "32646409c58ca2b143d430aef3e43823e4420cde"
+    },
+    "firmware": {
+      "commit": "db4b69fd212990c59c5f1712e23060cbb94276ec",
+      "archive_sha256": "edeb4f290630bdde7e573c1a8694f9e1c7035ef162db4ad8d2c2bea99d8c4a4b",
+      "mm6108_sha256": "aeacb187816b62c55efc362cde256c02b862613ebf136b96e11e4fa05b3e1b03"
+    },
+    "bcf": {
+      "package_version": "mm8108-2.0.0-r1",
+      "file": "bcf_fgh100mhaamd.bin",
+      "sha256": "55089af7d08597a16ddd4002ca4b23f24729aa5bd0f1b75b6e04bc5270d23ba6"
+    }
+  },
+  "development_baselines": {
+    "packages": "ec6146eff8c28eb44f2afa8496a5ecafcb379f1a",
+    "firmware": "a1eee8863dfa4635d0bfa75fe499738a48861e83"
+  },
+  "packages_commit": "0005a14dcbb3a19bc9459373ab98b9e04e41c7d6",
+  "sdio_bcf": {
+    "file": "bcf_mf04151.bin",
+    "package": "bsp-bcm271x",
+    "sha256": "e317084ede244ee5e76b296db5ec4107a42337cb6b766429e8a4daf905512702"
+  }
+}
