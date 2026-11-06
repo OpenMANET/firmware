@@ -22,6 +22,9 @@ Usage:
             -i                      initializes openwrt by updating/installing feeds
 
             -b <board>              assembles config based on diffconfigs in target board folder.
+                                    rpi-both builds ekh-bcm2710 and ekh-bcm2711 sequentially from
+                                    HEAD in temporary checkouts, sharing dl/ and writing to bin/.
+                                    Set MAKEFLAGS=-j8 (or another job count) to parallelize each build.
 
             -m                      minimal diffconfig. Includes only target_diffconfig when selecting
                                     files from the board config. Often combined with '-x'
@@ -204,6 +207,49 @@ while getopts ":l:s:b:x:g:ie:Emh" OPT; do
     esac
 done
 shift $((OPTIND-1))
+
+if [[ "$MODE" == b && "$BOARD" == rpi-both ]]; then
+    if [[ "$EXT_TOOLCHAIN" == 1 ]]; then
+        echo "rpi-both requires separate internal toolchains for BCM2710 and BCM2711." >&2
+        exit 1
+    fi
+
+    source_root=$PWD
+    source_commit=$(git rev-parse HEAD)
+    build_root=$(mktemp -d)
+    checkout="$build_root/firmware"
+    cleanup_rpi_build() {
+        if [[ -e "$checkout/.git" ]]; then
+            git -C "$source_root" worktree remove --force "$checkout"
+        fi
+        rmdir "$build_root"
+    }
+    trap cleanup_rpi_build EXIT
+
+    setup_options=(-i)
+    if [[ "$MINIMAL" == 1 ]]; then
+        setup_options+=(-m)
+    fi
+    for extra in $EXTRAS; do
+        setup_options+=(-x "$extra")
+    done
+    for override in "${GIT_SRC_OVERRIDES[@]}"; do
+        setup_options+=(-g "${override%%:*}:$(realpath -m -- "${override#*:}")")
+    done
+
+    for board in ekh-bcm2710 ekh-bcm2711; do
+        echo "Building $board from $source_commit"
+        git worktree add --detach "$checkout" "$source_commit"
+        (
+            cd "$checkout"
+            ./scripts/openmanet_setup.sh "${setup_options[@]}" -b "$board"
+            make CONFIG_DOWNLOAD_FOLDER="$source_root/dl" download
+            make CONFIG_DOWNLOAD_FOLDER="$source_root/dl" CONFIG_BINARY_FOLDER="$source_root/bin"
+        )
+        git worktree remove --force "$checkout"
+    done
+    exit 0
+fi
 
 # gotta have a target if saving/loading
 if [ "${MODE}" ] &&  [ -z "${TARGET_DEFCONFIG+x}" ] && [ -z "${BOARD+x}" ]; then
