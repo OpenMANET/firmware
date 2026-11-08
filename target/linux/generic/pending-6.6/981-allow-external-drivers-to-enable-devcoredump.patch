@@ -1,0 +1,15 @@
+Make DEV_COREDUMP configurable for external drivers. In-tree drivers can
+select WANT_DEV_COREDUMP, but the kernel never reads an external driver's
+Kconfig. Keep the existing default and ALLOW_DEV_COREDUMP dependency.
+
+--- a/drivers/base/Kconfig
++++ b/drivers/base/Kconfig
+@@ -123,7 +123,7 @@ config ALLOW_DEV_COREDUMP
+ 	  If unsure, say Y.
+ 
+ config DEV_COREDUMP
+-	bool
++	bool "Device coredump support"
+ 	default y if WANT_DEV_COREDUMP
+ 	depends on ALLOW_DEV_COREDUMP
+ 
