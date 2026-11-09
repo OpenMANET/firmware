@@ -1,0 +1,11 @@
+--- a/feeds/packages/utils/bluez/Makefile
++++ b/feeds/packages/utils/bluez/Makefile
+@@ -153,6 +153,8 @@
+ 	$(INSTALL_DIR) $(1)/etc/bluetooth
+ 	$(INSTALL_DIR) $(1)/etc/bluetooth/keys
+ 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/src/main.conf $(1)/etc/bluetooth/main.conf
++	# openmanetd owns explicit radio consent and session reconnects.
++	$(SED) 's/^#AutoEnable=.*/AutoEnable=false/;s/^#ReconnectAttempts=.*/ReconnectAttempts=0/' $(1)/etc/bluetooth/main.conf
+ 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/profiles/network/network.conf $(1)/etc/bluetooth/network.conf
+ 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/profiles/input/input.conf $(1)/etc/bluetooth/input.conf
+ 	$(INSTALL_DIR) $(1)/etc/init.d

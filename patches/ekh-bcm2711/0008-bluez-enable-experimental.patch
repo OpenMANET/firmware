@@ -1,0 +1,10 @@
+diff --git a/feeds/packages/utils/bluez/files/bluetoothd.init b/feeds/packages/utils/bluez/files/bluetoothd.init
+--- a/feeds/packages/utils/bluez/files/bluetoothd.init
++++ b/feeds/packages/utils/bluez/files/bluetoothd.init
+@@ -10,5 +10,5 @@ start_service() {
+ 	ln -snf /etc/bluetooth/keys/ /var/lib/bluetooth
+ 	procd_open_instance
+-	procd_set_param command "$PROG" -n
++	procd_set_param command "$PROG" -n -E
+ 	procd_close_instance
+ }
