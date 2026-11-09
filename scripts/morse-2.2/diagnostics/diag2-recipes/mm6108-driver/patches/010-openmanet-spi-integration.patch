@@ -1,0 +1,434 @@
+Subject: Preserve OpenMANET radio and SPI board integration on MM6108 2.2.2
+
+Rebase regulatory discovery, AP/STA, VIF, channel flag, SPI timing and
+optional FEM GPIO support. Use device-managed FEM GPIO ownership in SPI
+probe so failed probes and removal release it without double-free.
+Keep upstream bus probe ordering for disabled SDIO/USB frontends.
+
+diff --git a/firmware.c b/firmware.c
+index c570640..7e95226 100644
+--- a/firmware.c
++++ b/firmware.c
+@@ -528,6 +528,8 @@ static int add_fallback_regdoms_to_buffer(struct morse *mors,
+ static int morse_bcf_load(struct morse *mors, const struct firmware *bcf,
+ 			  unsigned int bcf_address)
+ {
++	bool first_regdom_found = false;
++	morse_elf_shdr first_regdom_hdr = {};
+ 	int i = 0;
+ 	int ret = 0;
+ 	morse_elf_ehdr ehdr;
+@@ -567,6 +569,7 @@ static int morse_bcf_load(struct morse *mors, const struct firmware *bcf,
+ 
+ 	sh_strs = (const char *)bcf->data + sh_strtab.sh_offset;
+ 
++	mors->has_valid_regdom = false;
+ 	mors->regdoms.count = 0;
+ 	if (test_bit(MORSE_STATE_FLAG_REGDOM_SET_BY_OTP, &mors->state_flags)) {
+ 		/* If OTP set, just report this (even if BCF does not define
+@@ -623,6 +626,11 @@ static int morse_bcf_load(struct morse *mors, const struct firmware *bcf,
+ 				goto exit;
+ 		}
+ 
++		if (!first_regdom_found) {
++			first_regdom_hdr = shdr;
++			first_regdom_found = true;
++		}
++
+ 		if ((strncmp(regdom_cc, mors->country, 2) == 0) && regdom_len < 0) {
+ 			ret = copy_bcf_section(bcf, bcf_buf + config_len, shdr,
+ 					       bcf_buf_len - config_len);
+@@ -667,10 +675,31 @@ static int morse_bcf_load(struct morse *mors, const struct firmware *bcf,
+ 		}
+ 	}
+ 
++	/* Direct matches and successful upstream country fallbacks are valid. */
++	mors->has_valid_regdom = regdom_len >= 0;
++
+ 	if (regdom_len < 0) {
+-		MORSE_ERR(mors, "Country code %s not found in BCF", mors->country);
+-		ret = -ENOENT;
+-		goto exit;
++		if (first_regdom_found) {
++			/* If region not supported and it's not set via OTP, force to first regdom.
++			 * This is helpful in initial bring-up, but userspace should
++			 * know to select a valid country (based on sysfs) before actually
++			 * using the device, since this may cause the driver and
++			 * firmware to have differing views about allowable frequencies.
++			 * This is a obviously a terrible hack.
++			 */
++			MORSE_ERR(mors, "Regdom %s not found in BCF; fix before using driver\n",
++				  mors->country);
++			ret = copy_bcf_section(bcf, bcf_buf + config_len, first_regdom_hdr,
++					       bcf_buf_len - config_len);
++			if (ret < 0)
++				goto exit;
++			regdom_len = ret;
++			mors->has_valid_regdom = false;
++		} else {
++			MORSE_ERR(mors, "Country code %s not found in BCF", mors->country);
++			ret = -ENOENT;
++			goto exit;
++		}
+ 	}
+ 
+ 	if ((config_len + regdom_len) > bcf_buf_len) {
+diff --git a/hw.c b/hw.c
+index 6b80f0a..248721b 100644
+--- a/hw.c
++++ b/hw.c
+@@ -43,6 +43,10 @@ module_param(reattach_hw, bool, 0644);
+ MODULE_PARM_DESC(reattach_hw,
+ 	"Do not reset hardware state during module exit, attempt to reattach during module init");
+ 
++bool enable_4v3_fem __read_mostly;
++module_param(enable_4v3_fem, bool, 0644);
++MODULE_PARM_DESC(enable_4v3_fem, "Enables 4.3V FEM");
++
+ static const struct morse_chip_series *chip_series[] = {
+ 	&mm61xx_chip_series,
+ 	&mm81xx_chip_series,
+@@ -938,3 +942,45 @@ int morse_hw_coredump_if_stopped(struct morse *mors)
+ 
+ 	return ret;
+ }
++
++int morse_4v3_fem_init(struct morse *mors)
++{
++	int ret;
++
++	if (!mors || !mors->cfg)
++		return -EINVAL;
++
++	// Do not error out on the optional 4.3V FEM GPIO
++	if (!gpio_is_valid(mors->cfg->gpios.fem_4v3))
++		return 0;
++
++	ret = devm_gpio_request_one(mors->dev, mors->cfg->gpios.fem_4v3,
++				    enable_4v3_fem ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
++				    "morse-4v3-fem-ctrl");
++	if (ret < 0) {
++		MORSE_PR_ERR(FEATURE_ID_DEFAULT, "Failed to request 4v3 FEM GPIO (gpio=%d, ret=%d)\n",
++		             mors->cfg->gpios.fem_4v3, ret);
++		return ret;
++	}
++
++
++	MORSE_DBG(mors, "Initialized 4v3 FEM GPIO %d (value: %d)\n",
++          mors->cfg->gpios.fem_4v3, enable_4v3_fem);
++
++	return 0;
++}
++
++int morse_get_4v3_fem_state(struct morse *mors)
++{
++	if(gpio_is_valid(mors->cfg->gpios.fem_4v3))
++		return gpio_get_value(mors->cfg->gpios.fem_4v3);
++	return 0;
++}
++
++int morse_set_4v3_fem_state(struct morse *mors, int state)
++{
++	if(gpio_is_valid(mors->cfg->gpios.fem_4v3))
++		gpio_set_value(mors->cfg->gpios.fem_4v3, state);
++	return 0;
++}
++
+diff --git a/hw.h b/hw.h
+index 7907633..9d62818 100644
+--- a/hw.h
++++ b/hw.h
+@@ -301,6 +301,7 @@ struct morse_gpios {
+ 	int wake;
+ 	int busy;
+ 	int spi_irq;
++	int fem_4v3;
+ };
+ 
+ struct morse_hw_cfg {
+@@ -842,4 +843,8 @@ void morse_hw_clear_aon(struct morse *mors);
+  */
+ int morse_hw_coredump_if_stopped(struct morse *mors);
+ 
++int morse_4v3_fem_init(struct morse *mors);
++int morse_get_4v3_fem_state(struct morse *mors);
++int morse_set_4v3_fem_state(struct morse *mors, int state);
++
+ #endif /* !_MORSE_HW_H_ */
+diff --git a/mac.c b/mac.c
+index aedfef5..c5dce1b 100644
+--- a/mac.c
++++ b/mac.c
+@@ -662,6 +662,23 @@ static struct ieee80211_vif *morse_get_first_vif_of_type(struct morse *mors,
+ 	return vif;
+ }
+ 
++struct ieee80211_vif *morse_get_active_ap(struct morse *mors)
++{
++	int vif_id = 0;
++	struct ieee80211_vif *vif = NULL;
++
++	spin_lock_bh(&mors->vif_list_lock);
++	for (vif_id = 0; vif_id < mors->max_vifs; vif_id++) {
++		vif = __morse_get_vif_from_vif_id(mors, vif_id);
++		if (vif && vif->type == NL80211_IFTYPE_AP && vif->bss_conf.enable_beacon)
++			break;
++
++		vif = NULL;
++	}
++	spin_unlock_bh(&mors->vif_list_lock);
++	return vif;
++}
++
+ struct ieee80211_vif *morse_get_ap_vif(struct morse *mors)
+ {
+ 	return morse_get_first_vif_of_type(mors, NL80211_IFTYPE_AP);
+@@ -2757,7 +2774,7 @@ static void ignore_s1g_channel(struct ieee80211_hw *hw, u32 freq_khz, u32 bw_mhz
+ 	}
+ 
+ 	/* Notify kernel channel is to be ignored */
+-	if (IEEE80211_CHAN_IGNORE) {
++	if (IEEE80211_CHAN_IGNORE != 0) {
+ 		if (op_chan_5g < 0) {
+ 			MORSE_WARN(mors, "%s: Channel %dkHz %dMHz %d (S1G) not found", __func__,
+ 				freq_khz, bw_mhz, op_chan_s1g);
+@@ -2818,7 +2835,7 @@ static int set_hw_ignored_s1g_channels(struct ieee80211_hw *hw)
+ 
+ 	disabled_count = le32_to_cpu(resp->n_channels);
+ 
+-	if (disabled_count && !IEEE80211_CHAN_IGNORE) {
++	if (disabled_count && IEEE80211_CHAN_IGNORE == 0) {
+ 		MORSE_INFO(mors,
+ 			   "No IEEE80211_CHAN_IGNORE, ignored channels not conveyed to cfg80211\n");
+ 	}
+@@ -3609,6 +3626,12 @@ static int morse_mac_ops_add_interface(struct ieee80211_hw *hw, struct ieee80211
+ 	struct morse *mors = hw->priv;
+ 	struct morse_vif *mors_vif = (struct morse_vif *)vif->drv_priv;
+ 
++	if (!mors->has_valid_regdom) {
++		MORSE_ERR(mors, "%s: Unable to start interface as country %s not in BCF\n",
++			__func__, mors->country);
++		return -EPERM;
++	}
++
+ 	if (!morse_mac_is_iface_type_supported(vif)) {
+ 		MORSE_ERR(mors, "%s: Attempt to add type %d, not supported\n", __func__, vif->type);
+ 		return -EOPNOTSUPP;
+@@ -3985,6 +4008,8 @@ static int morse_mac_change_channel(struct ieee80211_hw *hw)
+ 	int vif_id;
+ 	bool set_tx_power_limit;
+ 	bool have_ap = morse_get_ap_vif(mors) ? true : false;
++	bool have_sta = morse_get_sta_vif(mors) ? true : false;
++	bool have_active_ap = morse_get_active_ap(mors) ? true : false;
+ 	struct morse_vif *mors_scan_vif = NULL;
+ 
+ 
+@@ -4005,7 +4030,7 @@ static int morse_mac_change_channel(struct ieee80211_hw *hw)
+ 		(chan_s1g->ch.flags & IEEE80211_CHAN_2MHZ) ? 2 : 1;
+ 
+ 	/* Update primary channel info based on BSS only if no AP interfaces */
+-	if (!have_ap) {
++	if (!have_ap || ( have_sta && !have_active_ap) ) {
+ 		for (vif_id = 0; vif_id < mors->max_vifs; vif_id++) {
+ 			struct ieee80211_vif *vif = morse_get_vif_from_vif_id(mors, vif_id);
+ 
+@@ -4018,7 +4043,7 @@ static int morse_mac_change_channel(struct ieee80211_hw *hw)
+ 				 * width to 2MHz to be able to receive these responses.
+ 				 */
+ 				pri_bw_mhz = op_bw_mhz > 1 ? 2 : 1;
+-			} else if (vif && vif->bss_conf.bssid) {
++			} else if (vif && vif->bss_conf.bssid && vif->type != NL80211_IFTYPE_AP) {
+ 				/* If we are a STA and have a BSS/AP conf, try to use the AP's chan
+ 				 * info.
+ 				 */
+@@ -4078,7 +4103,7 @@ static int morse_mac_change_channel(struct ieee80211_hw *hw)
+ 		MORSE_ERR(mors, "%s: HW does not permit channel (f:%u kHz, bw:%u MHz)",
+ 			  __func__, HZ_TO_KHZ(freq_hz), op_bw_mhz);
+ 
+-		if (IEEE80211_CHAN_IGNORE) {
++		if (IEEE80211_CHAN_IGNORE != 0) {
+ 			/* If IEEE80211_CHAN_IGNORE is in use, then this channel should have been
+ 			 * marked as unusable on boot
+ 			 */
+@@ -7415,6 +7440,9 @@ static void morse_mac_config_ieee80211_hw(struct morse *mors, struct ieee80211_h
+ {
+ 	ieee80211_hw_set(hw, SIGNAL_DBM);
+ 	ieee80211_hw_set(hw, MFP_CAPABLE);
++
++	/* Let userspace (OpenWrt netifd/mac80211.sh) manage interface creation */
++	ieee80211_hw_set(hw, NO_AUTO_VIF);
+ 	ieee80211_hw_set(hw, REPORTS_TX_ACK_STATUS);
+ 
+ 	ieee80211_hw_set(hw, AMPDU_AGGREGATION);
+@@ -7607,6 +7635,10 @@ static void morse_reg_notifier(struct wiphy *wiphy, struct regulatory_request *r
+ 		return;
+ 	}
+ 
++	/* For now, we block all dynamic regulatory changes, as support is incomplete. */
++	MORSE_WARN(mors, "Regulatory change ignored; modparam country_code=%s\n", country);
++	return;
++
+ 	MORSE_INFO(mors, "Regulatory notification received on %s\n", wiphy_name(wiphy));
+ 
+ 	if (request->initiator != NL80211_REGDOM_SET_BY_USER ||
+diff --git a/morse.h b/morse.h
+index 16842fe..015ba27 100644
+--- a/morse.h
++++ b/morse.h
+@@ -1368,6 +1368,8 @@ struct morse {
+ 		char (*list)[3];
+ 	} regdoms;
+ 
++    bool has_valid_regdom;
++
+ 	/* Stored Channel Information, sta_type, enc_mode, RAW */
+ 	struct morse_custom_configs custom_configs;
+ 
+diff --git a/of.c b/of.c
+index 56ef88d..ffbd06a 100644
+--- a/of.c
++++ b/of.c
+@@ -71,6 +71,9 @@ int morse_of_probe(struct device *dev, struct morse_gpios *gpios,
+ 			/* Don't error on spi-irq-gpios - this might not be a SPI device */
+ 			gpio_pin = morse_of_get_gpio(np, MORSE_OF_GPIO_PROP("spi-irq"), 0);
+ 			gpios->spi_irq = gpio_pin;
++
++			/* Optional FEM voltage selection for board-specific BCFs. */
++			gpios->fem_4v3 = of_get_named_gpio(np, "fem-4v3-gpios", 0);
+ 			return 0;
+ 		}
+ 		dev_err(dev, "%s: Couldn't match device table\n", __func__);
+diff --git a/spi.c b/spi.c
+index 3e2bec0..29c478b 100644
+--- a/spi.c
++++ b/spi.c
+@@ -591,7 +591,7 @@ static int morse_spi_cmd53_read(struct morse_spi *mspi, u8 fn, u32 address, u8 *
+ 
+ 	if (!block) {
+ 		/* Scale bytes delay to block */
+-		u32 extra_bytes = (count * mspi->inter_block_delay_bytes) / MMC_SPI_BLOCKSIZE;
++		u32 extra_bytes = max(250, (count * mspi->inter_block_delay_bytes) / MMC_SPI_BLOCKSIZE);
+ 
+ 		/* Allow 4 bytes for CRC and another 10 bytes for start block token & chip delays
+ 		 * (usually comes in 2).
+@@ -755,7 +755,8 @@ static int morse_spi_cmd53_write(struct morse_spi *mspi, u8 fn, u32 address, u8
+ 		if (block)
+ 			cp += mspi->inter_block_delay_bytes;
+ 		else
+-			cp += spi_post_write_status_bytes;
++			/* stet: really we should use the new modparam here */
++			cp += max(250,(count * mspi->inter_block_delay_bytes) / MMC_SPI_BLOCKSIZE);
+ 	}
+ 
+ 	if (enable_ext_xtal_init) {
+@@ -1490,13 +1491,6 @@ static int morse_spi_probe(struct spi_device *spi)
+ 		return -ENOMEM;
+ 	}
+ 
+-	ret = morse_sysfs_init(mors);
+-	if (ret) {
+-		dev_err(&spi->dev, "morse_sysfs_init failed: %d\n", ret);
+-		goto err_exit;
+-	}
+-	sysfs_init = true;
+-
+ 	morse_hw_headless_init(mors);
+ 
+ 	/* update chip configuration */
+@@ -1577,7 +1571,12 @@ static int morse_spi_probe(struct spi_device *spi)
+ #ifdef SPI_CONTROLLER_ENABLE_CS_GPIOD
+ 	spi->controller->flags |= SPI_CONTROLLER_ENABLE_CS_GPIOD;
+ #else
+-#warning "SPI_CONTROLLER_ENABLE_CS_GPIOD macro not defined"
++	/* Flag is added by an out-of-tree spi.h patch which not all target
++	 * kernels carry. Without it CS may be forced high during spi_setup,
++	 * which only matters when a radio is actually attached over SPI.
++	 */
++	MORSE_SPI_WARN(mors,
++		       "SPI_CONTROLLER_ENABLE_CS_GPIOD not supported by this kernel; CS init sequencing may be unreliable\n");
+ #endif
+ #endif
+ 	morse_spi_xfer_init(mspi);
+@@ -1620,6 +1619,17 @@ static int morse_spi_probe(struct spi_device *spi)
+ 
+ 	morse_spi_config_burst_mode(mors, false);
+ 
++	ret = morse_4v3_fem_init(mors);
++	if (ret)
++		goto err_exit;
++
++	ret = morse_sysfs_init(mors);
++	if (ret) {
++		dev_err(&spi->dev, "morse_sysfs_init failed: %d\n", ret);
++		goto err_exit;
++	}
++	sysfs_init = true;
++
+ 	mors->board_serial = serial;
+ 	MORSE_SPI_INFO(mors, "Board serial: %s\n", mors->board_serial);
+ 
+diff --git a/sysfs.c b/sysfs.c
+index 4265a30..2f3d0f6 100644
+--- a/sysfs.c
++++ b/sysfs.c
+@@ -1,6 +1,8 @@
+ /*
+  * Copyright 2025 Morse Micro
+  */
++
++#include <linux/gpio.h>
+ #include "sysfs.h"
+ #include "debug.h"
+ #include "mac.h"
+@@ -98,6 +100,24 @@ static const struct attribute_group sysfs_attr_group = {
+ 	.attrs = sysfs_attrs,
+ };
+ 
++static ssize_t mm_4v3_fem_show(struct device *dev,
++					   struct device_attribute *attr,
++					   char *buf)
++{
++	struct morse *mors = dev_get_drvdata(dev);
++
++	if (!mors || !mors->cfg)
++		return -EINVAL;
++
++#if KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE
++	return sysfs_emit(buf, "%d\n", morse_get_4v3_fem_state(mors));
++#else
++	return snprintf(buf, PAGE_SIZE, "%d\n", morse_get_4v3_fem_state(mors));
++#endif
++}
++
++static DEVICE_ATTR_RO(mm_4v3_fem);
++
+ static ssize_t aid_show(struct device *dev,
+ 			struct device_attribute *attr, char *buf)
+ {
+@@ -210,8 +230,16 @@ int morse_sysfs_init(struct morse *mors)
+ 	if (ret < 0)
+ 		goto err_finish_scan_cache;
+ 
++	if (gpio_is_valid(mors->cfg->gpios.fem_4v3)) {
++		ret = device_create_file(mors->dev, &dev_attr_mm_4v3_fem);
++		if (ret)
++			goto err_remove_group;
++	}
++
+ 	return 0;
+ 
++err_remove_group:
++	sysfs_remove_group(&mors->dev->kobj, &sysfs_attr_group);
+ err_finish_scan_cache:
+ 	scan_result_cache_sysfs_finish(mors);
+ err:
+@@ -221,6 +249,9 @@ err:
+ 
+ void morse_sysfs_finish(struct morse *mors)
+ {
++	if (gpio_is_valid(mors->cfg->gpios.fem_4v3))
++		device_remove_file(mors->dev, &dev_attr_mm_4v3_fem);
++
+ 	sysfs_remove_group(&mors->dev->kobj, &sysfs_attr_group);
+ 	scan_result_cache_sysfs_finish(mors);
+ }
