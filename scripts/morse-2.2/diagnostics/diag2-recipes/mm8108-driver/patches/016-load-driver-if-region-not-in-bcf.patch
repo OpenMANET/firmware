@@ -1,0 +1,97 @@
+Subject: [PATCH] Allow invalid-region discovery, preserve 2.1 BCF fallbacks
+
+Recognize successful direct and upstream fallback matches. Reset validity on
+each load; discovery-only fallback still cannot create a VIF.
+
+--- a/firmware.c
++++ b/firmware.c
+@@ -486,6 +486,8 @@
+ static int morse_bcf_load(struct morse *mors, const struct firmware *bcf,
+ 			  unsigned int bcf_address)
+ {
++	bool first_regdom_found = false;
++	morse_elf_shdr first_regdom_hdr = {};
+ 	int i = 0;
+ 	int ret = 0;
+ 	morse_elf_ehdr ehdr;
+@@ -525,6 +527,7 @@
+ 
+ 	sh_strs = (const char *)bcf->data + sh_strtab.sh_offset;
+ 
++	mors->has_valid_regdom = false;
+ 	mors->regdoms.count = 0;
+ 	if (test_bit(MORSE_STATE_FLAG_REGDOM_SET_BY_OTP, &mors->state_flags)) {
+ 		/* If OTP set, just report this (even if BCF does not define
+@@ -579,6 +582,11 @@
+ 			ret = add_fallback_regdoms_to_buffer(mors, regdom_buff, regdom_cc);
+ 			if (ret)
+ 				goto exit;
++		}
++
++		if (!first_regdom_found) {
++			first_regdom_hdr = shdr;
++			first_regdom_found = true;
+ 		}
+ 
+ 		if ((strncmp(regdom_cc, mors->country, 2) == 0) && regdom_len < 0) {
+@@ -625,10 +633,31 @@
+ 		}
+ 	}
+ 
++	/* Direct matches and successful upstream country fallbacks are valid. */
++	mors->has_valid_regdom = regdom_len >= 0;
++
+ 	if (regdom_len < 0) {
+-		MORSE_ERR(mors, "Country code %s not found in BCF", mors->country);
+-		ret = -ENOENT;
+-		goto exit;
++		if (first_regdom_found) {
++			/* If region not supported and it's not set via OTP, force to first regdom.
++			 * This is helpful in initial bring-up, but userspace should
++			 * know to select a valid country (based on sysfs) before actually
++			 * using the device, since this may cause the driver and
++			 * firmware to have differing views about allowable frequencies.
++			 * This is a obviously a terrible hack.
++			 */
++			MORSE_ERR(mors, "Regdom %s not found in BCF; fix before using driver\n",
++				  mors->country);
++			ret = copy_bcf_section(bcf, bcf_buf + config_len, first_regdom_hdr,
++					       bcf_buf_len - config_len);
++			if (ret < 0)
++				goto exit;
++			regdom_len = ret;
++			mors->has_valid_regdom = false;
++		} else {
++			MORSE_ERR(mors, "Country code %s not found in BCF", mors->country);
++			ret = -ENOENT;
++			goto exit;
++		}
+ 	}
+ 
+ 	if ((config_len + regdom_len) > bcf_buf_len) {
+--- a/mac.c
++++ b/mac.c
+@@ -3478,6 +3478,12 @@
+ 	struct morse *mors = hw->priv;
+ 	struct morse_vif *mors_vif = (struct morse_vif *)vif->drv_priv;
+ 
++	if (!mors->has_valid_regdom) {
++		MORSE_ERR(mors, "%s: Unable to start interface as country %s not in BCF\n",
++			__func__, mors->country);
++		return -EPERM;
++	}
++
+ 	if (!morse_mac_is_iface_type_supported(vif)) {
+ 		MORSE_ERR(mors, "%s: Attempt to add type %d, not supported\n", __func__, vif->type);
+ 		return -EOPNOTSUPP;
+--- a/morse.h
++++ b/morse.h
+@@ -1292,6 +1292,8 @@
+ 		char (*list)[3];
+ 	} regdoms;
+ 
++    bool has_valid_regdom;
++
+ 	/* Stored Channel Information, sta_type, enc_mode, RAW */
+ 	struct morse_custom_configs custom_configs;
+ 

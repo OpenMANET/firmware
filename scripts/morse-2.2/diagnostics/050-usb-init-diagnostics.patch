@@ -1,0 +1,237 @@
+--- a/usb.c
++++ b/usb.c
+@@ -326,11 +326,23 @@
+ 		goto error;
+ 	}
+ 
++	if (musb->errors)
++		dev_err(mors->dev, "MM22DIAG command callback error=%d ep=0x%02x actual=%u\n",
++			musb->errors, ep->addr, ep->urb->actual_length);
+ 	musb->ongoing_cmd = 0;
+ 
+ 	return writesize;
+ 
+ error:
++	if (writesize == sizeof(struct morse_usb_command)) {
++		struct morse_usb_command diag_cmd;
++
++		memcpy(&diag_cmd, user_buffer, sizeof(diag_cmd));
++		dev_err(mors->dev,
++			"MM22DIAG command dir=%u addr=0x%08x len=%u ep=0x%02x ret=%d callback_error=%d\n",
++			le32_to_cpu(diag_cmd.dir), le32_to_cpu(diag_cmd.address),
++			le32_to_cpu(diag_cmd.length), ep->addr, retval, musb->errors);
++	}
+ 	musb->ongoing_cmd = 0;
+ 	return retval;
+ }
+@@ -394,6 +406,8 @@
+ static int morse_usb_mem_read(struct morse_usb *musb, u32 address, u8 *data, ssize_t size)
+ {
+ 	int ret;
++	bool diag_submitted = false;
++	bool diag_timed_out = false;
+ 	struct morse_usb_command cmd;
+ 	struct morse *mors = usb_get_intfdata(musb->interface);
+ 
+@@ -435,12 +449,14 @@
+ 		goto error;
+ 	}
+ 
++	diag_submitted = true;
+ 	ret = wait_event_interruptible_timeout(musb->rw_in_wait, (!musb->ongoing_rw),
+ 					       msecs_to_jiffies(URB_TIMEOUT_MS));
+ 	if (ret < 0) {
+ 		MORSE_USB_ERR(mors, "%s: wait_event_interruptible: error %d\n", __func__, ret);
+ 		goto error;
+ 	} else if (ret == 0) {
++		diag_timed_out = true;
+ 		/* Timed out. */
+ 		usb_kill_urb(musb->endpoints[MORSE_EP_MEM_RD].urb);
+ 	}
+@@ -458,6 +474,14 @@
+ 	ret = size;
+ 
+ error:
++	if (ret < 0 || diag_timed_out)
++		dev_err(mors->dev,
++			"MM22DIAG %s addr=0x%08x len=%zd ep=0x%02x submitted=%u timeout=%u ret=%d urb_status=%d actual=%u flags=0x%lx\n",
++			__func__, address, size, musb->endpoints[MORSE_EP_MEM_RD].addr,
++			diag_submitted, diag_timed_out, ret,
++			diag_submitted ? musb->endpoints[MORSE_EP_MEM_RD].urb->status : 0,
++			diag_submitted ? musb->endpoints[MORSE_EP_MEM_RD].urb->actual_length : 0,
++			musb->flags);
+ 	musb->ongoing_rw = 0;
+ 	mutex_unlock(&musb->lock);
+ 
+@@ -467,6 +491,8 @@
+ static int morse_usb_mem_write(struct morse_usb *musb, u32 address, u8 *data, ssize_t size)
+ {
+ 	int ret;
++	bool diag_submitted = false;
++	bool diag_timed_out = false;
+ 	struct morse_usb_command cmd;
+ 	struct morse *mors = usb_get_intfdata(musb->interface);
+ 
+@@ -513,12 +539,14 @@
+ 		goto error;
+ 	}
+ 
++	diag_submitted = true;
+ 	ret = wait_event_interruptible_timeout(musb->rw_in_wait, (!musb->ongoing_rw),
+ 					       msecs_to_jiffies(URB_TIMEOUT_MS));
+ 	if (ret < 0) {
+ 		MORSE_USB_ERR(mors, "%s error %d\n", __func__, ret);
+ 		goto error;
+ 	} else if (ret == 0) {
++		diag_timed_out = true;
+ 		/* Timed out. */
+ 		usb_kill_urb(musb->endpoints[MORSE_EP_MEM_WR].urb);
+ 	}
+@@ -532,6 +560,14 @@
+ 	ret = size;
+ 
+ error:
++	if (ret < 0 || diag_timed_out)
++		dev_err(mors->dev,
++			"MM22DIAG %s addr=0x%08x len=%zd ep=0x%02x submitted=%u timeout=%u ret=%d urb_status=%d actual=%u flags=0x%lx\n",
++			__func__, address, size, musb->endpoints[MORSE_EP_MEM_WR].addr,
++			diag_submitted, diag_timed_out, ret,
++			diag_submitted ? musb->endpoints[MORSE_EP_MEM_WR].urb->status : 0,
++			diag_submitted ? musb->endpoints[MORSE_EP_MEM_WR].urb->actual_length : 0,
++			musb->flags);
+ 	musb->ongoing_rw = 0;
+ 	mutex_unlock(&musb->lock);
+ 	return ret;
+--- a/firmware.c
++++ b/firmware.c
+@@ -187,7 +187,10 @@
+ 		goto exit;
+ 	}
+ 
++	dev_info(mors->dev, "MM22DIAG boot-address reg=0x%08x value=0x%08x\n",
++		 MORSE_REG_BOOT_ADDR(mors), addr);
+ 	status = morse_reg32_write(mors, MORSE_REG_BOOT_ADDR(mors), addr);
++	dev_info(mors->dev, "MM22DIAG boot-address result=%d\n", status);
+ 
+ exit:
+ 	morse_release_bus(mors);
+@@ -289,7 +292,11 @@
+ 			/* Set padding to 0xff */
+ 			memset(fw_buf + phdr.p_filesz, 0xff, padded_size - phdr.p_filesz);
+ 			morse_claim_bus(mors);
++			dev_info(mors->dev,
++				 "MM22DIAG segment=%d addr=0x%08x file_offset=0x%x bytes=%u padded=%u\n",
++				 i, (u32)address, phdr.p_offset, phdr.p_filesz, padded_size);
+ 			status = morse_dm_write(mors, address, fw_buf, padded_size);
++			dev_info(mors->dev, "MM22DIAG segment=%d result=%d\n", i, status);
+ 			morse_release_bus(mors);
+ 			if (status) {
+ 				ret = -1;
+@@ -717,7 +724,10 @@
+ 
+ 	/* Write BCF sections to hw */
+ 	morse_claim_bus(mors);
++	dev_info(mors->dev, "MM22DIAG BCF addr=0x%08x bytes=%d\n",
++		 bcf_address, config_len + regdom_len);
+ 	ret = morse_dm_write(mors, bcf_address, bcf_buf, config_len + regdom_len);
++	dev_info(mors->dev, "MM22DIAG BCF result=%d\n", ret);
+ 	morse_release_bus(mors);
+ 
+ exit:
+@@ -1291,7 +1301,9 @@
+ 	if (mors->chip_was_reset) {
+ 		MORSE_WARN(mors, "%s: Chip was already reset", __func__);
+ 	} else {
++		dev_info(mors->dev, "MM22DIAG stage=morse_hw_digital_reset begin\n");
+ 		ret = morse_hw_digital_reset(mors);
++		dev_info(mors->dev, "MM22DIAG stage=morse_hw_digital_reset result=%d\n", ret);
+ 		if (ret)
+ 			return ret;
+ 	}
+@@ -1300,17 +1312,23 @@
+ 	mors->chip_was_reset = false;
+ 
+ 	if (mors->cfg->pre_load_prepare) {
++		dev_info(mors->dev, "MM22DIAG stage=mors->cfg->pre_load_prepare begin\n");
+ 		ret = mors->cfg->pre_load_prepare(mors);
++		dev_info(mors->dev, "MM22DIAG stage=mors->cfg->pre_load_prepare result=%d\n", ret);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
+ 	if (init_params->download_fw) {
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_invalidate_host_ptr begin\n");
+ 		ret = morse_firmware_invalidate_host_ptr(mors);
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_invalidate_host_ptr result=%d\n", ret);
+ 		if (ret)
+ 			return ret;
+ 
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_load begin\n");
+ 		ret = morse_firmware_load(mors, fw);
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_load result=%d\n", ret);
+ 		if (ret)
+ 			return ret;
+ 
+@@ -1321,7 +1339,9 @@
+ 		if (bcf)
+ 			morse_bcf_load(mors, bcf, mors->bcf.address);
+ 
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_trigger begin\n");
+ 		ret = morse_firmware_trigger(mors);
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_trigger result=%d\n", ret);
+ 		if (ret)
+ 			return ret;
+ 	}
+@@ -1343,7 +1363,9 @@
+ 	}
+ 
+ 	if (init_params->get_host_table_ptr) {
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_get_host_table_ptr begin\n");
+ 		ret = morse_firmware_get_host_table_ptr(mors);
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_get_host_table_ptr result=%d\n", ret);
+ 		if (ret) {
+ 			MORSE_ERR(mors, "FW manifest pointer not set (ret:%d)\n", ret);
+ 			return ret;
+@@ -1351,7 +1373,9 @@
+ 	}
+ 
+ 	if (init_params->verify_fw) {
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_magic_verify begin\n");
+ 		ret = morse_firmware_magic_verify(mors);
++		dev_info(mors->dev, "MM22DIAG stage=morse_firmware_magic_verify result=%d\n", ret);
+ 		if (ret)
+ 			return ret;
+ 	}
+@@ -1373,7 +1397,10 @@
+ 		return ret;
+ 
+ 	while (retries--) {
++		dev_info(mors->dev, "MM22DIAG init attempt=%d chip_reset=%u\n",
++			 3 - retries, mors->chip_was_reset);
+ 		ret = morse_firmware_init_try(mors, fw, bcf, &init_params);
++		dev_info(mors->dev, "MM22DIAG init attempt=%d result=%d\n", 3 - retries, ret);
+ 		if (ret == 0)
+ 			break;
+ 	}
+--- a/mm81xx.c
++++ b/mm81xx.c
+@@ -688,14 +688,17 @@
+ static int mm81xx_digital_reset(struct morse *mors)
+ {
+ 	int ret = 0;
++	int diag_ret;
+ 
+ 	morse_claim_bus(mors);
+ 
+ 	/* This should be the first step in digital reset, do not reorder */
+-	mm81xx_enable_internal_slow_clock(mors);
++	diag_ret = mm81xx_enable_internal_slow_clock(mors);
++	dev_info(mors->dev, "MM22DIAG mm81xx_enable_internal_slow_clock result=%d\n", diag_ret);
+ 
+ 	/* Disable PMU control to CPU before digital reset */
+-	mm81xx_disable_pmu_ctrl_cpu(mors);
++	diag_ret = mm81xx_disable_pmu_ctrl_cpu(mors);
++	dev_info(mors->dev, "MM22DIAG mm81xx_disable_pmu_ctrl_cpu result=%d\n", diag_ret);
+ 
+ 	if (mors->bus_type == MORSE_HOST_BUS_TYPE_USB) {
+ #ifdef CONFIG_MORSE_USB

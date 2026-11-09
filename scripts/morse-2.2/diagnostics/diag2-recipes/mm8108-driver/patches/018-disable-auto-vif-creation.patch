@@ -1,0 +1,25 @@
+From: Prabha Murugesan <prabha.murugesan@morsemicro.com>
+Date: Tue, 17 Mar 2026 00:00:00 +1000
+Subject: [PATCH] mac80211: disable automatic wlan interface creation on driver registration
+
+Set IEEE80211_HW_NO_AUTO_VIF to prevent mac80211 from automatically
+creating a default STA interface when the morse driver registers with
+ieee80211_register_hw(). Interface creation is handled by the OpenWrt
+wifi subsystem (mac80211.sh/netifd) via nl80211.
+
+This ensures consistent behaviour across mac80211 versions (5.10 auto-
+creates a default wlanX; 6.12 does not). With this flag, both versions
+rely on userspace for interface management.
+
+--- a/mac.c
++++ b/mac.c
+@@ -6850,6 +6850,9 @@ static void morse_mac_config_ieee80211_hw(struct morse *mors, struct ieee80211_h
+ {
+ 	ieee80211_hw_set(hw, SIGNAL_DBM);
+ 	ieee80211_hw_set(hw, MFP_CAPABLE);
++
++	/* Let userspace (OpenWrt netifd/mac80211.sh) manage interface creation */
++	ieee80211_hw_set(hw, NO_AUTO_VIF);
+ 	ieee80211_hw_set(hw, REPORTS_TX_ACK_STATUS);
+
+ 	ieee80211_hw_set(hw, AMPDU_AGGREGATION);
