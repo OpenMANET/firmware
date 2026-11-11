@@ -37,7 +37,6 @@ jobs:
         with:
           pattern: firmware-*
           path: eu-artifacts
-          merge-multiple: true
       - name: Install image inspection tools
         run: |
           sh .github/workflows/scripts/prepare_https_apt.sh

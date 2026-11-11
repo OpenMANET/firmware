@@ -1,24 +1,50 @@
-name: Create GitHub release
+name: Verify Existing EU Test Images
 
 permissions:
-  contents: write
+  contents: read
+  actions: read
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
+    inputs:
+      build_run:
+        description: 'Run containing the two completed EU firmware build artifacts'
+        required: true
+        type: string
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-
+  verify:
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - uses: actions/checkout@v6
+      - name: Identify original build commit
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.build_run }}
+        run: |
+          [[ "$BUILD_RUN" =~ ^[0-9]+$ ]]
+          build_sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" --jq .head_sha)
+          [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$build_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v7
         with:
-          draft: true
-          prerelease: true
+          pattern: firmware-*
+          path: eu-artifacts
+          run-id: ${{ inputs.build_run }}
+          github-token: ${{ github.token }}
+      - name: Install image inspection tools
+        run: |
+          sh .github/workflows/scripts/prepare_https_apt.sh
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=30 -o APT::Update::Error-Mode=any update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=30 install -y squashfs-tools
+      - name: Verify original images and assemble release assets
+        env:
+          BUILD_COMMIT: ${{ steps.build.outputs.sha }}
+        run: python3 scripts/eu-test/verify_images.py eu-artifacts eu-release --build-commit "$BUILD_COMMIT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: 1.8-eu-verified-release
+          path: eu-release/*
+          if-no-files-found: error
+          retention-days: 14
