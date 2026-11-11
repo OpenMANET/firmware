@@ -1,263 +1,50 @@
-name: Build and Release Firmware
+name: Build 1.8-eu Test Firmware
 
 permissions:
-  contents: write
+  contents: read
 
 on:
-  push:
-    tags:
-      - "*"
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Create and push a new tag (e.g., 1.7.0-rc1). Leave empty to build without creating a tag.'
-        required: false
-        type: string
 
 jobs:
-  build-ekh-bcm2711:
-    name: Build ekh-bcm2711
-    uses: ./.github/workflows/build-firmware.yml
-    with:
-      board: ekh-bcm2711
-      target: bcm27xx
-      subtarget: bcm2711
-      description: "Raspberry Pi 4, CM4"
-      releasepackages: true
-      cpu_arch: aarch64_cortex-a72
-    secrets: inherit
-
-  build-ekh-bcm2710:
-    name: Build ekh-bcm2710
-    uses: ./.github/workflows/build-firmware.yml
-    with:
-      board: ekh-bcm2710
-      target: bcm27xx
-      subtarget: bcm2710
-      description: "Raspberry Pi 3B, 2W"
-      releasepackages: true
-      cpu_arch: ''
-    secrets: inherit
-
   build-halowlink2:
-    name: Build HalowLink2
+    name: Build EU HaLowLink 2
     uses: ./.github/workflows/build-firmware.yml
     with:
       board: halowlink2
       target: ramips
       subtarget: mt7621
-      description: "HalowLink 2 (MT7621)"
-      releasepackages: true
-      cpu_arch: mipsel_24kc
-    secrets: inherit
+      description: '1.8-eu test: HaLowLink 2 MM8108 SDIO'
+      releasepackages: false
 
-  build-hd01-v2:
-    name: Build HD01 V2
+  build-ekh-bcm2711:
+    name: Build EU Pi 4 / CM4
     uses: ./.github/workflows/build-firmware.yml
     with:
-      board: ht-hd01-v2
-      target: ramips
-      subtarget: mt76x8
-      description: "Heltec HT-HD01 V2 (MT76x8)"
-      releasepackages: true
-      cpu_arch: ''
-    secrets: inherit
+      board: ekh-bcm2711
+      target: bcm27xx
+      subtarget: bcm2711
+      description: '1.8-eu test: Raspberry Pi 4 / CM4 MM8108 USB'
+      releasepackages: false
 
-  build-venice:
-    name: Build venice
-    uses: ./.github/workflows/build-firmware.yml
-    with:
-      board: venice
-      target: imx
-      subtarget: cortexa53
-      description: "Gateworks Venice"
-      releasepackages: true
-      cpu_arch: aarch64_cortex-a53
-    secrets: inherit
-
-  publish-packages:
-    name: Publish Packages to packages-repo
-    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-halowlink2, build-hd01-v2, build-venice]
+  verify-images:
+    name: Verify EU image contents
+    needs: [build-halowlink2, build-ekh-bcm2711]
     runs-on: ubuntu-24.04
     steps:
-      - name: Download target packages artifacts
-        uses: actions/download-artifact@v7
-        with:
-          pattern: packages-targets-*
-          path: downloaded-packages/targets
-          merge-multiple: false
-
-      - name: Download arch packages artifacts
-        uses: actions/download-artifact@v7
-        with:
-          pattern: packages-arch-*
-          path: downloaded-packages/arch
-          merge-multiple: false
-
-      - name: Checkout packages-repo
-        uses: actions/checkout@v6
-        with:
-          repository: OpenMANET/packages-repo
-          token: ${{ secrets.PACKAGES_REPO_TOKEN }}
-          path: packages-repo
-
-      - name: Publish target packages
-        run: |
-          set -euo pipefail
-          for artifact_dir in downloaded-packages/targets/packages-targets-*/; do
-            [ -d "$artifact_dir" ] || continue
-            artifact_name=$(basename "$artifact_dir")
-            # Strip the 'packages-targets-' prefix, then split on '--'
-            remainder="${artifact_name#packages-targets-}"
-            target="${remainder%%--*}"
-            subtarget="${remainder#*--}"
-            dest="packages-repo/24.10/targets/${target}/${subtarget}/packages"
-            echo "Clearing and repopulating: ${dest}"
-            rm -rf "${dest}"
-            mkdir -p "${dest}"
-            cp -r "${artifact_dir}/"* "${dest}/"
-          done
-
-      - name: Publish arch packages
-        run: |
-          set -euo pipefail
-          for artifact_dir in downloaded-packages/arch/packages-arch-*/; do
-            [ -d "$artifact_dir" ] || continue
-            artifact_name=$(basename "$artifact_dir")
-            cpu_arch="${artifact_name#packages-arch-}"
-            dest="packages-repo/24.10/packages/${cpu_arch}"
-            echo "Clearing and repopulating: ${dest}"
-            rm -rf "${dest}"
-            mkdir -p "${dest}"
-            cp -r "${artifact_dir}/"* "${dest}/"
-          done
-
-      - name: Commit and push packages
-        run: |
-          cd packages-repo
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No package changes to commit."
-          else
-            git commit -m "chore: update packages from firmware release ${{ github.ref_name }}"
-            git push
-          fi
-
-  release:
-    name: Create GitHub Release
-    needs: [build-ekh-bcm2711, build-ekh-bcm2710, build-halowlink2, build-hd01-v2, build-venice]
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Create and push tag if provided
-        if: github.event.inputs.tag != ''
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const tag = '${{ github.event.inputs.tag }}';
-            const sha = context.sha;
-
-            try {
-              await github.rest.git.createRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: `refs/tags/${tag}`,
-                sha: sha
-              });
-              console.log(`Created tag ${tag} at ${sha}`);
-            } catch (error) {
-              if (error.status === 422) {
-                console.log(`Tag ${tag} already exists`);
-              } else {
-                throw error;
-              }
-            }
-
-      - name: Determine release tag
-        id: tag
-        run: |
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-            echo "version=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v7
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
         with:
           pattern: firmware-*
-          path: release-artifacts
-          merge-multiple: false
-
-      - name: Organize release files
-        run: |
-          mkdir -p release-files
-
-          # Move all firmware files to release-files directory
-          for board_dir in release-artifacts/firmware-*; do
-            if [ -d "$board_dir" ]; then
-              board_name=$(basename "$board_dir" | sed 's/firmware-//')
-              echo "Processing $board_name..."
-
-              # Copy firmware images with board prefix
-              find "$board_dir" -name "*.img.gz" -exec cp {} release-files/ \;
-              find "$board_dir" -name "*sysupgrade.bin" -exec cp {} release-files/ \;
-
-              # Copy checksums with board prefix
-              if [ -f "$board_dir/sha256sums" ]; then
-                cp "$board_dir/sha256sums" "release-files/sha256sums-${board_name}.txt"
-              fi
-            fi
-          done
-
-          echo "=== Release files prepared ==="
-          ls -lah release-files/
-
-          # Create combined checksums file
-          cd release-files
-          if command -v sha256sum &> /dev/null; then
-            sha256sum *.img.gz 2>/dev/null > SHA256SUMS.txt || true
-          fi
-          cd ..
-
-      - name: Generate release notes
-        id: release_notes
-        run: |
-          cat > release_notes.md << 'EOF'
-          ## ${{ steps.tag.outputs.version }}
-          ### Installation
-
-          For detailed documentation, visit the [OpenMANET Documentation](https://openmanet.github.io/docs/).
-
-          ### Checksums
-
-          Verify your download using the SHA256 checksums provided in the `SHA256SUMS.txt` file or individual board checksum files.
-
-          ---
-
-          EOF
-
-          cat release_notes.md
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+          path: eu-artifacts
+          merge-multiple: true
+      - name: Install image inspection tools
+        run: sudo apt-get update && sudo apt-get install -y squashfs-tools
+      - name: Verify images and prepare release assets
+        run: python3 scripts/eu-test/verify_images.py eu-artifacts eu-release
+      - uses: actions/upload-artifact@v7
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: ${{ steps.tag.outputs.version }}
-          body_path: release_notes.md
-          draft: true
-          prerelease: false
-          files: |
-            release-files/*.img.gz
-            release-files/*sysupgrade.bin
-            release-files/SHA256SUMS.txt
-            release-files/sha256sums-*.txt
-          fail_on_unmatched_files: false
+          name: 1.8-eu-verified-release
+          path: eu-release/*
+          if-no-files-found: error
+          retention-days: 14
