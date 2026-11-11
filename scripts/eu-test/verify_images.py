@@ -89,8 +89,8 @@ def main():
                     if read_file(filesystem, offset, target) != content:
                         raise RuntimeError(f'{image}: {target} differs from pinned source')
                 modules = read_file(filesystem, offset, 'etc/modules.d/mm8108').decode()
-                if 'country=EU' not in modules:
-                    raise RuntimeError(f'{image}: module does not default to EU')
+                if 'country=US' not in modules:
+                    raise RuntimeError(f'{image}: normal module country default was changed')
                 version = read_file(filesystem, offset, 'etc/openwrt_release').decode()
                 if '1.8-eu' not in version:
                     raise RuntimeError(f'{image}: wrong version identity: {version}')
@@ -105,12 +105,13 @@ def main():
         checksum = hashlib.file_digest(image.open('rb'), 'sha256').hexdigest()
         shutil.copy2(image, output / image.name)
         results.append({'image': image.name, 'sha256': checksum, 'contents_verified': True})
-        print(f'PASS {image.name}: EU module, pinned netifd/defaults, firmware 2.2.3, version 1.8-eu')
+        print(f'PASS {image.name}: normal US module default, pinned selectable-EU netifd/defaults, firmware 2.2.3, version 1.8-eu')
     (output / 'SHA256SUMS.txt').write_text(''.join(f"{r['sha256']}  {r['image']}\n" for r in results))
     firmware_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     (output / 'BUILD_INFO.json').write_text(json.dumps({
         'firmware_commit': firmware_sha, 'packages_commit': packages_sha,
         'release': '1.8-eu', 'images': results,
+        'defaults': 'standard boot defaults; select EU in normal LuCI wizard',
         'hardware_validation': 'EU initialization validated separately on CM4/MM8108 USB at 0 dBm; these images and EU 16 dBm operation have not been boot/RF tested',
     }, indent=2) + '\n')
 
