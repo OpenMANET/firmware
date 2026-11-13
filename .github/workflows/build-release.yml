@@ -221,11 +221,16 @@ jobs:
           echo "=== Release files prepared ==="
           ls -lah release-files/
 
-          # Create combined checksums file
+          # Include every published firmware image, including ramips .bin files.
           cd release-files
-          if command -v sha256sum &> /dev/null; then
-            sha256sum *.img.gz 2>/dev/null > SHA256SUMS.txt || true
+          shopt -s nullglob
+          images=(*.img.gz *sysupgrade.bin)
+          if [ "${#images[@]}" -eq 0 ]; then
+            echo "No firmware images found for release" >&2
+            exit 1
           fi
+          sha256sum -- "${images[@]}" > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
           cd ..
 
       - name: Generate release notes

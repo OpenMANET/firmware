@@ -21,9 +21,28 @@ concurrency:
 
 jobs:
   build-toolchains:
-    name: Build Toolchains for each target
+    name: Build supported toolchain
     permissions:
       contents: read
       packages: read
       actions: write
-    uses: openwrt/actions-shared-workflows/.github/workflows/toolchain.yml@main
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep aligned with the five board families in build-release.yml.
+        include:
+          - target: bcm27xx
+            subtarget: bcm2710
+          - target: bcm27xx
+            subtarget: bcm2711
+          - target: ramips
+            subtarget: mt7621
+          - target: ramips
+            subtarget: mt76x8
+          - target: imx
+            subtarget: cortexa53
+    uses: openwrt/actions-shared-workflows/.github/workflows/reusable_build.yml@main
+    with:
+      target: ${{ matrix.target }}
+      subtarget: ${{ matrix.subtarget }}
+      build_toolchain: true
