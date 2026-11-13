@@ -28,15 +28,68 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  determine-changed-files:
+    uses: openwrt/actions-shared-workflows/.github/workflows/reusable_determine_changed_files.yml@main
+
+  determine-changed-packages:
+    needs: determine-changed-files
+    uses: openwrt/actions-shared-workflows/.github/workflows/reusable_determine_changed_packages.yml@main
+    with:
+      all_changed_files: ${{ needs.determine-changed-files.outputs.all_changed_files }}
+
   build-kernels:
-    name: Build all affected Kernels
+    name: Build supported kernel
+    needs: determine-changed-packages
     permissions:
       contents: read
       packages: read
       actions: write
-    secrets:
-      ccache_s3_endpoint: ${{ secrets.CCACHE_S3_ENDPOINT }}
-      ccache_s3_bucket: ${{ secrets.CCACHE_S3_BUCKET }}
-      ccache_s3_access_key: ${{ secrets.CCACHE_S3_ACCESS_KEY }}
-      ccache_s3_secret_key: ${{ secrets.CCACHE_S3_SECRET_KEY }}
-    uses: openwrt/actions-shared-workflows/.github/workflows/kernel.yml@main
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep aligned with the five board families in build-release.yml.
+        include:
+          - target: bcm27xx
+            subtarget: bcm2710
+          - target: bcm27xx
+            subtarget: bcm2711
+          - target: ramips
+            subtarget: mt7621
+          - target: ramips
+            subtarget: mt76x8
+          - target: imx
+            subtarget: cortexa53
+    uses: openwrt/actions-shared-workflows/.github/workflows/reusable_build.yml@main
+    with:
+      container_name: toolchain
+      target: ${{ matrix.target }}
+      subtarget: ${{ matrix.subtarget }}
+      build_kernel: true
+      build_all_kmods: true
+      build_dtb: true
+      check_packages_list: ${{ needs.determine-changed-packages.outputs.changed_packages }}
+
+  check-kernel-patches:
+    name: Check supported kernel patches
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep aligned with the five board families in build-release.yml.
+        include:
+          - target: bcm27xx
+            subtarget: bcm2710
+          - target: bcm27xx
+            subtarget: bcm2711
+          - target: ramips
+            subtarget: mt7621
+          - target: ramips
+            subtarget: mt76x8
+          - target: imx
+            subtarget: cortexa53
+    uses: openwrt/actions-shared-workflows/.github/workflows/reusable_check-kernel-patches.yml@main
+    with:
+      target: ${{ matrix.target }}
+      subtarget: ${{ matrix.subtarget }}
