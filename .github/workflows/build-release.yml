@@ -1,4 +1,4 @@
-name: Build 1.8-eu Test Firmware
+name: Build 1.8-eu2 Test Firmware
 
 permissions:
   contents: read
@@ -14,7 +14,7 @@ jobs:
       board: halowlink2
       target: ramips
       subtarget: mt7621
-      description: '1.8-eu test: HaLowLink 2 MM8108 SDIO'
+      description: '1.8-eu2 test: HaLowLink 2 MM8108 SDIO'
       releasepackages: false
 
   build-ekh-bcm2711:
@@ -24,7 +24,7 @@ jobs:
       board: ekh-bcm2711
       target: bcm27xx
       subtarget: bcm2711
-      description: '1.8-eu test: Raspberry Pi 4 / CM4 MM8108 USB'
+      description: '1.8-eu2 test: Raspberry Pi 4 / CM4 MM8108 USB'
       releasepackages: false
 
   verify-images:
@@ -46,7 +46,7 @@ jobs:
         run: python3 scripts/eu-test/verify_images.py eu-artifacts eu-release
       - uses: actions/upload-artifact@v7
         with:
-          name: 1.8-eu-verified-release
+          name: 1.8-eu2-verified-release
           path: eu-release/*
           if-no-files-found: error
           retention-days: 14

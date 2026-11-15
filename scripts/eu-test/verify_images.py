@@ -110,6 +110,15 @@ def main():
     feed_line = next(line for line in pathlib.Path('feeds.conf.default').read_text().splitlines()
                      if line.startswith('src-git openmanet '))
     packages_sha = feed_line.rsplit('^', 1)[1]
+    luci_line = next(line for line in pathlib.Path('feeds.conf.default').read_text().splitlines()
+                     if line.startswith('src-git luci '))
+    luci_sha = luci_line.rsplit('^', 1)[1]
+    test_url = f'https://raw.githubusercontent.com/OpenMANET/luci/{luci_sha}/tests/test_s1g_mesh_channels.js'
+    with urllib.request.urlopen(test_url, timeout=60) as response:
+        widget_test = response.read()
+    js_runtime = shutil.which('node') or shutil.which('gjs')
+    if not js_runtime:
+        raise RuntimeError('Install node or gjs to verify the shipped channel widget')
     paths = {
         'lib/netifd/wireless/morse.sh': 'morse-micro/netifd-morse/lib/netifd/wireless/morse.sh',
         'etc/uci-defaults/99_morse_radio_defaults': 'boards/bsp-common/files/uci-defaults/99_morse_radio_defaults',
@@ -147,26 +156,34 @@ def main():
                 if 'country=US' not in modules:
                     raise RuntimeError(f'{image}: normal module country default was changed')
                 version = read_file(filesystem, offset, 'etc/openwrt_release').decode()
-                if '1.8-eu' not in version:
+                if '1.8-eu2' not in version:
                     raise RuntimeError(f'{image}: wrong version identity: {version}')
                 status = read_file(filesystem, offset, 'usr/lib/opkg/status').decode()
                 firmware = next((p for p in status.split('\n\n')
                                  if p.startswith('Package: mm8108-firmware\n')), '')
                 if 'Version: 2.2.3' not in firmware:
                     raise RuntimeError(f'{image}: MM8108 firmware is not 2.2.3')
+                # LuCI minifies this file during packaging. Exercise the actual
+                # shipped widget rather than checking unminified source text.
+                test_path = pathlib.Path(directory) / 'test_s1g_mesh_channels.js'
+                widget_path = pathlib.Path(directory) / 'widgets.js'
+                test_path.write_bytes(widget_test)
+                widget_path.write_bytes(read_file(filesystem, offset, 'www/luci-static/resources/tools/widgets.js'))
+                subprocess.run([js_runtime, str(test_path), str(widget_path)], check=True)
                 break
             else:
                 raise RuntimeError(f'{image}: no readable expected squashfs root')
         shutil.copy2(image, output / image.name)
         results.append({'image': image.name, 'sha256': checksum, 'contents_verified': True})
-        print(f'PASS {image.name}: normal US module default, pinned selectable-EU netifd/defaults, firmware 2.2.3, version 1.8-eu')
+        print(f'PASS {image.name}: EU mesh widget behavior, normal US module default, pinned selectable-EU netifd/defaults, firmware 2.2.3, version 1.8-eu2')
     (output / 'SHA256SUMS.txt').write_text(''.join(f"{r['sha256']}  {r['image']}\n" for r in results))
     verification_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     firmware_sha = args.build_commit or verification_sha
     (output / 'BUILD_INFO.json').write_text(json.dumps({
         'firmware_commit': firmware_sha, 'packages_commit': packages_sha,
         'verification_commit': verification_sha,
-        'release': '1.8-eu', 'images': results,
+        'luci_commit': luci_sha,
+        'release': '1.8-eu2', 'images': results,
         'defaults': 'standard boot defaults; select EU in normal LuCI wizard',
         'hardware_validation': 'EU initialization validated separately on CM4/MM8108 USB at 0 dBm; these images and EU 16 dBm operation have not been boot/RF tested',
     }, indent=2) + '\n')

@@ -44,7 +44,7 @@ jobs:
         run: python3 scripts/eu-test/verify_images.py eu-artifacts eu-release --build-commit "$BUILD_COMMIT"
       - uses: actions/upload-artifact@v7
         with:
-          name: 1.8-eu-verified-release
+          name: 1.8-eu2-verified-release
           path: eu-release/*
           if-no-files-found: error
           retention-days: 14
