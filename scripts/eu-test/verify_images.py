@@ -187,6 +187,7 @@ def main():
         'defaults': 'standard boot defaults; select EU in normal LuCI wizard',
         'hardware_validation': 'EU initialization validated separately on CM4/MM8108 USB at 0 dBm; these images and EU 16 dBm operation have not been boot/RF tested',
     }, indent=2) + '\n')
+    shutil.copy2(pathlib.Path(__file__).with_name('TESTING.md'), output / 'TESTING.md')
 
 
 if __name__ == '__main__':
