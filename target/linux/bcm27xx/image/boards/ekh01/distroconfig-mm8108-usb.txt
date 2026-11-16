@@ -13,6 +13,8 @@ dtoverlay=disable-bt
 dtparam=i2c1=on
 [pi4]
 dtparam=i2c1=on
+# Keep PL011 on native Bluetooth and route the header GPS to mini UART.
+dtoverlay=uart1
 [cm4]
 # This overlay is used to allow m.2 wifi cards
 dtoverlay=pcie-32bit-dma
@@ -33,8 +35,7 @@ gpu_mem_1024=128
 # enable uart
 enable_uart=1
 
-# enable uart5
-dtoverlay=uart5
+# Do not enable UART5: GPIO12 is the WM1302 GPS wake line.
 
 # disable SD activity LED by default
 #(we configure it for HaLow later in userspace)
