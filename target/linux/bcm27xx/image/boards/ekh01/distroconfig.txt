@@ -2,17 +2,26 @@
 # Bootloader configuration - distroconfig.txt
 ################################################################################
 
-# Restore PL011 (ttyAMA0) to GPIOs 14 & 15, instead of Mini UART (ttyS0).
-# Mini UART is disabled by default unless "enable_uart=1" is specified,
-#  which changes the core frequency to a fixed value and impacts performance.
-# See https://www.raspberrypi.com/documentation/computers/configuration.html#mini-uart-and-cpu-core-frequency
-[pi0w]
-dtoverlay=disable-bt
+# Keep native Bluetooth on PL011 and header GPS on the mini UART.
+# Select Bluetooth-capable BCM2710 boards explicitly: [pi3] also includes
+# CM3/CM3+, which have no onboard Bluetooth and keep their PL011 header UART.
+# Board types: Pi 3B, 3B+, 3A+, Zero 2 W (Raspberry Pi revision codes).
+[board-type=0x8]
+dtoverlay=uart1
+core_freq=250
+[board-type=0xd]
+dtoverlay=uart1
+core_freq=250
+[board-type=0xe]
+dtoverlay=uart1
+core_freq=250
+[board-type=0x12]
+dtoverlay=uart1
+core_freq=250
 [pi3]
-dtoverlay=disable-bt
 dtparam=i2c1=on
 [pi4]
-dtoverlay=miniuart-bt
+dtoverlay=uart1
 dtparam=i2c1=on
 [cm4]
 # This overlay is used to allow m.2 wifi cards
@@ -32,10 +41,9 @@ gpu_mem_512=128
 gpu_mem_1024=128
 
 # enable uart
-uart_enable=1
+enable_uart=1
 
-# enable uart5
-dtoverlay=uart5
+# Do not enable UART5: GPIO12 is the WM1302 GPS wake line.
 
 # disable SD activity LED by default
 #(we configure it for HaLow later in userspace)
