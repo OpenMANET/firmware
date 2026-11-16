@@ -1,0 +1,95 @@
+--- a/feeds/packages/utils/collectd/Makefile
++++ b/feeds/packages/utils/collectd/Makefile
+@@ -9,7 +9,7 @@
+ 
+ PKG_NAME:=collectd
+ PKG_VERSION:=5.12.0
+-PKG_RELEASE:=54
++PKG_RELEASE:=55
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
+ PKG_SOURCE_URL:=https://collectd.org/files/ \
+--- /dev/null
++++ b/feeds/packages/utils/collectd/patches/952-share-legacy-librrd-lock.patch
+@@ -0,0 +1,81 @@
++--- a/src/rrdtool.c
+++++ b/src/rrdtool.c
++@@ -103,10 +103,6 @@
++ static pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER;
++ static pthread_cond_t queue_cond = PTHREAD_COND_INITIALIZER;
++ 
++-#if !HAVE_THREADSAFE_LIBRRD
++-static pthread_mutex_t librrd_lock = PTHREAD_MUTEX_INITIALIZER;
++-#endif
++-
++ static int do_shutdown;
++ 
++ #if HAVE_THREADSAFE_LIBRRD
++@@ -148,17 +144,17 @@
++   memcpy(new_argv + 2, argv, argc * sizeof(char *));
++   new_argv[new_argc] = NULL;
++ 
++-  pthread_mutex_lock(&librrd_lock);
+++  pthread_mutex_lock(&cu_rrd_legacy_lock);
++   optind = 0; /* bug in librrd? */
++   rrd_clear_error();
++ 
++   status = rrd_update(new_argc, new_argv);
++-  pthread_mutex_unlock(&librrd_lock);
++ 
++   if (status != 0) {
++     WARNING("rrdtool plugin: rrd_update_r failed: %s: %s", filename,
++             rrd_get_error());
++   }
+++  pthread_mutex_unlock(&cu_rrd_legacy_lock);
++ 
++   sfree(new_argv);
++ 
++--- a/src/utils/rrdcreate/rrdcreate.c
+++++ b/src/utils/rrdcreate/rrdcreate.c
++@@ -57,8 +57,9 @@
++ static const char *const rra_types[] = {"AVERAGE", "MIN", "MAX"};
++ static int rra_types_num = STATIC_ARRAY_SIZE(rra_types);
++ 
++-#if !defined(HAVE_THREADSAFE_LIBRRD)
++-static pthread_mutex_t librrd_lock = PTHREAD_MUTEX_INITIALIZER;
+++#if !HAVE_THREADSAFE_LIBRRD
+++/* Legacy librrd shares getopt and error state across creates and updates. */
+++pthread_mutex_t cu_rrd_legacy_lock = PTHREAD_MUTEX_INITIALIZER;
++ #endif
++ 
++ static async_create_file_t *async_creation_list;
++@@ -383,17 +384,17 @@
++   memcpy(new_argv + 6, argv, argc * sizeof(char *));
++   new_argv[new_argc] = NULL;
++ 
++-  pthread_mutex_lock(&librrd_lock);
+++  pthread_mutex_lock(&cu_rrd_legacy_lock);
++   optind = 0; /* bug in librrd? */
++   rrd_clear_error();
++ 
++   status = rrd_create(new_argc, new_argv);
++-  pthread_mutex_unlock(&librrd_lock);
++ 
++   if (status != 0) {
++     P_WARNING("srrd_create: rrd_create (%s) failed: %s", filename,
++               rrd_get_error());
++   }
+++  pthread_mutex_unlock(&cu_rrd_legacy_lock);
++ 
++   sfree(new_argv);
++ 
++--- a/src/utils/rrdcreate/rrdcreate.h
+++++ b/src/utils/rrdcreate/rrdcreate.h
++@@ -30,6 +30,11 @@
++ #include "plugin.h"
++ 
++ #include <stddef.h>
+++#include <pthread.h>
+++
+++#if !HAVE_THREADSAFE_LIBRRD
+++extern pthread_mutex_t cu_rrd_legacy_lock;
+++#endif
++ 
++ struct rrdcreate_config_s {
++   unsigned long stepsize;
