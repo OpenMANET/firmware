@@ -1,0 +1,330 @@
+diff --git a/routing/batctl/Makefile b/routing/batctl/Makefile
+index 7491a35..1290e08 100644
+--- a/routing/batctl/Makefile
++++ b/routing/batctl/Makefile
+@@ -3,12 +3,12 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=batctl
+-PKG_VERSION:=2025.4
+-PKG_RELEASE:=2
++PKG_VERSION:=2026.4
++PKG_RELEASE:=1
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)
+-PKG_HASH:=566aa4fd74355e8d5dd2bd21c25e98cc068e77fd08e19f80b8e2b5edde7c8e65
++PKG_HASH:=a2daa501d306acf30621942289eb651a2f174f20e714f70359d29fb32baa2d33
+ PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(BUILD_VARIANT)/$(PKG_NAME)-$(PKG_VERSION)
+ 
+ PKG_MAINTAINER:=Simon Wunderlich <sw@simonwunderlich.de>
+diff --git a/routing/batman-adv/Makefile b/routing/batman-adv/Makefile
+index 88f6b2a..3b6a0af 100644
+--- a/routing/batman-adv/Makefile
++++ b/routing/batman-adv/Makefile
+@@ -3,12 +3,12 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=batman-adv
+-PKG_VERSION:=2025.4
+-PKG_RELEASE:=2
++PKG_VERSION:=2026.4
++PKG_RELEASE:=1
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://downloads.open-mesh.org/batman/releases/batman-adv-$(PKG_VERSION)
+-PKG_HASH:=62490a8f8b58c02e819216f3e963249984645d3e460156a043b73fc53e24f86d
++PKG_HASH:=022848e450e3ace29e7510eefc0f876e4f7c780bd52736ef2c80359e9e333a20
+ PKG_EXTMOD_SUBDIRS:=net/batman-adv
+ 
+ PKG_MAINTAINER:=Simon Wunderlich <sw@simonwunderlich.de>
+@@ -63,11 +63,7 @@ PKG_EXTRA_KCONFIG:= \
+ 	CONFIG_BATMAN_ADV_DAT=$(if $(CONFIG_BATMAN_ADV_DAT),y,n) \
+ 	CONFIG_BATMAN_ADV_MCAST=$(if $(CONFIG_BATMAN_ADV_MCAST),y,n) \
+ 	CONFIG_BATMAN_ADV_BATMAN_V=$(if $(CONFIG_BATMAN_ADV_BATMAN_V),y,n) \
+-	CONFIG_BATMAN_ADV_TRACING=$(if $(CONFIG_BATMAN_ADV_TRACING),y,n) \
+-
+-PKG_EXTRA_CFLAGS:= \
+-	$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=m,%,$(filter %=m,$(PKG_EXTRA_KCONFIG)))) \
+-	$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=y,%,$(filter %=y,$(PKG_EXTRA_KCONFIG)))) \
++	CONFIG_BATMAN_ADV_TRACING=$(if $(CONFIG_BATMAN_ADV_TRACING),y,n)
+ 
+ NOSTDINC_FLAGS = \
+ 	$(KERNEL_NOSTDINC_FLAGS) \
+@@ -76,18 +72,25 @@ NOSTDINC_FLAGS = \
+ 	-I$(STAGING_DIR)/usr/include/mac80211-backport/uapi \
+ 	-I$(STAGING_DIR)/usr/include/mac80211 \
+ 	-I$(STAGING_DIR)/usr/include/mac80211/uapi \
++	-I$(PKG_BUILD_DIR)/compat-include/ \
+ 	-I$(PKG_BUILD_DIR)/include/ \
+ 	-include backport/autoconf.h \
+ 	-include backport/backport.h \
+-	-include $(PKG_BUILD_DIR)/compat-hacks.h \
++	-include $(PKG_BUILD_DIR)/compat.h \
+ 	-DBATADV_SOURCE_VERSION=\\\"$(PKG_VERSION)-openwrt-$(PKG_RELEASE)\\\"
+ 
++define Build/Prepare
++	$(call Build/Prepare/Default)
++	# The mac80211 backport already provides the LINUX_VERSION_IS_* macros.
++	$(RM) $(PKG_BUILD_DIR)/compat-include/linux/version.h
++endef
++
+ define Build/Compile
++	$(PKG_EXTRA_KCONFIG) $(PKG_BUILD_DIR)/gen-compat-autoconf.sh $(PKG_BUILD_DIR)/compat-autoconf.h
+ 	$(MAKE) $(PKG_JOBS) -C "$(LINUX_DIR)" \
+ 		$(KERNEL_MAKE_FLAGS) \
+ 		M="$(PKG_BUILD_DIR)/net/batman-adv" \
+ 		$(PKG_EXTRA_KCONFIG) \
+-		EXTRA_CFLAGS="$(PKG_EXTRA_CFLAGS)" \
+ 		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
+ 		modules
+ endef
+diff --git a/routing/batman-adv/patches/0001-fix-batadv_is_cfg80211_netdev.patch b/routing/batman-adv/patches/0001-fix-batadv_is_cfg80211_netdev.patch
+index 63227e0..3f3ef41 100644
+--- a/routing/batman-adv/patches/0001-fix-batadv_is_cfg80211_netdev.patch
++++ b/routing/batman-adv/patches/0001-fix-batadv_is_cfg80211_netdev.patch
+@@ -7,7 +7,7 @@ macro to use when building under backports.
+ 
+ --- a/net/batman-adv/hard-interface.c
+ +++ b/net/batman-adv/hard-interface.c
+-@@ -309,8 +309,7 @@ static bool batadv_is_cfg80211_netdev(st
++@@ -332,8 +332,7 @@ static bool batadv_is_cfg80211_netdev(st
+  {
+  	if (!net_device)
+  		return false;
+diff --git a/routing/batman-adv/patches/0002-Revert-batman-adv-Switch-to-linux-array_size.h.patch b/routing/batman-adv/patches/0002-Revert-batman-adv-Switch-to-linux-array_size.h.patch
+deleted file mode 100644
+index cbc4042..0000000
+--- a/routing/batman-adv/patches/0002-Revert-batman-adv-Switch-to-linux-array_size.h.patch
++++ /dev/null
+@@ -1,69 +0,0 @@
+-From: Sven Eckelmann <sven@narfation.org>
+-Date: Fri, 2 Feb 2024 22:49:48 +0100
+-Subject: Revert "batman-adv: Switch to linux/array_size.h"
+-
+-The original patch requires Linux 6.7.0 or a mac80211 compat header with this
+-name. But the mac80211 package is currently not providing this header and
+-OpenWrt main is still using older Linux kernel versions for some targets.
+-
+-This reverts commit f33d7f724675544a36b24c77f8d4b95d41252ae2.
+-
+---- a/compat-include/linux/array_size.h
+-+++ /dev/null
+-@@ -1,20 +0,0 @@
+--/* SPDX-License-Identifier: GPL-2.0 */
+--/* Copyright (C) B.A.T.M.A.N. contributors:
+-- *
+-- * Marek Lindner, Simon Wunderlich
+-- *
+-- * This file contains macros for maintaining compatibility with older versions
+-- * of the Linux kernel.
+-- */
+--
+--#ifndef _NET_BATMAN_ADV_COMPAT_LINUX_ARRAY_SIZE_H_
+--#define _NET_BATMAN_ADV_COMPAT_LINUX_ARRAY_SIZE_H_
+--
+--#include <linux/version.h>
+--#if LINUX_VERSION_IS_GEQ(6, 7, 0)
+--#include_next <linux/array_size.h>
+--#else
+--#include <linux/kernel.h>
+--#endif
+--
+--#endif /* _NET_BATMAN_ADV_COMPAT_LINUX_ARRAY_SIZE_H_ */
+---- a/net/batman-adv/main.c
+-+++ b/net/batman-adv/main.c
+-@@ -6,7 +6,6 @@
+- 
+- #include "main.h"
+- 
+--#include <linux/array_size.h>
+- #include <linux/atomic.h>
+- #include <linux/build_bug.h>
+- #include <linux/byteorder/generic.h>
+-@@ -19,6 +18,7 @@
+- #include <linux/init.h>
+- #include <linux/ip.h>
+- #include <linux/ipv6.h>
+-+#include <linux/kernel.h>
+- #include <linux/kobject.h>
+- #include <linux/kref.h>
+- #include <linux/list.h>
+---- a/net/batman-adv/netlink.c
+-+++ b/net/batman-adv/netlink.c
+-@@ -7,7 +7,6 @@
+- #include "netlink.h"
+- #include "main.h"
+- 
+--#include <linux/array_size.h>
+- #include <linux/atomic.h>
+- #include <linux/bitops.h>
+- #include <linux/bug.h>
+-@@ -19,6 +18,7 @@
+- #include <linux/if_ether.h>
+- #include <linux/if_vlan.h>
+- #include <linux/init.h>
+-+#include <linux/kernel.h>
+- #include <linux/limits.h>
+- #include <linux/minmax.h>
+- #include <linux/netdevice.h>
+diff --git a/routing/batman-adv/patches/0002-keep-module-version.patch b/routing/batman-adv/patches/0002-keep-module-version.patch
+new file mode 100644
+index 0000000..66237dc
+--- /dev/null
++++ b/routing/batman-adv/patches/0002-keep-module-version.patch
+@@ -0,0 +1,14 @@
++batman-adv: retain the version on OpenWrt with stripped modules
++
++batctl -v reads the loaded module's version from sysfs. OpenWrt's
++CONFIG_MODULE_STRIPPED drops MODULE_VERSION. Keep this one metadata field
++so the upgraded package reports its version just like the previous one.
++
++--- a/net/batman-adv/version.c
+++++ b/net/batman-adv/version.c
++@@ -25,4 +25,4 @@ struct new_utsname batadv_version_name =
++  * interface. It should be kept until it is unlikely that there are active
++  * installations of these "broken" versions of these tools with recent kernels.
++  */
++-MODULE_VERSION(UTS_RELEASE);
+++MODULE_INFO(version, UTS_RELEASE);
+diff --git a/routing/batman-adv/patches/0003-Revert-batman-adv-move-asm-unaligned.h-to-linux-unal.patch b/routing/batman-adv/patches/0003-Revert-batman-adv-move-asm-unaligned.h-to-linux-unal.patch
+deleted file mode 100644
+index 1c500c7..0000000
+--- a/routing/batman-adv/patches/0003-Revert-batman-adv-move-asm-unaligned.h-to-linux-unal.patch
++++ /dev/null
+@@ -1,49 +0,0 @@
+-From: Sven Eckelmann <sven@narfation.org>
+-Date: Tue, 10 Dec 2024 22:31:33 +0100
+-Subject: Revert "batman-adv: move asm/unaligned.h to linux/unaligned.h"
+-
+-This header is only available with Linux 6.12
+-
+-This reverts commit ee60832ebec47a023d634b06f9434103ec090aed.
+-
+---- a/compat-include/linux/unaligned.h
+-+++ /dev/null
+-@@ -1,20 +0,0 @@
+--/* SPDX-License-Identifier: GPL-2.0 */
+--/* Copyright (C) B.A.T.M.A.N. contributors:
+-- *
+-- * Marek Lindner, Simon Wunderlich
+-- *
+-- * This file contains macros for maintaining compatibility with older versions
+-- * of the Linux kernel.
+-- */
+--
+--#ifndef _NET_BATMAN_ADV_COMPAT_LINUX_UNALIGNED_H_
+--#define _NET_BATMAN_ADV_COMPAT_LINUX_UNALIGNED_H_
+--
+--#include <linux/version.h>
+--#if LINUX_VERSION_IS_GEQ(6, 12, 0)
+--#include_next <linux/unaligned.h>
+--#else
+--#include <asm/unaligned.h>
+--#endif
+--
+--#endif /* _NET_BATMAN_ADV_COMPAT_LINUX_UNALIGNED_H_ */
+---- a/net/batman-adv/distributed-arp-table.c
+-+++ b/net/batman-adv/distributed-arp-table.c
+-@@ -7,6 +7,7 @@
+- #include "distributed-arp-table.h"
+- #include "main.h"
+- 
+-+#include <asm/unaligned.h>
+- #include <linux/atomic.h>
+- #include <linux/bitops.h>
+- #include <linux/byteorder/generic.h>
+-@@ -32,7 +33,6 @@
+- #include <linux/stddef.h>
+- #include <linux/string.h>
+- #include <linux/udp.h>
+--#include <linux/unaligned.h>
+- #include <linux/workqueue.h>
+- #include <net/arp.h>
+- #include <net/genetlink.h>
+diff --git a/routing/batman-adv/patches/0004-batman-adv-Avoid-double-rtnl_lock-ELP-metric-worker.patch b/routing/batman-adv/patches/0004-batman-adv-Avoid-double-rtnl_lock-ELP-metric-worker.patch
+deleted file mode 100644
+index 0f9fc97..0000000
+--- a/routing/batman-adv/patches/0004-batman-adv-Avoid-double-rtnl_lock-ELP-metric-worker.patch
++++ /dev/null
+@@ -1,80 +0,0 @@
+-From: Sven Eckelmann <sven@narfation.org>
+-Subject: batman-adv: Avoid double-rtnl_lock ELP metric worker
+-
+-Backport upstream commit cfc83a3c71517b59c1047db57da31e26a9dc2f33.
+-The wireless ELP metric worker must use rtnl_trylock because interface
+-removal holds RTNL while synchronously cancelling that worker.
+-
+-diff --git a/net/batman-adv/bat_v_elp.c b/net/batman-adv/bat_v_elp.c
+-index cb16c1e..fe83209 100644
+---- a/net/batman-adv/bat_v_elp.c
+-+++ b/net/batman-adv/bat_v_elp.c
+-@@ -111,7 +111,15 @@ static bool batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh,
+- 			/* unsupported WiFi driver version */
+- 			goto default_throughput;
+- 
+--		real_netdev = batadv_get_real_netdev(hard_iface->net_dev);
+-+		/* only use rtnl_trylock because the elp worker will be cancelled while
+-+		 * the rntl_lock is held. the cancel_delayed_work_sync() would otherwise
+-+		 * wait forever when the elp work_item was started and it is then also
+-+		 * trying to rtnl_lock
+-+		 */
+-+		if (!rtnl_trylock())
+-+			return false;
+-+		real_netdev = __batadv_get_real_netdev(hard_iface->net_dev);
+-+		rtnl_unlock();
+- 		if (!real_netdev)
+- 			goto default_throughput;
+- 
+-diff --git a/net/batman-adv/hard-interface.c b/net/batman-adv/hard-interface.c
+-index 5113f87..1c48804 100644
+---- a/net/batman-adv/hard-interface.c
+-+++ b/net/batman-adv/hard-interface.c
+-@@ -204,7 +204,7 @@ static bool batadv_is_valid_iface(const struct net_device *net_dev)
+- }
+- 
+- /**
+-- * batadv_get_real_netdevice() - check if the given netdev struct is a virtual
+-+ * __batadv_get_real_netdev() - check if the given netdev struct is a virtual
+-  *  interface on top of another 'real' interface
+-  * @netdev: the device to check
+-  *
+-@@ -214,7 +214,7 @@ static bool batadv_is_valid_iface(const struct net_device *net_dev)
+-  * Return: the 'real' net device or the original net device and NULL in case
+-  *  of an error.
+-  */
+--static struct net_device *batadv_get_real_netdevice(struct net_device *netdev)
+-+struct net_device *__batadv_get_real_netdev(struct net_device *netdev)
+- {
+- 	struct batadv_hard_iface *hard_iface = NULL;
+- 	struct net_device *real_netdev = NULL;
+-@@ -267,7 +267,7 @@ struct net_device *batadv_get_real_netdev(struct net_device *net_device)
+- 	struct net_device *real_netdev;
+- 
+- 	rtnl_lock();
+--	real_netdev = batadv_get_real_netdevice(net_device);
+-+	real_netdev = __batadv_get_real_netdev(net_device);
+- 	rtnl_unlock();
+- 
+- 	return real_netdev;
+-@@ -336,7 +336,7 @@ static u32 batadv_wifi_flags_evaluate(struct net_device *net_device)
+- 	if (batadv_is_cfg80211_netdev(net_device))
+- 		wifi_flags |= BATADV_HARDIF_WIFI_CFG80211_DIRECT;
+- 
+--	real_netdev = batadv_get_real_netdevice(net_device);
+-+	real_netdev = __batadv_get_real_netdev(net_device);
+- 	if (!real_netdev)
+- 		return wifi_flags;
+- 
+-diff --git a/net/batman-adv/hard-interface.h b/net/batman-adv/hard-interface.h
+-index 9db8a31..9ba8fb2 100644
+---- a/net/batman-adv/hard-interface.h
+-+++ b/net/batman-adv/hard-interface.h
+-@@ -67,6 +67,7 @@ enum batadv_hard_if_bcast {
+- 
+- extern struct notifier_block batadv_hard_if_notifier;
+- 
+-+struct net_device *__batadv_get_real_netdev(struct net_device *net_device);
+- struct net_device *batadv_get_real_netdev(struct net_device *net_device);
+- bool batadv_is_cfg80211_hardif(struct batadv_hard_iface *hard_iface);
+- bool batadv_is_wifi_hardif(struct batadv_hard_iface *hard_iface);

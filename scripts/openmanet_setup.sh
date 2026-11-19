@@ -121,6 +121,18 @@ download_toolchain(){
     fi
 }
 
+patch_openmanet_feed(){
+    local patch_file
+
+    for patch_file in "$PWD"/patches/common/*.patch; do
+        [ -e "$patch_file" ] || continue
+        if git -C feeds/openmanet apply --reverse --check "$patch_file" 2>/dev/null; then
+            continue
+        fi
+        git -C feeds/openmanet apply "$patch_file"
+    done
+}
+
 patch_feeds_packages(){
     local BOARD_ARG="${1:-}"
 
@@ -220,6 +232,7 @@ if [ "${INITIALIZE}" ]; then
     ./scripts/feeds uninstall -a
     ./scripts/feeds update -a
     #patch packages if necessary and re-create index files
+    patch_openmanet_feed
     patch_feeds_packages "${BOARD:-}"
     ./scripts/feeds update -i
     ./scripts/feeds install -p openmanet -a
