@@ -1,0 +1,57 @@
+diff --git a/morse-micro/mm8108-driver/Makefile b/morse-micro/mm8108-driver/Makefile
+index 21bd2f5..64655df 100644
+--- a/morse-micro/mm8108-driver/Makefile
++++ b/morse-micro/mm8108-driver/Makefile
+@@ -7,7 +7,7 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=mm8108-driver
+-PKG_RELEASE:=2
++PKG_RELEASE:=3
+ 
+ PKG_VERSION:=2.2.3
+ PKG_LICENSE:=GPLv2
+diff --git a/morse-micro/mm8108-driver/patches/045-reset-running-mm8108b2-on-usb-probe.patch b/morse-micro/mm8108-driver/patches/045-reset-running-mm8108b2-on-usb-probe.patch
+new file mode 100644
+index 0000000..f888d53
+--- /dev/null
++++ b/morse-micro/mm8108-driver/patches/045-reset-running-mm8108b2-on-usb-probe.patch
+@@ -0,0 +1,38 @@
++--- a/mm81xx.c
+++++ b/mm81xx.c
++@@ -699,7 +699,23 @@
++ 
++ 	if (mors->bus_type == MORSE_HOST_BUS_TYPE_USB) {
++ #ifdef CONFIG_MORSE_USB
++-		ret = morse_usb_ndr_reset(mors);
+++		/* Running firmware publishes its memory-access state. Replacing its
+++		 * instruction RAM after a USB NDR can stop the transport mid-upload.
+++		 * A digital reset disconnects the device; upload on the fresh probe.
+++		 */
+++		if (mors->chip_id == MM8108B2_ID && mors->hw_state == MORSE_HW_STATE_OFF &&
+++		    !morse_test_mode_enabled(test_mode) &&
+++		    (mors->mem_access.restriction_is_overridden ||
+++		     mors->mem_access.restriction_is_enforced)) {
+++			ret = morse_reg32_write(mors, MORSE_REG_RESET(mors),
+++						MORSE_REG_RESET_VALUE(mors));
+++			if (!ret) {
+++				dev_info(mors->dev, "Reset running MM8108 before USB firmware reload\n");
+++				ret = -ENODEV;
+++			}
+++		} else {
+++			ret = morse_usb_ndr_reset(mors);
+++		}
++ #endif
++ 		goto usb_reset;
++ 	}
++--- a/firmware.c
+++++ b/firmware.c
++@@ -1374,7 +1374,7 @@
++ 
++ 	while (retries--) {
++ 		ret = morse_firmware_init_try(mors, fw, bcf, &init_params);
++-		if (ret == 0)
+++		if (ret == 0 || ret == -ENODEV)
++ 			break;
++ 	}
++ 
