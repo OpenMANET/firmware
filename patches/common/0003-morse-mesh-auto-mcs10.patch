@@ -1,0 +1,75 @@
+diff --git a/morse-micro/netifd-morse/Makefile b/morse-micro/netifd-morse/Makefile
+index 8fed5c1..93098f1 100644
+--- a/morse-micro/netifd-morse/Makefile
++++ b/morse-micro/netifd-morse/Makefile
+@@ -8,7 +8,7 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=netifd-morse
+-PKG_RELEASE=3
++PKG_RELEASE=4
+ 
+ PKG_LICENSE:=GPLv2
+ PKG_LICENSE_FILES:=
+diff --git a/morse-micro/netifd-morse/lib/netifd/wireless/morse.sh b/morse-micro/netifd-morse/lib/netifd/wireless/morse.sh
+index b2d5738..1746037 100755
+--- a/morse-micro/netifd-morse/lib/netifd/wireless/morse.sh
++++ b/morse-micro/netifd-morse/lib/netifd/wireless/morse.sh
+@@ -16,8 +16,8 @@ MM_MOD_INT="watchdog_interval_secs max_rates max_rate_tries spi_clock_speed max_
+ 			default_cmd_timeout_ms sdio_reset_time tx_max_power_mbm max_mc_frames duty_cycle_mode ocs_type fixed_mcs fixed_bw
+ 			fixed_ss fixed_guard tx_status_lifetime_ms max_total_vendor_ie_bytes coredump_include coredump_method
+ 			hw_reload_after_stop slow_clock_mode rsn_beacon_mode hw_scan_prim_deconstruct duty_cycle_probe_retry_threshold
+-			spi_inter_block_delay_bytes tx_queued_lifetime_ms"
+-MM_MOD_BOOL="enable_mac80211_connection_monitor mcs10_mode enable_rts_8mhz
++			spi_inter_block_delay_bytes tx_queued_lifetime_ms mcs10_mode"
++MM_MOD_BOOL="enable_mac80211_connection_monitor enable_rts_8mhz
+ 			enable_otp_check enable_survey enable_subbands enable_ps enable_trav_pilot enable_watchdog_reset
+ 			enable_watchdog no_hwcrypt enable_raw enable_arp_offload enable_dynamic_ps_offload
+ 			enable_coredump enable_mbssid_ie enable_trav_pilot enable_cts_to_self enable_airtime_fairness
+@@ -67,8 +67,8 @@ check_cac(){
+ 	json_select ..
+ }
+ 
+-check_powersave_iface() {
+-	local disabled powersave
++check_iface_settings() {
++	local disabled powersave mode
+ 
+ 	json_select config
+ 	json_get_var disabled disabled
+@@ -79,6 +79,10 @@ check_powersave_iface() {
+ 	fi
+ 
+ 	num_iface=$((num_iface + 1))
++	json_get_var mode mode
++	if [ "$mode" = mesh ]; then
++		has_mesh_iface=1
++	fi
+ 
+ 	json_get_var powersave powersave
+ 	if [ "$powersave" = "1" ]; then
+@@ -129,8 +133,10 @@ get_vfem_4v3_bcf() {
+ }
+ 
+ build_mod_params() {
++	local has_mesh_iface=0 configured_mcs10_mode
+ 	json_select config
+ 	json_get_vars bcf vfem_4v3 firmware_type chan_test_mode
++	json_get_var configured_mcs10_mode mcs10_mode
+ 
+ 	if [ -z "$bcf" ]; then
+ 		mm_sku=$(persistent_vars_storage.sh READ mm_sku 2> /dev/null | tr 'A-Z-' 'a-z_')
+@@ -210,7 +216,12 @@ build_mod_params() {
+ 
+ 	num_iface=0
+ 	ps_requested_by_iface=0
+-	for_each_interface "ap sta adhoc mesh none monitor" check_powersave_iface
++	for_each_interface "ap sta adhoc mesh none monitor" check_iface_settings
++
++	# Add the 1 MHz MCS10 retry on mesh radios unless explicitly configured.
++	if [ "$has_mesh_iface" = 1 ] && [ -z "$configured_mcs10_mode" ]; then
++		MOD_PARAMS="$MOD_PARAMS mcs10_mode=2"
++	fi
+ 
+ 	# APP-4887: Keep powersave disabled by default on USB-based Morse devices to ensure the LED remains functional.
+ 	is_usb=0
